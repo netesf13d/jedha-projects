@@ -36,7 +36,16 @@
 ehthumbs.db
 Thumbs.db
 
-# Backup checkpoints #
+# Backups and caches #
 ######################
 .~*
-.ipynb_checkpoints
+.ipynb_checkpoints/
+__pycache__/
+
+# API keys #
+############
+*.key
+
+# specific dirs #
+#################
+pgdb/
