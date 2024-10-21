@@ -46,6 +46,8 @@ __pycache__/
 ############
 *.key
 
-# specific dirs #
-#################
+# specific files #
+##################
+*.json
 pgdb/
+_.*/
