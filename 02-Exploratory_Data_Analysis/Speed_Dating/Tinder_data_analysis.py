@@ -86,9 +86,9 @@ plt.show()
 
 #%%
 
-'sports', 'tvsports', 'exercise', 'dining',
+['sports', 'tvsports', 'exercise', 'dining',
 'museums', 'art', 'hiking', 'gaming', 'clubbing', 'reading', 'tv',
-'theater', 'movies', 'concerts', 'music', 'shopping', 'yoga'
+'theater', 'movies', 'concerts', 'music', 'shopping', 'yoga']
 
 
 
