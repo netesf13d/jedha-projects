@@ -4,6 +4,7 @@
 
 """
 
+import csv
 from itertools import product
 from datetime import datetime
 
@@ -419,4 +420,65 @@ for both new (left panel) and recurring (right panel) visitors.
 - In both conditions, there is a small linear dependence of the inflection point with age, with a lower inflection point for younger visitors.
 """
 
+#%%
+
+from sklearn.model_selection import train_test_split
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, confusion_matrix
+
+
+## Data to fit
+Y = df.loc[:, 'converted']
+X = df.loc[:, ['age', 'total_pages_visited']]
+
+## split
+X_tr, X_val, Y_tr, Y_val = train_test_split(X, Y, test_size=0.1, stratify=Y)
+
+
+##### training pipeline #####
+## preprocess
+featureencoder = StandardScaler()
+X_tr = featureencoder.fit_transform(X_tr)
+
+## train
+classifier = LogisticRegression() # 
+classifier.fit(X_tr, Y_tr)
+
+## train set predicitions
+Y_tr_pred = classifier.predict(X_tr)
+
+
+
+##### performance assessment #####
+## prprocess
+X_val = featureencoder.transform(X_val)
+
+## make predicitions
+Y_val_pred = classifier.predict(X_val)
+
+
+#%%
+## metrics
+print(f'Train set F1-score: {f1_score(Y_tr, Y_tr_pred)}')
+print(f'Test set F1-score: {f1_score(Y_val, Y_val_pred)}')
+print("Train set confusion matrix\n",
+      confusion_matrix(Y_tr, Y_tr_pred, normalize='all'))
+print("Test set confusion matrix\n",
+      confusion_matrix(Y_val, Y_val_pred, normalize='all'))
+
+
+##### testing pipeline #####
+test_df = pd.read_csv('./conversion_data_test.csv')
+X_test = test_df.loc[:, ['age', 'total_pages_visited']]
+
+X_test = featureencoder.transform(X_test)
+Y_test_pred = classifier.predict(X_test)
+
+
+
+fname = 'conversion_data_test_predictions_EXAMPLE.csv'
+np.savetxt(fname, Y_test_pred, fmt='%d', header='converted', comments='')
 
