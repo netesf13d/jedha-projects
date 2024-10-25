@@ -44,11 +44,8 @@ df.groupby(['country', 'converted']).count()['age'] # the name 'age' is irreleva
 df.groupby(['source', 'converted']).count()['age']
 
 df1 = df.groupby(['new_user', 'source', 'country']).mean()['converted']
-
-
 countries = ['China', 'Germany', 'UK', 'US']
 sources = ['Ads', 'Direct', 'Seo']
-
 
 # new user
 new_pconv = np.empty((len(sources), len(countries)), dtype=float)
@@ -170,7 +167,7 @@ fig2, axs2 = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
 axs2[0].plot(ages, age_data['counts_new'], color='tab:blue',
              linewidth=1, label='new visitors')
 axs2[0].plot(ages, age_data['counts_rec'], color='tab:orange',
-             linewidth=1, label='recurrent visitors')
+             linewidth=1, label='recur. visitors')
 axs2[0].axvline(17, color='k', linewidth=1, linestyle='--')
 axs2[0].text(11, 8500, '17 yo\ncutoff', ha='center', va='center')
 axs2[0].set_xlim(0, 80)
@@ -187,7 +184,7 @@ axs2[1].plot(ages, decay_exp(ages, *popt_new),
              linewidth=1, color='tab:blue', label='exp decay fit')
 axs2[1].errorbar(ages, age_data['pconv_rec'], yerr=age_data['std_pconv_rec'],
                  color='tab:orange', fmt='o', markersize=3, markeredgewidth=0.3,
-                 label='recurrent visitors')
+                 label='recur. visitors')
 axs2[1].plot(ages, decay_exp(ages, *popt_rec),
              linewidth=1, color='tab:orange', label='exp decay fit')
 axs2[1].axvline(17, color='k', linewidth=1, linestyle='--')
@@ -214,7 +211,7 @@ plt.show()
 """
 Here we show the distribution of ages (left panel) and the conversion probability (right panel)
 aggregated by `'source'` and `'country'`, but distinguishing new and recurrent visitors.
-- The distribution of ages is the same for the two categories: a gaussian with a cutoff at 17 years old,
+- The distribution of ages is the same for the two categories: a truncated gaussian with a cutoff at 17 years old,
   centered at around 28 years old. The probability of having a new visitor is roughly twice that of a recurrent visitor.
 - The newsletter subscription probability decays with age. The observed decay fits well with an exponential
   from which we recover very similar decay constants of about 14 years. The multiplicative factor is 5-6 times higher
@@ -240,3 +237,107 @@ page_data = {
     'std_pconv_new': np.zeros(30, dtype=float),
 }
 
+# new users
+inew = df['new_user'] == 1
+for i, c in df.loc[inew, 'total_pages_visited'].value_counts().items():
+    page_data['counts_new'][i] = c
+for i, p in df.loc[inew, ['total_pages_visited', 'converted']].groupby('total_pages_visited').mean()['converted'].items():
+    page_data['pconv_new'][i] = p
+    page_data['std_pconv_new'][i] = p*(1-p) / np.sqrt(page_data['counts_new'][i])
+# recurrent users
+irec = df['new_user'] == 0
+for i, c in df.loc[irec, 'total_pages_visited'].value_counts().items():
+    page_data['counts_rec'][i] = c
+for i, p in df.loc[irec, ['total_pages_visited', 'converted']].groupby('total_pages_visited').mean()['converted'].items():
+    page_data['pconv_rec'][i] = p
+    page_data['std_pconv_rec'][i] = p*(1-p) / np.sqrt(page_data['counts_rec'][i])
+
+
+## Your beloved sigmoid fit
+def sigmoid(x: np.ndarray,
+            x0: float,
+            a: float)-> np.ndarray:
+    """
+    Exponential decay: f(x) = 1 / (1 + exp(- a * (x - x0)))
+    """
+    return 1 / (1 + np.exp(- a * (x - x0)))
+
+
+x = npages
+# new visitors
+y_new = page_data['pconv_new']
+yerr_new = page_data['std_pconv_new']
+popt_new, pcov_new = curve_fit(sigmoid, x, y_new, p0=(15, 1),
+                               sigma=np.where(yerr_new==0., 1., yerr_new))
+# recurring visitors
+y_rec = page_data['pconv_rec']
+yerr_rec = page_data['std_pconv_rec']
+popt_rec, pcov_rec = curve_fit(sigmoid, x, y_rec, p0=(15, 1),
+                               sigma=np.where(yerr_rec==0., 1., yerr_rec))
+
+
+## plot
+fig3, axs3 = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
+
+axs3[0].plot(npages, page_data['counts_new'], color='tab:blue',
+             linewidth=1, label='new visitors')
+axs3[0].plot(npages, page_data['counts_rec'], color='tab:orange',
+             linewidth=1, label='recur. visitors')
+axs3[0].axvline(13, color='k', linewidth=1, linestyle='--')
+# axs3[0].text(11, 8500, '17 yo\ncutoff', ha='center', va='center')
+axs3[0].set_xlim(0, 30)
+axs3[0].set_ylim(-200, 30000)
+axs3[0].set_title("Ages distribution")
+axs3[0].set_xlabel('# pages visited')
+axs3[0].set_ylabel('Counts')
+axs3[0].legend()
+
+axs3[1].errorbar(npages, page_data['pconv_new'], yerr=page_data['std_pconv_new'],
+                 color='tab:blue', fmt='o', markersize=3, markeredgewidth=0.3,
+                 label='new visitors')
+axs3[1].plot(npages, sigmoid(npages, *popt_new),
+              linewidth=1, color='tab:blue', label='sigmoid fit')
+axs3[1].errorbar(npages, page_data['pconv_rec'], yerr=page_data['std_pconv_rec'],
+                 color='tab:orange', fmt='o', markersize=3, markeredgewidth=0.3,
+                 label='recur. visitors')
+axs3[1].plot(npages, sigmoid(npages, *popt_rec),
+             linewidth=1, color='tab:orange', label='sigmoid fit')
+axs3[1].axvline(13, color='k', linewidth=1, linestyle='--')
+
+new_popt_txt = (f'x0 = {popt_new[0]:.3} +- {pcov_new[0, 0]:.2}\n'
+                f'a = {popt_new[1]:.3} +- {pcov_new[1, 1]:.2}\n')
+axs3[1].text(23, 0.8, new_popt_txt, ha='center', va='center', fontsize=7)
+
+rec_popt_txt = (f'x0 = {popt_rec[0]:.3} +- {pcov_rec[0, 0]:.2}\n'
+                f'a = {popt_rec[1]:.3} +- {pcov_rec[1, 1]:.2}\n')
+axs3[1].text(7, 0.7, rec_popt_txt, ha='center', va='center', fontsize=7)
+
+axs3[1].set_xlim(0, 30)
+axs3[1].set_ylim(-0.005, 1.005)
+# axs3[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], [0, 5, 10, 15, 20])
+# axs3[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], minor=True)
+axs3[1].set_title("Conversion probability distribution")
+axs3[1].set_xlabel('# pages visited')
+axs3[1].set_ylabel('Conversion probability')
+axs3[1].legend()
+
+plt.show()
+
+
+"""
+Here we show the distribution of number of pages visited (left panel) and the corresponding conversion probability (right panel)
+built the same way as in the previous figure.
+- Although we still have a factor ~2 between the total counts, we remark that website visits with more than 13 pages visited are
+  mostly done by recurrent visitors. Accounting for the factor 2, this makes it more than twice likely that a > 13 pages visit
+  is done by a recurrent visitor.
+- The two distributions are thus not proportional. They actually look like
+  [inverse-gamma distributions](https://en.wikipedia.org/wiki/Inverse-gamma_distribution).
+- The newsletter subscription probability looks like a sigmoid for both new and recurring visitors. The inflection points are shifted,
+  and looking at the 13 pages-visits threshold, we see that here the conversion probability is thrice for recurring users than for new users.
+- Sigmoid fits with the slope and inflection point as parameters is also shown on the right panel. The slopes are roughly the same,
+  the difference being the inflection point: 12.5 pages for recurring visitors vs 15 pages for new visitors.
+- Finally, we note two outlier events on the right panel. ~30 pages visits with no subscription. We might consider removing these observations
+  for training later on.
+
+We again stress that such regularity is unlikely in any realistic context.
+"""
