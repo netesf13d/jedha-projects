@@ -12,6 +12,8 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+# from matplotlib.colors import Colormap, LightSource
+# from matplotlib.collections import PolyCollection
 
 
 
@@ -228,6 +230,7 @@ These patterns are extremely regular and again reveal the artificial nature of t
 We proceed in a similar fashion this time with the quantity `'total_pages_visited'`
 """
 npages = np.arange(30)
+
 page_data = {
     'counts_rec': np.zeros(30, dtype=int),
     'counts_new': np.zeros(30, dtype=int),
@@ -341,3 +344,79 @@ built the same way as in the previous figure.
 
 We again stress that such regularity is unlikely in any realistic context.
 """
+
+
+#%% 
+
+### Combined effect of age and number of pages visited
+pconv_new = np.zeros((80, 30), dtype=float)
+std_pconv_new = np.zeros((80, 30), dtype=float)
+pconv_rec = np.zeros((80, 30), dtype=float)
+std_pconv_rec = np.zeros((80, 30), dtype=float)
+
+# it's getting quite complex uh ?
+# new users
+pconv_new_counts_df = df.loc[inew, ['age', 'total_pages_visited']].value_counts()
+pconv_new_df = df.loc[inew, ['age', 'total_pages_visited', 'converted']] \
+                 .groupby(['age', 'total_pages_visited']) \
+                 .mean()['converted']
+for (i, j), p in pconv_new_df.items():
+    pconv_new[i, j] = p
+for (i, j), c in pconv_new_counts_df.items():
+    std_pconv_new[i, j] = pconv_new[i, j] / np.sqrt(c)
+# recurrent visitors
+pconv_rec_counts_df = df.loc[irec, ['age', 'total_pages_visited']].value_counts()
+pconv_rec_df = df.loc[irec, ['age', 'total_pages_visited', 'converted']] \
+                 .groupby(['age', 'total_pages_visited']) \
+                 .mean()['converted']
+for (i, j), p in pconv_rec_df.items():
+    pconv_rec[i, j] = p
+for (i, j), c in pconv_rec_counts_df.items():
+    std_pconv_rec[i, j] = pconv_rec[i, j] / np.sqrt(c)
+
+
+x, y = np.meshgrid(npages[:25], ages[17:46])
+
+fig4, axs4 = plt.subplots(
+    nrows=1, ncols=2,
+    gridspec_kw={'left':0.1, 'right': 0.95, 'top': 0.9, 'bottom': 0.1},
+    subplot_kw=dict(projection='3d'))
+
+# new visitors
+axs4[0].view_init(elev=20, azim=-110)
+surf = axs4[0].plot_surface(
+    x, y, pconv_new[17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
+    linewidth=0, antialiased=True, shade=False)
+
+axs4[0].set_xlim(0, 24)
+axs4[0].set_ylim(17, 45)
+axs4[0].tick_params(pad=0)
+axs4[0].set_title('New visitors')
+axs4[0].set_xlabel('# pages visited')
+axs4[0].set_ylabel('age')
+axs4[0].set_zlabel('conv. prob.')
+
+# recurring visitors
+axs4[1].view_init(elev=20, azim=-110)
+surf = axs4[1].plot_surface(
+    x, y, pconv_rec[17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
+    linewidth=0, antialiased=True, shade=False)
+
+axs4[1].set_xlim(0, 24)
+axs4[1].set_ylim(17, 45)
+axs4[1].tick_params(pad=0)
+axs4[1].set_title('Recurring visitors')
+axs4[1].set_xlabel('# pages visited')
+axs4[1].set_ylabel('age')
+axs4[1].set_zlabel('conv. prob.')
+
+plt.show()
+
+"""
+The figure shows the conversion probability as a function of age and number of pages visited
+for both new (left panel) and recurring (right panel) visitors.
+- the sigmoid dependence of the conversion probability vs. number of pages visited is valid over the whole age range.
+- In both conditions, there is a small linear dependence of the inflection point with age, with a lower inflection point for younger visitors.
+"""
+
+
