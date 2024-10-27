@@ -4,7 +4,7 @@
 
 """
 
-import csv
+import sys
 from itertools import product
 from datetime import datetime
 
@@ -346,6 +346,73 @@ built the same way as in the previous figure.
 We again stress that such regularity is unlikely in any realistic context.
 """
 
+#%%
+
+### Effect of the number of pages visited for each country
+
+"""
+We noted above that the country of origin has a significant impact on the conversion probability.
+We consider the two following hypotheses to explain this trend:
+- The country of orgin has an impact on the distribution of number of pages visited, but not on the subscription threshold (the inflection point of the sigmoid).
+  In this case, the country is expected to not be a good a predictor: the relevant information would be already contained in the number of pages visited.
+- The pages visits distribution does not depend on the country, but the conversion threshold does. In this case, the country (more precisely, its correlation with the number of pages visted)
+  would be a highly relevant predictor.
+For comparison, the new/recurring character of visitors effect is a mixture of these two: it affects both the pages visits distribution and conversion threshold.
+"""
+
+countries = []
+npages = np.arange(30)
+page_counts = np.zeros((4, 30), dtype=float)
+pconv = np.zeros((4, 30), dtype=float)
+std_pconv = np.zeros((4, 30), dtype=float)
+
+for k, (country, df_country) in enumerate(df.groupby('country')):
+    countries.append(country)
+    for i, c in df_country.loc[:, 'total_pages_visited'].value_counts().items():
+        page_counts[k, i] = c
+    for i, p in df_country.loc[:, ['total_pages_visited', 'converted']].groupby('total_pages_visited').mean()['converted'].items():
+        pconv[k, i] = p
+        std_pconv[k, i] = p*(1-p) / np.sqrt(page_counts[k, i])
+
+page_distrib = page_counts / np.sum(page_counts, axis=1, keepdims=True)
+
+## plot
+fig4, axs4 = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
+
+for k, country in enumerate(countries):
+    axs4[0].plot(npages, page_distrib[k], color=f'C{k+1}',
+                 linewidth=1, label=country)
+axs4[0].axvline(13, color='k', linewidth=1, linestyle='--')
+axs4[0].set_xlim(0, 30)
+axs4[0].set_ylim(0, 0.16)
+axs4[0].set_title("# pages visited distribution")
+axs4[0].set_xlabel('# pages visited')
+axs4[0].set_ylabel('Probability')
+axs4[0].legend()
+
+for k, country in enumerate(countries):
+    axs4[1].errorbar(npages, pconv[k], yerr=std_pconv[k],
+                     color=f'C{k+1}', fmt='o', markersize=3, markeredgewidth=0.3,
+                     label=country)
+axs4[1].axvline(13, color='k', linewidth=1, linestyle='--')
+
+axs4[1].set_xlim(0, 30)
+axs4[1].set_ylim(-0.005, 1.005)
+axs4[1].set_title("Conversion probability distribution")
+axs4[1].set_xlabel('# pages visited')
+axs4[1].set_ylabel('Conversion probability')
+axs4[1].legend()
+
+plt.show()
+
+"""
+Here we show, for each country, the distribution of pages visited (left panel) and the conversion probability as a function of the number of pages visited (right panel).
+- The behavior of users from `'Germany'`, `'UK'` and `'US'` is quite similar both in terms of page visits and conversion probability thresholding with a tendency Germany < UK < US
+which matches the differences observed in figure 1.
+- The behavior difference of users from `'China'` is striking. First, the distibution of pages visits is different, with much less visits of more than 13 pages, those which are associated to newsletter subscription.
+Second, the threshold seems to be set at a significantly higher level than other countries. These two factors explain the much lower conversion rates observed in figure 1.
+"""
+
 
 #%% 
 
@@ -424,15 +491,60 @@ for both new (left panel) and recurring (right panel) visitors.
 
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, confusion_matrix
 
 
+from typing import Callable
+
+def evaluate_model(preprocessor: Callable,
+                   prediction_engine: Callable,
+                   name_suffix: str = 'EXAMPLE')-> np.ndarray:
+    """
+    Evaluate the model on the test set.
+
+    Parameters
+    ----------
+    preprocessor : Callable: pd.DataFrame -> T
+        The feature preprocessor.
+    prediction_engine : Callable: T -> np.ndarray
+        The prediciton engine of the model.
+    name_suffix : str, optional
+        Suffix appended to the output filename. The default is 'EXAMPLE'.
+    
+    Returns
+    -------
+    Y_pred : 1D np.ndarray
+        The model's predictions on the test set.
+    """
+    df = pd.read_csv('./conversion_data_test.csv')
+    X = preprocessor(df)
+    Y_pred = prediction_engine(X)
+    
+    fname = 'conversion_data_test_predictions_EXAMPLE.csv'
+    np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
+    
+    return Y_pred
+
+
+#%%
+
+categorical_vars = ['country', 'source']
+quantitative_vars = ['age', 'new_user', 'total_pages_visited']
+
+
+## One hot encoding
+# enc = OneHotEncoder(drop='first')
+# enc.fit(df.loc[:, categorical_vars])
+df = pd.get_dummies(df)
+
+
+
 ## Data to fit
 Y = df.loc[:, 'converted']
-X = df.loc[:, ['age', 'total_pages_visited']]
+X = df.loc[:, ['country', 'total_pages_visited']]
 
 ## split
 X_tr, X_val, Y_tr, Y_val = train_test_split(X, Y, test_size=0.1, stratify=Y)
@@ -453,7 +565,7 @@ Y_tr_pred = classifier.predict(X_tr)
 
 
 ##### performance assessment #####
-## prprocess
+## preprocess
 X_val = featureencoder.transform(X_val)
 
 ## make predicitions
@@ -471,13 +583,15 @@ print("Test set confusion matrix\n",
 
 
 ##### testing pipeline #####
+
+    
+    
+
 test_df = pd.read_csv('./conversion_data_test.csv')
 X_test = test_df.loc[:, ['age', 'total_pages_visited']]
 
 X_test = featureencoder.transform(X_test)
 Y_test_pred = classifier.predict(X_test)
-
-
 
 fname = 'conversion_data_test_predictions_EXAMPLE.csv'
 np.savetxt(fname, Y_test_pred, fmt='%d', header='converted', comments='')
