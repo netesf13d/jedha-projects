@@ -498,7 +498,10 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import f1_score, confusion_matrix, roc_curve, auc
+from sklearn.metrics import (f1_score,
+                             confusion_matrix,
+                             roc_curve,
+                             auc)
 
 
 from typing import Callable
@@ -566,19 +569,26 @@ print(f'best threshold = {best_thr:.8f}',
       f'best F1-score = {best_score:.8f}')
 
 #%%
-## plot ROC
+## metrics: confusion matrix and ROC
 n_splits = 10
-cv = StratifiedKFold(n_splits=n_splits)
-roc_pipeline = Pipeline([('scaler', StandardScaler()),
-                         ('classifier', LogisticRegression())])
+cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+clf = Pipeline([('scaler', StandardScaler()),
+                      ('classifier', LogisticRegression())])
 
-mean_fpr = np.linspace(0, 1, 101)
-mean_tpr = np.zeros(101, dtype=float)
-thr_fpr, thr_tpr = 0, 0
+mean_cm = np.zeros((2, 2), dtype=float) # confusion matrix
+mean_fpr = np.linspace(0, 1, 101) # false-positive rates
+mean_tpr = np.zeros(101, dtype=float) # true-positive rates
+thr_fpr, thr_tpr = 0, 0 # fpr, tpr at threshold
 for i, (itr, ival) in enumerate(cv.split(X, y)):
-    roc_pipeline.fit(X.iloc[itr], y.iloc[itr])
-    y_decision = roc_pipeline.decision_function(X.iloc[ival])
-    fpr, tpr, thr= roc_curve(y.iloc[ival], y_decision)
+    X_v, y_v = X.iloc[ival], y.iloc[ival]
+    clf.fit(X.iloc[itr], y.iloc[itr])
+    # confusion matrix
+    y_pred = clf.predict_proba(X_v)[:, 1] > best_thr
+    mean_cm += confusion_matrix(y_v, y_pred) / len(X)
+    # ROC
+    y_decision = clf.decision_function(X_v)
+    fpr, tpr, thr = roc_curve(y_v, y_decision)
+    print(thr)
     mean_tpr += np.interp(mean_fpr, fpr, tpr, left=0, right=1) / n_splits
     thr_fpr += np.interp(best_thr, thr, fpr) / n_splits
     thr_tpr += np.interp(best_thr, thr, tpr) / n_splits
@@ -651,10 +661,12 @@ def preprocessor_baseline(dataframe: pd.DataFrame)-> np.ndarray:
 def predictor_baseline(X: np.ndarray)-> np.ndarray:
     return model.predict(X)
 
-models = {
-    'baseline': shake_256(b'baseline').hexdigest(4),
-    'linreg_threhold_adjust': shake_256(b'linreg_threhold_adjust').hexdigest(4),
-    }
+models = [
+    b'baseline',
+    b'linreg_threhold_adjust',
+    ]
+models = {m: shake_256(m).hexdigest(4) for m in models}
+
 
 evaluate_model(preprocessor_baseline,
                predictor_baseline,
