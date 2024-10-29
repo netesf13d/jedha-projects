@@ -42,6 +42,114 @@ df = df.loc[df['age'] < 80]
 # =============================================================================
 
 
+def prob_distrib(df: pd.DataFrame,
+                 group_by: str,
+                 variables: list[str],
+                 xvals: list[np.ndarray],
+                 )-> tuple[list, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    TODO doc
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DESCRIPTION.
+    group_by : str
+        DESCRIPTION.
+    variables : list[str]
+        DESCRIPTION.
+    xvals : list[np.ndarray]
+        DESCRIPTION.
+
+    Returns
+    -------
+    group_vals : list
+        DESCRIPTION.
+    counts : np.ndarray
+        DESCRIPTION.
+    pconv : np.ndarray
+        DESCRIPTION.
+    std_pconv : TYPE
+        DESCRIPTION.
+
+    """
+    group_vals = []
+    counts = np.zeros((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
+                      dtype=float)
+    pconv = np.full((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
+                    np.nan, dtype=float)
+
+    for k, (group, gdf) in enumerate(df.groupby(group_by)):
+        group_vals.append(group)
+        for idx, c in gdf.loc[:, variables].value_counts().items():
+            counts[k, *idx] = c
+        pconv_df = gdf.loc[:, variables + ['converted']] \
+                      .groupby(variables) \
+                      .mean()['converted']
+        for idx, p in pconv_df.items():
+            idx = idx if isinstance(idx, tuple) else (idx,) # cast to tuple if no multiindex
+            pconv[k, *idx] = p
+
+    std_pconv = np.where(pconv * (1 - pconv) == 0., 1, pconv) / np.sqrt(counts)
+    return group_vals, counts, pconv, std_pconv
+
+
+def prob_distrib_plot(xvals: np.ndarray,
+                      counts: np.ndarray,
+                      pconv: np.ndarray,
+                      std_pconv: np.ndarray,
+                      group_labels: list[str]):
+    """
+    TODO doc
+    TODO add count patch
+
+    Parameters
+    ----------
+    xvals : np.ndarray
+        DESCRIPTION.
+    counts : np.ndaarray
+        DESCRIPTION.
+    pconv : np.ndarray
+        DESCRIPTION.
+    std_pconv : np.ndarray
+        DESCRIPTION.
+    labels : list[str]
+        DESCRIPTION.
+
+    Returns
+    -------
+    fig : atplotlib Figure
+        DESCRIPTION.
+    axs : np.ndarray[matplotlib Axes]
+        DESCRIPTION.
+
+    """
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
+    
+    distribs = counts / np.sum(counts, axis=1, keepdims=True)
+    for k, label in enumerate(group_labels):
+        axs[0].plot(xvals, distribs[k], color=f'C{k}',
+                    linewidth=1, label=label)
+    axs[0].axvline(17, color='k', linewidth=1, linestyle='--')
+    axs[0].set_xlim(0, np.max(xvals)+1)
+    axs[0].set_ylim(-np.max(distribs)*0.02, np.max(distribs)*1.02)
+    axs[0].set_ylabel('Prob. density')
+
+    for k, label in enumerate(group_labels):
+        axs[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
+                        color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
+                        label=label)
+    axs[1].set_xlim(0, np.max(xvals)+1)
+    axs[1].set_ylim(-0.005, int(np.max(pconv[~np.isnan(pconv)])*120)/100)
+    axs[1].set_title("Conversion probability distribution")
+    axs[1].set_ylabel('Conversion probability')
+    
+    return fig, axs
+
+
+
+#%% 
+
 ## 
 df.groupby(['country', 'converted']).count()['age'] # the name 'age' is irrelevant here
 ##
@@ -121,135 +229,7 @@ We can make the following remarks:
 
 #%%
 
-def prob_distrib(df: pd.DataFrame,
-                 group_by: str,
-                 variables: list[str],
-                 xvals: list[np.ndarray],
-                 )-> tuple[list, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DESCRIPTION.
-    group_by : str
-        DESCRIPTION.
-    variables : list[str]
-        DESCRIPTION.
-    xvals : list[np.ndarray]
-        DESCRIPTION.
-
-    Returns
-    -------
-    group_vals : list
-        DESCRIPTION.
-    counts : np.ndarray
-        DESCRIPTION.
-    pconv : np.ndarray
-        DESCRIPTION.
-    std_pconv : TYPE
-        DESCRIPTION.
-
-    """
-    group_vals = []
-    counts = np.zeros((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
-                      dtype=float)
-    pconv = np.full((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
-                    np.nan, dtype=float)
-
-    for k, (group, gdf) in enumerate(df.groupby(group_by)):
-        group_vals.append(group)
-        for idx, c in gdf.loc[:, variables].value_counts().items():
-            counts[k, *idx] = c
-        pconv_df = gdf.loc[:, variables + ['converted']] \
-                      .groupby(variables) \
-                      .mean()['converted']
-        for idx, p in pconv_df.items():
-            idx = idx if isinstance(idx, tuple) else (idx,) # cast to tuple if no multiindex
-            pconv[k, *idx] = p
-
-    std_pconv = np.where(pconv * (1 - pconv) == 0., 1, pconv) / np.sqrt(counts)
-    return group_vals, counts, pconv, std_pconv
-
-# ## make data
-# group_by = 'new_user'
-# # variables = ['age', 'total_pages_visited']
-# # xvals = [np.arange(80), np.arange(30)]
-# variables = ['age']
-# xvals = [np.arange(80)]
-
-# group_vals = []
-# counts = np.zeros((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
-#                   dtype=float)
-# pconv = np.full((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
-#                 np.nan, dtype=float)
-
-# for k, (group, gdf) in enumerate(df.groupby(group_by)):
-#     group_vals.append(group)
-#     for idx, c in gdf.loc[:, variables].value_counts().items():
-#         counts[k, *idx] = c
-#     pconv_df = gdf.loc[:, variables + ['converted']] \
-#                   .groupby(variables) \
-#                   .mean()['converted']
-#     for idx, p in pconv_df.items():
-#         idx = idx if isinstance(idx, tuple) else (idx,) # cast to tuple if no multiindex
-#         pconv[k, *idx] = p
-
-# std_pconv = np.where(pconv * (1 - pconv) == 0., 1, pconv) / np.sqrt(counts)
-
-
-
-def distrib_plot(xvals: np.ndarray,
-                 counts: np.ndaarray,
-                 pconv: np.ndarray,
-                 std_pconv: np.ndarray,
-                 labels: list[str]):
-    """
-    
-
-    Parameters
-    ----------
-    xvals : np.ndarray
-        DESCRIPTION.
-    counts : np.ndaarray
-        DESCRIPTION.
-    pconv : np.ndarray
-        DESCRIPTION.
-    std_pconv : np.ndarray
-        DESCRIPTION.
-    labels : list[str]
-        DESCRIPTION.
-
-    Returns
-    -------
-    fig : atplotlib Figure
-        DESCRIPTION.
-    axs : np.ndarray[matplotlib Axes]
-        DESCRIPTION.
-
-    """
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
-    
-    distribs = counts / np.sum(counts, axis=1, keepdims=True)
-    for k, group in enumerate(group_vals):
-        axs[0].plot(xvals, distribs[k], color=f'C{k}',
-                    linewidth=1, label=labels[k])
-    axs[0].axvline(17, color='k', linewidth=1, linestyle='--')
-    axs[0].set_xlim(0, np.max(xvals)+1)
-    axs[0].set_ylim(-np.max(distribs)*0.02, np.max(distribs)*1.02)
-    axs[0].set_ylabel('Prob. density')
-
-    for k, group in enumerate(group_vals):
-        axs[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
-                        color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
-                         label=labels[k])
-    axs[1].set_xlim(0, np.max(xvals)+1)
-    axs[1].set_ylim(-0.005, int(np.max(pconv[~np.isnan(pconv)])*120)/100)
-    axs[1].set_title("Conversion probability distribution")
-    axs[1].set_ylabel('Conversion probability')
-    
-    return fig, axs
     
 
 # ## plot
@@ -281,44 +261,50 @@ def distrib_plot(xvals: np.ndarray,
 # axs[1].set_ylabel('Conversion probability')
 
 
-xvals = np.arange(80)
-group_vals, counts, pconv, std_pconv = prob_distrib(
-    df, group_by='new_user', variables=['age'], xvals=[xvals])
+# xvals = np.arange(80)
+# group_vals, counts, pconv, std_pconv = prob_distrib(
+#     df, group_by='new_user', variables=['age'], xvals=[xvals])
 
-fig, axs = distrib_plot(xvals, counts, pconv, std_pconv,
-                        labels=['recur. visitors', 'new visitors'])
-axs[0].legend()
-axs[1].legend()
-plt.show()
+# fig, axs = distrib_plot(xvals, counts, pconv, std_pconv,
+#                         labels=['recur. visitors', 'new visitors'])
+# axs[0].legend()
+# axs[1].legend()
+# plt.show()
 
 
 
 #%%
 ### Age data
 ## prepare age data
+# ages = np.arange(80)
+# age_data = {
+#     'counts_rec': np.zeros(80, dtype=int),
+#     'counts_new': np.zeros(80, dtype=int),
+#     'pconv_rec': np.zeros(80, dtype=float),
+#     'std_pconv_rec': np.zeros(80, dtype=float),
+#     'pconv_new': np.zeros(80, dtype=float),
+#     'std_pconv_new': np.zeros(80, dtype=float),
+# }
+# # new users
+# inew = df['new_user'] == 1
+# for i, c in df.loc[inew, 'age'].value_counts().items():
+#     age_data['counts_new'][i] = c
+# for i, p in df.loc[inew, ['age', 'converted']].groupby('age').mean()['converted'].items():
+#     age_data['pconv_new'][i] = p
+#     age_data['std_pconv_new'][i] = p*(1-p) / np.sqrt(age_data['counts_new'][i])
+# # recurrent users
+# irec = df['new_user'] == 0
+# for i, c in df.loc[irec, 'age'].value_counts().items():
+#     age_data['counts_rec'][i] = c
+# for i, p in df.loc[irec, ['age', 'converted']].groupby('age').mean()['converted'].items():
+#     age_data['pconv_rec'][i] = p
+#     age_data['std_pconv_rec'][i] = p*(1-p) / np.sqrt(age_data['counts_rec'][i])
+
+
 ages = np.arange(80)
-age_data = {
-    'counts_rec': np.zeros(80, dtype=int),
-    'counts_new': np.zeros(80, dtype=int),
-    'pconv_rec': np.zeros(80, dtype=float),
-    'std_pconv_rec': np.zeros(80, dtype=float),
-    'pconv_new': np.zeros(80, dtype=float),
-    'std_pconv_new': np.zeros(80, dtype=float),
-}
-# new users
-inew = df['new_user'] == 1
-for i, c in df.loc[inew, 'age'].value_counts().items():
-    age_data['counts_new'][i] = c
-for i, p in df.loc[inew, ['age', 'converted']].groupby('age').mean()['converted'].items():
-    age_data['pconv_new'][i] = p
-    age_data['std_pconv_new'][i] = p*(1-p) / np.sqrt(age_data['counts_new'][i])
-# recurrent users
-irec = df['new_user'] == 0
-for i, c in df.loc[irec, 'age'].value_counts().items():
-    age_data['counts_rec'][i] = c
-for i, p in df.loc[irec, ['age', 'converted']].groupby('age').mean()['converted'].items():
-    age_data['pconv_rec'][i] = p
-    age_data['std_pconv_rec'][i] = p*(1-p) / np.sqrt(age_data['counts_rec'][i])
+new_user, age_counts, age_pconv, age_std_pconv = prob_distrib(
+    df, group_by='new_user', variables=['age'], xvals=[ages])
+
 
 ## let us make a nice exponential fit
 from scipy.optimize import curve_fit
@@ -331,45 +317,52 @@ def decay_exp(x: np.ndarray,
     """
     return A * np.exp(- x / tau)
 
+idx_new = ~np.isnan(age_pconv[1])
+x_new = ages[idx_new]
+y_new = age_pconv[1, idx_new]
+y_new_sigma = age_std_pconv[1, idx_new]
+popt_new, pcov_new = curve_fit(decay_exp, x_new, y_new, p0=(0.1, 10),
+                               sigma=y_new_sigma)
+# # does not work: nans are not removed from sigma
+# popt_new, pcov_new = curve_fit(decay_exp, ages, age_pconv[1], p0=(0.1, 10),
+#                                sigma=age_std_pconv[1], nan_policy='omit')
 
-x = ages[17:]
-# new visitors
-y_new = age_data['pconv_new'][17:]
-yerr_new = age_data['std_pconv_new'][17:]
-popt_new, pcov_new = curve_fit(decay_exp, x, y_new, p0=(0.05, 10),
-                               sigma=np.where(yerr_new==0., 1., yerr_new))
-# recurring visitors
-y_rec = age_data['pconv_rec'][17:]
-yerr_rec = age_data['std_pconv_rec'][17:]
-popt_rec, pcov_rec = curve_fit(decay_exp, x, y_rec, p0=(0.05, 10),
-                               sigma=np.where(yerr_rec==0., 1., yerr_rec))
+idx_rec = ~np.isnan(age_pconv[0])
+x_rec = ages[idx_rec]
+y_rec = age_pconv[0, idx_rec]
+y_rec_sigma = age_std_pconv[0, idx_rec]
+popt_rec, pcov_rec = curve_fit(decay_exp, x_rec, y_rec, p0=(0.1, 10),
+                               sigma=y_rec_sigma)
 
-## plot
-fig2, axs2 = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
 
-axs2[0].plot(ages, age_data['counts_new'], color='tab:blue',
-             linewidth=1, label='new visitors')
-axs2[0].plot(ages, age_data['counts_rec'], color='tab:orange',
-             linewidth=1, label='recur. visitors')
+# x = ages[17:]
+# # new visitors
+# y_new = age_data['pconv_new'][17:]
+# yerr_new = age_data['std_pconv_new'][17:]
+# popt_new, pcov_new = curve_fit(decay_exp, x, y_new, p0=(0.05, 10),
+#                                sigma=np.where(yerr_new==0., 1., yerr_new))
+# # recurring visitors
+# y_rec = age_data['pconv_rec'][17:]
+# yerr_rec = age_data['std_pconv_rec'][17:]
+# popt_rec, pcov_rec = curve_fit(decay_exp, x, y_rec, p0=(0.05, 10),
+#                                sigma=np.where(yerr_rec==0., 1., yerr_rec))
+
+# ## plot
+fig2, axs2 = prob_distrib_plot(
+    ages, age_counts, age_pconv, age_std_pconv,
+    group_labels=['recur. visitors', 'new visitors'])
+
+
 axs2[0].axvline(17, color='k', linewidth=1, linestyle='--')
-axs2[0].text(11, 8500, '17 yo\ncutoff', ha='center', va='center')
-axs2[0].set_xlim(0, 80)
-axs2[0].set_ylim(-200, 10000)
+axs2[0].text(11, 0.04, '17 yo\ncutoff', ha='center', va='center')
 axs2[0].set_title("Ages distribution")
 axs2[0].set_xlabel('Age (years)')
-axs2[0].set_ylabel('Counts')
 axs2[0].legend()
 
-axs2[1].errorbar(ages, age_data['pconv_new'], yerr=age_data['std_pconv_new'],
-                 color='tab:blue', fmt='o', markersize=3, markeredgewidth=0.3,
-                 label='new visitors')
 axs2[1].plot(ages, decay_exp(ages, *popt_new),
-             linewidth=1, color='tab:blue', label='exp decay fit')
-axs2[1].errorbar(ages, age_data['pconv_rec'], yerr=age_data['std_pconv_rec'],
-                 color='tab:orange', fmt='o', markersize=3, markeredgewidth=0.3,
-                 label='recur. visitors')
-axs2[1].plot(ages, decay_exp(ages, *popt_rec),
              linewidth=1, color='tab:orange', label='exp decay fit')
+axs2[1].plot(ages, decay_exp(ages, *popt_rec),
+             linewidth=1, color='tab:blue', label='exp decay fit')
 axs2[1].axvline(17, color='k', linewidth=1, linestyle='--')
 
 new_popt_txt = (f'A = {popt_new[0]:.3} +- {pcov_new[0, 0]:.2}\n'
@@ -380,13 +373,12 @@ rec_popt_txt = (f'A = {popt_rec[0]:.3} +- {pcov_rec[0, 0]:.2}\n'
                 f'tau = {popt_rec[1]:.3} +- {pcov_rec[1, 1]:.2}\n')
 axs2[1].text(35, 0.12, rec_popt_txt, ha='center', va='center', fontsize=7)
 
-axs2[1].set_xlim(0, 80)
-axs2[1].set_ylim(-0.005, 0.20)
-axs2[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], [0, 5, 10, 15, 20])
-axs2[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], minor=True)
+# axs2[1].set_xlim(0, 80)
+# axs2[1].set_ylim(-0.005, 0.20)
+# axs2[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], [0, 5, 10, 15, 20])
+# axs2[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], minor=True)
 axs2[1].set_title("Conversion probability distribution")
 axs2[1].set_xlabel('Age (years)')
-axs2[1].set_ylabel('Conversion probability (%)')
 axs2[1].legend()
 
 plt.show()
@@ -848,9 +840,9 @@ models = [
 models = {m: shake_256(m).hexdigest(4) for m in models}
 
 
-evaluate_model(preprocessor_baseline,
-               predictor_baseline,
-               name_suffix=models['linreg_threhold_adjust'])
+# evaluate_model(preprocessor_baseline,
+#                predictor_baseline,
+#                name_suffix=models['linreg_threhold_adjust'])
 
 
 
