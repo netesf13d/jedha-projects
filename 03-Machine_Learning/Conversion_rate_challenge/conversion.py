@@ -489,21 +489,26 @@ for both new (left panel) and recurring (right panel) visitors.
 
 #%%
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (train_test_split,
+                                     cross_validate,
+                                     StratifiedKFold,
+                                     TunedThresholdClassifierCV)
+from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import f1_score, confusion_matrix
+from sklearn.metrics import f1_score, confusion_matrix, roc_curve, auc
 
 
 from typing import Callable
 
 def evaluate_model(preprocessor: Callable,
-                   prediction_engine: Callable,
+                   predictor: Callable,
                    name_suffix: str = 'EXAMPLE')-> np.ndarray:
     """
-    Evaluate the model on the test set.
+    Evaluate the model on the test set. The predictions are exported as
+    'conversion_data_test_predictions_{name_suffix}.csv'
 
     Parameters
     ----------
@@ -521,12 +526,15 @@ def evaluate_model(preprocessor: Callable,
     """
     df = pd.read_csv('./conversion_data_test.csv')
     X = preprocessor(df)
-    Y_pred = prediction_engine(X)
+    Y_pred = predictor(X)
     
-    fname = 'conversion_data_test_predictions_EXAMPLE.csv'
+    fname = f'conversion_data_test_predictions_{name_suffix}.csv'
     np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
     
     return Y_pred
+
+#%% TODO basic linregress
+
 
 
 #%%
@@ -535,64 +543,122 @@ categorical_vars = ['country', 'source']
 quantitative_vars = ['age', 'new_user', 'total_pages_visited']
 
 
-## One hot encoding
-# enc = OneHotEncoder(drop='first')
-# enc.fit(df.loc[:, categorical_vars])
-df = pd.get_dummies(df)
-
-
-
 ## Data to fit
-Y = df.loc[:, 'converted']
-X = df.loc[:, ['country', 'total_pages_visited']]
+y = df.loc[:, 'converted']
+X_df = df.loc[:, [c for c in df.columns if c != 'converted']]
 
-## split
-X_tr, X_val, Y_tr, Y_val = train_test_split(X, Y, test_size=0.1, stratify=Y)
-
-
-##### training pipeline #####
-## preprocess
-featureencoder = StandardScaler()
-X_tr = featureencoder.fit_transform(X_tr)
-
-## train
-classifier = LogisticRegression() # 
-classifier.fit(X_tr, Y_tr)
-
-## train set predicitions
-Y_tr_pred = classifier.predict(X_tr)
+## One hot encoding
+X_df = pd.get_dummies(X_df)
+X = X_df.drop(['country_US', 'source_Seo'], axis=1)
 
 
+## model evaluation
+pipeline = Pipeline([('scaler', StandardScaler()),
+                     ('classifier', LogisticRegression())])
+# scores = cross_validate(pipeline, X, Y, cv=5, scoring='f1')
+model = TunedThresholdClassifierCV(pipeline, scoring='f1', cv=10,
+                                   random_state=None,
+                                   store_cv_results=True)
+model.fit(X, y)
+best_thr = model.best_threshold_
+best_score = model.best_score_
+print(f'best threshold = {best_thr:.8f}',
+      f'best F1-score = {best_score:.8f}')
 
-##### performance assessment #####
-## preprocess
-X_val = featureencoder.transform(X_val)
+#%%
+## plot ROC
+n_splits = 10
+cv = StratifiedKFold(n_splits=n_splits)
+roc_pipeline = Pipeline([('scaler', StandardScaler()),
+                         ('classifier', LogisticRegression())])
 
-## make predicitions
-Y_val_pred = classifier.predict(X_val)
+mean_fpr = np.linspace(0, 1, 101)
+mean_tpr = np.zeros(101, dtype=float)
+thr_fpr, thr_tpr = 0, 0
+for i, (itr, ival) in enumerate(cv.split(X, y)):
+    roc_pipeline.fit(X.iloc[itr], y.iloc[itr])
+    y_decision = roc_pipeline.decision_function(X.iloc[ival])
+    fpr, tpr, thr= roc_curve(y.iloc[ival], y_decision)
+    mean_tpr += np.interp(mean_fpr, fpr, tpr, left=0, right=1) / n_splits
+    thr_fpr += np.interp(best_thr, thr, fpr) / n_splits
+    thr_tpr += np.interp(best_thr, thr, tpr) / n_splits
+mean_tpr[0] = 0
+mean_auc = auc(mean_fpr, mean_tpr)
+
 
 
 #%%
-## metrics
-print(f'Train set F1-score: {f1_score(Y_tr, Y_tr_pred)}')
-print(f'Test set F1-score: {f1_score(Y_val, Y_val_pred)}')
-print("Train set confusion matrix\n",
-      confusion_matrix(Y_tr, Y_tr_pred, normalize='all'))
-print("Test set confusion matrix\n",
-      confusion_matrix(Y_val, Y_val_pred, normalize='all'))
+fig, ax = plt.subplots(figsize=(6, 6))
+ax.plot(mean_fpr, mean_tpr, label=f'Mean ROC (AUC = {mean_auc:.4f})')
+ax.plot(thr_fpr, thr_tpr, marker='X', markersize=5)
+ax.text(0.8, 0.93, f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}',
+        ha='center', va='center')
+ax.legend(loc=4)
+ax.set_xlim(-0.01, 1.01)
+ax.set_ylim(-0.01, 1.01)
+ax.grid(visible=True, alpha=0.3)
+plt.show()
 
 
+
+## preprocess
+# fenc = StandardScaler()
+# X_tr = fenc.fit_transform(X_tr)
+
+# ## split
+# X_tr, X_val, Y_tr, Y_val = train_test_split(X, Y, test_size=0.1, stratify=Y)
+
+
+# ##### training pipeline #####
+# ## preprocess
+# featureencoder = StandardScaler()
+# X_tr = featureencoder.fit_transform(X_tr)
+
+# ## train
+# classifier = LogisticRegression() # 
+# classifier.fit(X_tr, Y_tr)
+
+# ## train set predicitions
+# Y_tr_pred = classifier.predict(X_tr)
+
+
+
+# ##### performance assessment #####
+# ## preprocess
+# X_val = featureencoder.transform(X_val)
+
+# ## make predicitions
+# Y_val_pred = classifier.predict(X_val)
+
+
+# ## metrics
+# print(f'Train set F1-score: {f1_score(Y_tr, Y_tr_pred)}')
+# print(f'Test set F1-score: {f1_score(Y_val, Y_val_pred)}')
+# print("Train set confusion matrix\n",
+#       confusion_matrix(Y_tr, Y_tr_pred, normalize='all'))
+# print("Test set confusion matrix\n",
+#       confusion_matrix(Y_val, Y_val_pred, normalize='all'))
+
+#%%
 ##### testing pipeline #####
+from hashlib import shake_256
 
-    
-    
+def preprocessor_baseline(dataframe: pd.DataFrame)-> np.ndarray:
+    df = pd.get_dummies(dataframe)
+    df = df.drop(['country_US', 'source_Seo'], axis=1)
+    return df
 
-test_df = pd.read_csv('./conversion_data_test.csv')
-X_test = test_df.loc[:, ['age', 'total_pages_visited']]
+def predictor_baseline(X: np.ndarray)-> np.ndarray:
+    return model.predict(X)
 
-X_test = featureencoder.transform(X_test)
-Y_test_pred = classifier.predict(X_test)
+models = {
+    'baseline': shake_256(b'baseline').hexdigest(4),
+    'linreg_threhold_adjust': shake_256(b'linreg_threhold_adjust').hexdigest(4),
+    }
 
-fname = 'conversion_data_test_predictions_EXAMPLE.csv'
-np.savetxt(fname, Y_test_pred, fmt='%d', header='converted', comments='')
+evaluate_model(preprocessor_baseline,
+               predictor_baseline,
+               name_suffix=models['linreg_threhold_adjust'])
+
+
 
