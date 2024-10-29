@@ -13,6 +13,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 # from matplotlib.colors import Colormap, LightSource
 # from matplotlib.collections import PolyCollection
 
@@ -64,40 +65,46 @@ for i, source in enumerate(sources):
 
 
 # TODO finish plot
-# fig1, axs1 = plt.subplots(nrows=1, ncols=2, figsize=(6, 4))
-fig1 = plt.figure(figsize=(6, 3))
-gs = gridspec.GridSpec(
-    nrows=1, ncols=3,
-    width_ratios=[1, 1, 0.1], wspace=0.1,
-    figure=fig1,
-    left=0.1, bottom=0.2, right=0.95, top=0.77)
-axs1 = gs.subplots(sharex=False, sharey=False, squeeze=True)
+fig1, axs1 = plt.subplots(nrows=1, ncols=2, figsize=(6, 4))
+axs1_cb = np.empty_like(axs1, dtype=object)
 
 axs1[0].set_aspect('equal')
-axs1[0].pcolor(new_pconv, cmap='plasma', edgecolors='k', lw=0.5)
-axs1[0].set_xticks([0.5, 1.5, 2.5, 3.5], countries)
+heatmap1 = axs1[0].pcolormesh(100*new_pconv, cmap='plasma',
+                              edgecolors='k', lw=0.5)
+axs1[0].set_xticks([0.5, 1.5, 2.5, 3.5], countries, rotation=60)
 axs1[0].set_yticks([0.5, 1.5, 2.5], sources)
 axs1[0].set_title("New visitors")
 for (i, j), p in np.ndenumerate(new_pconv):
-    axs1[0].text(j+0.5, i+0.5, f'{100*p:.2f}', ha='center', va='center')
+    color = 'k' if p > np.max(new_pconv) / 3 else 'w'
+    axs1[0].text(j+0.5, i+0.5, f'{100*p:.2f}', color=color,
+                 ha='center', va='center')
+
+divider1 = make_axes_locatable(axs1[0])
+axs1_cb[0] = divider1.append_axes("right", size="7%", pad="5%")
+fig1.add_axes(axs1_cb[0])
+fig1.colorbar(heatmap1, cax=axs1_cb[0], orientation="vertical",
+              ticklocation="right")
+axs1_cb[0].set_yticks([0, 0.5, 1, 1.5, 2, 2.5])
 
 
 axs1[1].set_aspect('equal')
-axs1[1].pcolormesh(rec_pconv, cmap='plasma', edgecolors='k', lw=0.5)
-axs1[1].tick_params(top=False, labeltop=False,
-                  bottom=False, labelbottom=False,
-                  left=False, labelleft=False,
-                  right=False, labelright=False)
-# axs1[1].set_xlim(0, 1.2e5)
+heatmap2 = axs1[1].pcolormesh(100*rec_pconv, cmap='plasma',
+                              edgecolors='k', lw=0.5)
+axs1[1].set_xticks([0.5, 1.5, 2.5, 3.5], countries, rotation=60)
+axs1[1].tick_params(left=False, labelleft=False)
 axs1[1].set_title("Recurring visitors")
-for (i, j), p in np.ndenumerate(new_pconv):
-    axs1[0].text(j+0.5, i+0.5, f'{100*p:.2f}', ha='center', va='center')
 for (i, j), p in np.ndenumerate(rec_pconv):
-    axs1[1].text(j+0.5, i+0.5, f'{100*p:.2f}', ha='center', va='center')
+    color = 'k' if p > np.max(rec_pconv) / 3 else 'w'
+    axs1[1].text(j+0.5, i+0.5, f'{100*p:.2f}', color=color,
+                 ha='center', va='center')
 
+divider2 = make_axes_locatable(axs1[1])
+axs1_cb[1] = divider2.append_axes("right", size="7%", pad="5%")
+fig1.add_axes(axs1_cb[1])
+fig1.colorbar(heatmap2, cax=axs1_cb[1], orientation="vertical",
+              ticklocation="right")
+axs1_cb[1].set_yticks([0, 5, 10, 15])
 
-# cb = fig.colorbar(yzprof, cax=ax[2], orientation="horizontal",
-#                   ticklocation="top", extend="max", extendfrac=0.03)
 
 plt.show()
 
@@ -114,6 +121,179 @@ We can make the following remarks:
 
 #%%
 
+def prob_distrib(df: pd.DataFrame,
+                 group_by: str,
+                 variables: list[str],
+                 xvals: list[np.ndarray],
+                 )-> tuple[list, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DESCRIPTION.
+    group_by : str
+        DESCRIPTION.
+    variables : list[str]
+        DESCRIPTION.
+    xvals : list[np.ndarray]
+        DESCRIPTION.
+
+    Returns
+    -------
+    group_vals : list
+        DESCRIPTION.
+    counts : np.ndarray
+        DESCRIPTION.
+    pconv : np.ndarray
+        DESCRIPTION.
+    std_pconv : TYPE
+        DESCRIPTION.
+
+    """
+    group_vals = []
+    counts = np.zeros((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
+                      dtype=float)
+    pconv = np.full((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
+                    np.nan, dtype=float)
+
+    for k, (group, gdf) in enumerate(df.groupby(group_by)):
+        group_vals.append(group)
+        for idx, c in gdf.loc[:, variables].value_counts().items():
+            counts[k, *idx] = c
+        pconv_df = gdf.loc[:, variables + ['converted']] \
+                      .groupby(variables) \
+                      .mean()['converted']
+        for idx, p in pconv_df.items():
+            idx = idx if isinstance(idx, tuple) else (idx,) # cast to tuple if no multiindex
+            pconv[k, *idx] = p
+
+    std_pconv = np.where(pconv * (1 - pconv) == 0., 1, pconv) / np.sqrt(counts)
+    return group_vals, counts, pconv, std_pconv
+
+# ## make data
+# group_by = 'new_user'
+# # variables = ['age', 'total_pages_visited']
+# # xvals = [np.arange(80), np.arange(30)]
+# variables = ['age']
+# xvals = [np.arange(80)]
+
+# group_vals = []
+# counts = np.zeros((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
+#                   dtype=float)
+# pconv = np.full((df[group_by].nunique(),) + tuple(len(x) for x in xvals),
+#                 np.nan, dtype=float)
+
+# for k, (group, gdf) in enumerate(df.groupby(group_by)):
+#     group_vals.append(group)
+#     for idx, c in gdf.loc[:, variables].value_counts().items():
+#         counts[k, *idx] = c
+#     pconv_df = gdf.loc[:, variables + ['converted']] \
+#                   .groupby(variables) \
+#                   .mean()['converted']
+#     for idx, p in pconv_df.items():
+#         idx = idx if isinstance(idx, tuple) else (idx,) # cast to tuple if no multiindex
+#         pconv[k, *idx] = p
+
+# std_pconv = np.where(pconv * (1 - pconv) == 0., 1, pconv) / np.sqrt(counts)
+
+
+
+def distrib_plot(xvals: np.ndarray,
+                 counts: np.ndaarray,
+                 pconv: np.ndarray,
+                 std_pconv: np.ndarray,
+                 labels: list[str]):
+    """
+    
+
+    Parameters
+    ----------
+    xvals : np.ndarray
+        DESCRIPTION.
+    counts : np.ndaarray
+        DESCRIPTION.
+    pconv : np.ndarray
+        DESCRIPTION.
+    std_pconv : np.ndarray
+        DESCRIPTION.
+    labels : list[str]
+        DESCRIPTION.
+
+    Returns
+    -------
+    fig : atplotlib Figure
+        DESCRIPTION.
+    axs : np.ndarray[matplotlib Axes]
+        DESCRIPTION.
+
+    """
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
+    
+    distribs = counts / np.sum(counts, axis=1, keepdims=True)
+    for k, group in enumerate(group_vals):
+        axs[0].plot(xvals, distribs[k], color=f'C{k}',
+                    linewidth=1, label=labels[k])
+    axs[0].axvline(17, color='k', linewidth=1, linestyle='--')
+    axs[0].set_xlim(0, np.max(xvals)+1)
+    axs[0].set_ylim(-np.max(distribs)*0.02, np.max(distribs)*1.02)
+    axs[0].set_ylabel('Prob. density')
+
+    for k, group in enumerate(group_vals):
+        axs[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
+                        color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
+                         label=labels[k])
+    axs[1].set_xlim(0, np.max(xvals)+1)
+    axs[1].set_ylim(-0.005, int(np.max(pconv[~np.isnan(pconv)])*120)/100)
+    axs[1].set_title("Conversion probability distribution")
+    axs[1].set_ylabel('Conversion probability')
+    
+    return fig, axs
+    
+
+# ## plot
+# xvals = np.arange(80)
+# pconv = pconv
+# std_pconv = std_pconv
+# labels = ['recur. visitors', 'new visitors']
+
+# distribs = counts / np.sum(counts, axis=1, keepdims=True)
+
+# fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
+
+# for k, group in enumerate(group_vals):
+#     axs[0].plot(xvals, distribs[k], color=f'C{k}',
+#                 linewidth=1, label=labels[k])
+# axs[0].axvline(17, color='k', linewidth=1, linestyle='--')
+# axs[0].set_xlim(0, np.max(xvals)+1)
+# axs[0].set_ylim(-np.max(distribs)*0.02, np.max(distribs)*1.02)
+# axs[0].set_ylabel('Prob. density')
+
+
+# for k, group in enumerate(group_vals):
+#     axs[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
+#                     color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
+#                      label=labels[k])
+# axs[1].set_xlim(0, np.max(xvals)+1)
+# axs[1].set_ylim(-0.005, int(np.max(pconv[~np.isnan(pconv)])*120)/100)
+# axs[1].set_title("Conversion probability distribution")
+# axs[1].set_ylabel('Conversion probability')
+
+
+xvals = np.arange(80)
+group_vals, counts, pconv, std_pconv = prob_distrib(
+    df, group_by='new_user', variables=['age'], xvals=[xvals])
+
+fig, axs = distrib_plot(xvals, counts, pconv, std_pconv,
+                        labels=['recur. visitors', 'new visitors'])
+axs[0].legend()
+axs[1].legend()
+plt.show()
+
+
+
+#%%
 ### Age data
 ## prepare age data
 ages = np.arange(80)
