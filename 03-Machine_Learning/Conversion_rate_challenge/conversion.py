@@ -5,8 +5,9 @@
 """
 
 import sys
-from itertools import product
-from datetime import datetime
+# from itertools import product
+# from datetime import datetime
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -101,7 +102,6 @@ def prob_distrib_plot(xvals: np.ndarray,
                       group_labels: list[str]):
     """
     TODO doc
-    TODO add count patch
 
     Parameters
     ----------
@@ -486,7 +486,11 @@ for both new (left panel) and recurring (right panel) visitors.
 """
 
 #%%
+"""
+## <a name="linear"></a>Logistic regression
+"""
 
+from sklearn.base import clone
 from sklearn.model_selection import (train_test_split,
                                      cross_validate,
                                      StratifiedKFold,
@@ -502,10 +506,9 @@ from sklearn.metrics import (f1_score,
                              auc)
 
 
-from typing import Callable
-
 def evaluate_model(preprocessor: Callable,
                    predictor: Callable,
+                   export_csv: bool = False,
                    name_suffix: str = 'EXAMPLE')-> np.ndarray:
     """
     Evaluate the model on the test set. The predictions are exported as
@@ -517,6 +520,9 @@ def evaluate_model(preprocessor: Callable,
         The feature preprocessor.
     prediction_engine : Callable: T -> np.ndarray
         The prediciton engine of the model.
+    export_csv : bool, optional
+        Export the test data as a csv file for challenge assessment.
+        The default is False.
     name_suffix : str, optional
         Suffix appended to the output filename. The default is 'EXAMPLE'.
     
@@ -529,50 +535,123 @@ def evaluate_model(preprocessor: Callable,
     X = preprocessor(df)
     Y_pred = predictor(X)
     
-    fname = f'conversion_data_test_predictions_{name_suffix}.csv'
-    np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
+    if export_csv:
+        fname = f'conversion_data_test_predictions_{name_suffix}.csv'
+        np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
     
     return Y_pred
 
-#%% TODO basic linregress
 
+#%%
+"""
+### A first model
+
+We reproduce here the basic linear regression from the template, this time including all the features in the fit.
+We do a simple train-test split using the train set, without relying on the test set provided due to limited access.
+"""
+
+"""
+Preprocessing and training
+"""
+
+# Data to fit
+y = df.loc[:, 'converted']
+X_df = df.drop('converted', axis=1)
+
+# One-hot encoding with pandas
+X_df = pd.get_dummies(X_df)
+X = X_df.drop(['country_US', 'source_Seo'], axis=1)
+
+# Simple train-test split
+X_tr, X_test, y_tr, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
+
+# Data scaling: scale everything, including categorical data
+scaler = StandardScaler()
+X_tr = scaler.fit_transform(X_tr)
+
+# fit logistic regression classifier
+classifier = LogisticRegression()
+classifier.fit(X_tr, y_tr)
+
+
+"""
+Performance assessment
+"""
+
+# train set predicitions
+y_tr_pred = classifier.predict(X_tr)
+
+# test set predicitions
+X_test = scaler.transform(X_test) # no fit this time
+y_test_pred = classifier.predict(X_test)
+
+# metrics
+print(f'Train set F1-score: {f1_score(y_tr, y_tr_pred)}')
+print("Train set confusion matrix\n",
+      confusion_matrix(y_tr, y_tr_pred, normalize=None))
+print(f'Test set F1-score: {f1_score(y_test, y_test_pred)}')
+print("Test set confusion matrix\n",
+      confusion_matrix(y_test, y_test_pred, normalize=None))
 
 
 #%%
 
-categorical_vars = ['country', 'source']
-quantitative_vars = ['age', 'new_user', 'total_pages_visited']
+"""
+### Improving the simple model
 
+Let us now make some improvements to the previous code, without changing the model (almost).
+"""
 
-## Data to fit
+"""
+A first improvement is to make it work in a more integrated fashion. We thus do the following:
+- The data preprocessing, encoding of categorical variables and scaling of quantitative variables, is wrapped in a `compose.ColumnTransformer`
+- The preprocessing and classification are wrapped in a `pipeline.Pipeline`, exposing a single interface for all steps
+"""
+
+##
+# data preparation
 y = df.loc[:, 'converted']
-X_df = df.loc[:, [c for c in df.columns if c != 'converted']]
+X = df.drop('converted', axis=1)
 
-## One hot encoding
-X_df = pd.get_dummies(X_df)
-X = X_df.drop(['country_US', 'source_Seo'], axis=1)
+# preprocessing
+cat_vars = ['country', 'source']
+quant_vars = ['age', 'new_user', 'total_pages_visited']
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
 
-
-## model evaluation
-pipeline = Pipeline([('scaler', StandardScaler()),
+# full pipeline
+pipeline = Pipeline([('column_preprocessing', col_preproc),
                      ('classifier', LogisticRegression())])
-# scores = cross_validate(pipeline, X, Y, cv=5, scoring='f1')
+
+"""
+The default logistic regression classifier uses a threshold probability of 0.5 to classify an observation.
+This corresponds to the minimization of the logistic loss.
+However, we recall that the performance of our model is assessed not by the average logistic loss but through the F1-score.
+Our model can adjust by cross-validation this threshold probability so as to maximize the F1-score. This is done by wrapping the
+pipeline into a `model_selection.TunedThresholdClassifierCV`.
+"""
 model = TunedThresholdClassifierCV(pipeline, scoring='f1', cv=10,
                                    random_state=None,
                                    store_cv_results=True)
 model.fit(X, y)
 best_thr = model.best_threshold_
-logit_thr = np.log(best_thr / (1 - best_thr))
 best_score = model.best_score_
 print(f'best threshold = {best_thr:.8f}',
       f'best F1-score = {best_score:.8f}')
 
 #%%
+"""
 ## metrics: confusion matrix and ROC
+
+The receiver operating characteristic (ROC) curve is the natural metric associated to the classification threshold variation.
+
+"""
+logit_thr = np.log(best_thr / (1 - best_thr))
+
 n_splits = 10
 cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
-clf = Pipeline([('scaler', StandardScaler()),
-                      ('classifier', LogisticRegression())])
+clf = clone(model) # an unfitted copy of our previous model
 
 mean_cm = np.zeros((2, 2), dtype=float) # confusion matrix
 mean_fpr = np.linspace(0, 1, 101) # false-positive rates
@@ -667,9 +746,10 @@ models = [
 models = {m: shake_256(m).hexdigest(4) for m in models}
 
 
-# evaluate_model(preprocessor_baseline,
-#                predictor_baseline,
-#                name_suffix=models['linreg_threhold_adjust'])
+evaluate_model(preprocessor_baseline,
+               predictor_baseline,
+               export_csv=False,
+               name_suffix=models['linreg_threhold_adjust'])
 
 
 
