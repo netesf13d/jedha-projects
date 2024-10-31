@@ -5,6 +5,7 @@
 """
 
 import sys
+import time
 # from itertools import product
 # from datetime import datetime
 from typing import Callable
@@ -443,38 +444,38 @@ country, counts, pconv, std_pconv = prob_distrib(
 
 x, y = np.meshgrid(npages[:25], ages[17:46])
 
-fig4, axs4 = plt.subplots(
+fig5, axs5 = plt.subplots(
     nrows=1, ncols=2,
     gridspec_kw={'left':0.1, 'right': 0.95, 'top': 0.9, 'bottom': 0.1},
     subplot_kw=dict(projection='3d'))
 
 # new visitors
-axs4[0].view_init(elev=20, azim=-110)
-surf = axs4[0].plot_surface(
+axs5[0].view_init(elev=20, azim=-110)
+surf = axs5[0].plot_surface(
     x, y, pconv[1, 17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
     linewidth=0, antialiased=True, shade=False)
 
-axs4[0].set_xlim(0, 24)
-axs4[0].set_ylim(17, 45)
-axs4[0].tick_params(pad=0)
-axs4[0].set_title('New visitors')
-axs4[0].set_xlabel('# pages visited')
-axs4[0].set_ylabel('age')
-axs4[0].set_zlabel('conv. prob.')
+axs5[0].set_xlim(0, 24)
+axs5[0].set_ylim(17, 45)
+axs5[0].tick_params(pad=0)
+axs5[0].set_title('New visitors')
+axs5[0].set_xlabel('# pages visited')
+axs5[0].set_ylabel('age')
+axs5[0].set_zlabel('conv. prob.')
 
 # recurring visitors
-axs4[1].view_init(elev=20, azim=-110)
-surf = axs4[1].plot_surface(
+axs5[1].view_init(elev=20, azim=-110)
+surf = axs5[1].plot_surface(
     x, y, pconv[0, 17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
     linewidth=0, antialiased=True, shade=False)
 
-axs4[1].set_xlim(0, 24)
-axs4[1].set_ylim(17, 45)
-axs4[1].tick_params(pad=0)
-axs4[1].set_title('Recurring visitors')
-axs4[1].set_xlabel('# pages visited')
-axs4[1].set_ylabel('age')
-axs4[1].set_zlabel('conv. prob.')
+axs5[1].set_xlim(0, 24)
+axs5[1].set_ylim(17, 45)
+axs5[1].tick_params(pad=0)
+axs5[1].set_title('Recurring visitors')
+axs5[1].set_xlabel('# pages visited')
+axs5[1].set_ylabel('age')
+axs5[1].set_zlabel('conv. prob.')
 
 plt.show()
 
@@ -497,7 +498,7 @@ from sklearn.model_selection import (train_test_split,
                                      TunedThresholdClassifierCV)
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, FunctionTransformer
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (f1_score,
@@ -588,10 +589,10 @@ y_test_pred = classifier.predict(X_test)
 # metrics
 print(f'Train set F1-score: {f1_score(y_tr, y_tr_pred)}')
 print("Train set confusion matrix\n",
-      confusion_matrix(y_tr, y_tr_pred, normalize=None))
+      confusion_matrix(y_tr, y_tr_pred, normalize='all'))
 print(f'Test set F1-score: {f1_score(y_test, y_test_pred)}')
 print("Test set confusion matrix\n",
-      confusion_matrix(y_test, y_test_pred, normalize=None))
+      confusion_matrix(y_test, y_test_pred, normalize='all'))
 
 
 #%%
@@ -606,6 +607,11 @@ Let us now make some improvements to the previous code, without changing the mod
 A first improvement is to make it work in a more integrated fashion. We thus do the following:
 - The data preprocessing, encoding of categorical variables and scaling of quantitative variables, is wrapped in a `compose.ColumnTransformer`
 - The preprocessing and classification are wrapped in a `pipeline.Pipeline`, exposing a single interface for all steps
+
+Note that one-hot encoding can be done with pandas
+```python
+X = pd.get_dummies(X).drop(['country_US', 'source_Seo'], axis=1)
+```
 """
 
 ##
@@ -615,9 +621,11 @@ X = df.drop('converted', axis=1)
 
 # preprocessing
 cat_vars = ['country', 'source']
-quant_vars = ['age', 'new_user', 'total_pages_visited']
+bool_vars = ['new_user']
+quant_vars = ['age', 'total_pages_visited']
 col_preproc = ColumnTransformer(
     [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
+     ('bool_id', FunctionTransformer(lambda x: x), bool_vars),
      ('quant_scaler', StandardScaler(), quant_vars)])
 
 # full pipeline
@@ -631,27 +639,37 @@ However, we recall that the performance of our model is assessed not by the aver
 Our model can adjust by cross-validation this threshold probability so as to maximize the F1-score. This is done by wrapping the
 pipeline into a `model_selection.TunedThresholdClassifierCV`.
 """
+
 model = TunedThresholdClassifierCV(pipeline, scoring='f1', cv=10,
-                                   random_state=None,
+                                   random_state=1234,
                                    store_cv_results=True)
+t0 = time.time()
 model.fit(X, y)
+t1 = time.time()
+print(f'model fitting time: {t1-t0} s')
+
 best_thr = model.best_threshold_
+logit_thr = np.log(best_thr / (1 - best_thr))
 best_score = model.best_score_
+
 print(f'best threshold = {best_thr:.8f}',
-      f'best F1-score = {best_score:.8f}')
+      f'\nbest F1-score = {best_score:.8f}')
 
 #%%
 """
 ## metrics: confusion matrix and ROC
 
 The receiver operating characteristic (ROC) curve is the natural metric associated to the classification threshold variation.
+We produce the mean curve through 10-times cross validation building a ROC curve from each validation set and averaging the results.
 
+We also use the data to compute the mean confusion matrix at the threshold selected above. Compared to that of the non-adjusted linear regression,
+we get 15% less false positives, at the expense of 50% more false negatives. However, since the latter are not involved in the computation of the F1 score,
+the overall result is an improved value.
 """
-logit_thr = np.log(best_thr / (1 - best_thr))
-
 n_splits = 10
 cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
-clf = clone(model) # an unfitted copy of our previous model
+clf = Pipeline([('column_preprocessing', col_preproc),
+                ('classifier', LogisticRegression())])
 
 mean_cm = np.zeros((2, 2), dtype=float) # confusion matrix
 mean_fpr = np.linspace(0, 1, 101) # false-positive rates
@@ -666,66 +684,40 @@ for i, (itr, ival) in enumerate(cv.split(X, y)):
     # ROC
     y_decision = clf.decision_function(X_v)
     fpr, tpr, thr = roc_curve(y_v, y_decision)
-    print(thr)
     mean_tpr += np.interp(mean_fpr, fpr, tpr, left=0, right=1) / n_splits
-    thr_fpr += np.interp(np.log(best_thr / (1 - best_thr)), thr, fpr) / n_splits
-    thr_tpr += np.interp(np.log(best_thr / (1 - best_thr)), thr, tpr) / n_splits
+    thr_fpr += np.interp(logit_thr, thr[::-1], fpr[::-1]) / n_splits
+    thr_tpr += np.interp(logit_thr, thr[::-1], tpr[::-1]) / n_splits
 mean_tpr[0] = 0
 mean_auc = auc(mean_fpr, mean_tpr)
 
+print("Mean confusion matrix\n", mean_cm)
 
 
 #%%
-fig, ax = plt.subplots(figsize=(6, 6))
-ax.plot(mean_fpr, mean_tpr, label=f'Mean ROC (AUC = {mean_auc:.4f})')
-ax.plot(thr_fpr, thr_tpr, marker='X', markersize=5)
-ax.text(0.8, 0.93, f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}',
-        ha='center', va='center')
-ax.legend(loc=4)
-ax.set_xlim(-0.01, 1.01)
-ax.set_ylim(-0.01, 1.01)
-ax.grid(visible=True, alpha=0.3)
+"""
+We plot the ROC curve in figure 6. The location of our selected threshold is indicated on the curve as an orange cross.
+"""
+
+fig6, ax6 = plt.subplots(figsize=(5, 5))
+fig6.suptitle('Figure 6', x=0.02, ha='left')
+
+ax6.plot(mean_fpr, mean_tpr, label=f'Mean ROC (AUC = {mean_auc:.4f})')
+ax6.plot(thr_fpr, thr_tpr, marker='X', markersize=7, markeredgewidth=0.1)
+
+ax6.legend(loc=4)
+ax6.set_title('mean ROC curve')
+ax6.set_xlabel('False positive rate')
+ax6.set_ylabel('True positive rate')
+ax6.set_xlim(-0.01, 1.01)
+ax6.set_ylim(-0.01, 1.01)
+ax6.grid(visible=True, alpha=0.3)
+
+thr_txt = (f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}\n'
+           f'TPR = {thr_tpr:.4}\nFPR = {thr_fpr:.4}')
+ax6.text(0.23, 0.74, thr_txt, ha='center', va='center')
+
 plt.show()
 
-
-
-## preprocess
-# fenc = StandardScaler()
-# X_tr = fenc.fit_transform(X_tr)
-
-# ## split
-# X_tr, X_val, Y_tr, Y_val = train_test_split(X, Y, test_size=0.1, stratify=Y)
-
-
-# ##### training pipeline #####
-# ## preprocess
-# featureencoder = StandardScaler()
-# X_tr = featureencoder.fit_transform(X_tr)
-
-# ## train
-# classifier = LogisticRegression() # 
-# classifier.fit(X_tr, Y_tr)
-
-# ## train set predicitions
-# Y_tr_pred = classifier.predict(X_tr)
-
-
-
-# ##### performance assessment #####
-# ## preprocess
-# X_val = featureencoder.transform(X_val)
-
-# ## make predicitions
-# Y_val_pred = classifier.predict(X_val)
-
-
-# ## metrics
-# print(f'Train set F1-score: {f1_score(Y_tr, Y_tr_pred)}')
-# print(f'Test set F1-score: {f1_score(Y_val, Y_val_pred)}')
-# print("Train set confusion matrix\n",
-#       confusion_matrix(Y_tr, Y_tr_pred, normalize='all'))
-# print("Test set confusion matrix\n",
-#       confusion_matrix(Y_val, Y_val_pred, normalize='all'))
 
 #%%
 ##### testing pipeline #####
