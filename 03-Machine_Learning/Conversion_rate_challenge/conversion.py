@@ -492,13 +492,17 @@ for both new (left panel) and recurring (right panel) visitors.
 """
 
 from sklearn.base import clone
-from sklearn.model_selection import (train_test_split,
+from sklearn.model_selection import (GridSearchCV,
+                                     train_test_split,
                                      cross_validate,
                                      StratifiedKFold,
                                      TunedThresholdClassifierCV)
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, FunctionTransformer
+from sklearn.preprocessing import (OneHotEncoder,
+                                   StandardScaler,
+                                   FunctionTransformer,
+                                   PolynomialFeatures)
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (f1_score,
@@ -507,8 +511,7 @@ from sklearn.metrics import (f1_score,
                              auc)
 
 
-def evaluate_model(preprocessor: Callable,
-                   predictor: Callable,
+def evaluate_model(pipeline: Pipeline,
                    export_csv: bool = False,
                    name_suffix: str = 'EXAMPLE')-> np.ndarray:
     """
@@ -517,10 +520,8 @@ def evaluate_model(preprocessor: Callable,
 
     Parameters
     ----------
-    preprocessor : Callable: pd.DataFrame -> T
+    Pipeline : Callable: pd.DataFrame -> T
         The feature preprocessor.
-    prediction_engine : Callable: T -> np.ndarray
-        The prediciton engine of the model.
     export_csv : bool, optional
         Export the test data as a csv file for challenge assessment.
         The default is False.
@@ -533,14 +534,49 @@ def evaluate_model(preprocessor: Callable,
         The model's predictions on the test set.
     """
     df = pd.read_csv('./conversion_data_test.csv')
-    X = preprocessor(df)
-    Y_pred = predictor(X)
+    Y_pred = pipeline.predict(df)
     
     if export_csv:
         fname = f'conversion_data_test_predictions_{name_suffix}.csv'
         np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
     
     return Y_pred
+
+
+# def evaluate_model(preprocessor: Callable,
+#                    predictor: Callable,
+#                    export_csv: bool = False,
+#                    name_suffix: str = 'EXAMPLE')-> np.ndarray:
+#     """
+#     Evaluate the model on the test set. The predictions are exported as
+#     'conversion_data_test_predictions_{name_suffix}.csv'
+
+#     Parameters
+#     ----------
+#     preprocessor : Callable: pd.DataFrame -> T
+#         The feature preprocessor.
+#     prediction_engine : Callable: T -> np.ndarray
+#         The prediciton engine of the model.
+#     export_csv : bool, optional
+#         Export the test data as a csv file for challenge assessment.
+#         The default is False.
+#     name_suffix : str, optional
+#         Suffix appended to the output filename. The default is 'EXAMPLE'.
+    
+#     Returns
+#     -------
+#     Y_pred : 1D np.ndarray
+#         The model's predictions on the test set.
+#     """
+#     df = pd.read_csv('./conversion_data_test.csv')
+#     X = preprocessor(df)
+#     Y_pred = predictor(X)
+    
+#     if export_csv:
+#         fname = f'conversion_data_test_predictions_{name_suffix}.csv'
+#         np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
+    
+#     return Y_pred
 
 
 #%%
@@ -571,8 +607,8 @@ scaler = StandardScaler()
 X_tr = scaler.fit_transform(X_tr)
 
 # fit logistic regression classifier
-classifier = LogisticRegression()
-classifier.fit(X_tr, y_tr)
+model1 = LogisticRegression()
+model1.fit(X_tr, y_tr)
 
 
 """
@@ -580,11 +616,11 @@ Performance assessment
 """
 
 # train set predicitions
-y_tr_pred = classifier.predict(X_tr)
+y_tr_pred = model1.predict(X_tr)
 
 # test set predicitions
 X_test = scaler.transform(X_test) # no fit this time
-y_test_pred = classifier.predict(X_test)
+y_test_pred = model1.predict(X_test)
 
 # metrics
 print(f'Train set F1-score: {f1_score(y_tr, y_tr_pred)}')
@@ -640,17 +676,17 @@ Our model can adjust by cross-validation this threshold probability so as to max
 pipeline into a `model_selection.TunedThresholdClassifierCV`.
 """
 
-model = TunedThresholdClassifierCV(pipeline, scoring='f1', cv=10,
-                                   random_state=1234,
-                                   store_cv_results=True)
+model1_ta = TunedThresholdClassifierCV(pipeline, scoring='f1', cv=10,
+                                       random_state=1234,
+                                       store_cv_results=True)
 t0 = time.time()
-model.fit(X, y)
+model1_ta.fit(X, y)
 t1 = time.time()
 print(f'model fitting time: {t1-t0} s')
 
-best_thr = model.best_threshold_
+best_thr = model1_ta.best_threshold_
 logit_thr = np.log(best_thr / (1 - best_thr))
-best_score = model.best_score_
+best_score = model1_ta.best_score_
 
 print(f'best threshold = {best_thr:.8f}',
       f'\nbest F1-score = {best_score:.8f}')
@@ -717,31 +753,127 @@ thr_txt = (f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}\n'
 ax6.text(0.23, 0.74, thr_txt, ha='center', va='center')
 
 plt.show()
+sys.exit()
+
+#%%
+
+"""
+As mentioned in the EDA section, there is an interaction of the variables. We can capture such interaction by introducing
+polynomial features of the form $X_i X_j$. This is done with `preprocessing.PolynomialFeatures`. However, we limit ourselves
+to 1st order interactions proper, and consider only quadratic *cross* terms $X_i X_j, \ i \neq j$.
+Still, there are $n(n-1)/2 = 45$ such terms for $n=10$. This is a lot, and we expect many of those terms to have no predictive power.
+
+In order to keep only relevant terms, we apply a lasso penalty. The penalty parameter 
+
+
+we expect many cross terms X1*X2 to heve no effe
+"""
+
+# no need to drop values in OHE: we'll do regularization
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(lambda x: x), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+# set the classifier
+clf = LogisticRegression(
+    penalty='l1', # 
+    fit_intercept=False, # intercept already included as a feature by `PolynomialFeatures`
+    solver='saga', # supports L1 penalty
+    )
+
+# full pipeline
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('poly_features', PolynomialFeatures(degree=2, interaction_only=True)),
+     ('classifier', clf)])
+
+# optimize the L1 regularization parameter
+gsearch = GridSearchCV(
+    pipeline,  param_grid={'classifier__C': np.linspace(0.01, 0.1, num=21)},
+    n_jobs=8, refit=False, cv=10, verbose=False)
+gsearch.fit(X, y)
+best_C = gsearch.best_params_['classifier__C']
+print(f'found best C = {best_C}')
+clf.C = best_C
+
+# evaluate the model by cross validation
+cv_model2 = cross_validate(pipeline, X, y, scoring='f1', cv=10)
+model2_f1 = np.mean(cv_model2['test_score'])
+model2_std_f1 = np.std(cv_model2['test_score'])
+print(f'Mean F1-score = {model2_f1:.8} +- {model2_std_f1:.8}')
+
+# fit on the complete dataset
+model2 = pipeline.fit(X, y)
+
+"""
+The model is better than the simple linear regression. However, it is no better than the version with adjusted classification threshold.
+We can proceed as before and adapt the classification threshold of this model to improve it further.
+"""
+
+model2_ta = TunedThresholdClassifierCV(
+    clone(pipeline), scoring='f1', cv=10, random_state=1234)
+t0 = time.time()
+model2_ta.fit(X, y)
+t1 = time.time()
+print(f'model fitting time: {t1-t0} s')
+
+best_thr = model2_ta.best_threshold_
+logit_thr = np.log(best_thr / (1 - best_thr))
+best_score = model2_ta.best_score_
+
+print(f'best threshold = {best_thr:.8f}',
+      f'\nbest F1-score = {best_score:.8f}')
+
+"""
+There is an improvement with respect to the non-adjusted model, but the score is not better than the adjusted simple linear regression.
+"""
+
+#%%
+
+"""
+The application of the `PolynomialFeatures` preprocessor caused the apparition of many useless features 
+The many (and mostly useless) features added through application of the `PolynomialFeatures` preprocessor were the cause of a significant slowdown
+of the various optimization procedures. 
+
+A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
+multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
+
+
+"""
+
+dfs = {idx: df_ for idx, df_ in X.groupby(['country', 'new_user'])}
+
+
 
 
 #%%
 ##### testing pipeline #####
 from hashlib import shake_256
 
-def preprocessor_baseline(dataframe: pd.DataFrame)-> np.ndarray:
-    df = pd.get_dummies(dataframe)
-    df = df.drop(['country_US', 'source_Seo'], axis=1)
-    return df
+# def preprocessor_baseline(dataframe: pd.DataFrame)-> np.ndarray:
+#     df = pd.get_dummies(dataframe)
+#     df = df.drop(['country_US', 'source_Seo'], axis=1)
+#     return df
 
-def predictor_baseline(X: np.ndarray)-> np.ndarray:
-    return model.predict(X)
+# def predictor_baseline(X: np.ndarray)-> np.ndarray:
+#     return model.predict(X)
 
-models = [
-    b'baseline',
-    b'linreg_threhold_adjust',
-    ]
-models = {m: shake_256(m).hexdigest(4) for m in models}
+models = {
+    # 'model1_ta': model1_ta,
+    'model2': model2,
+    'model2_ta': model2_ta,
+    
+    }
+# models = {m: shake_256(m).hexdigest(4) for m in models}
 
+for m, model in models.items():
+    evaluate_model(model, export_csv=True, name_suffix=m)
 
-evaluate_model(preprocessor_baseline,
-               predictor_baseline,
-               export_csv=False,
-               name_suffix=models['linreg_threhold_adjust'])
+# evaluate_model(preprocessor_baseline,
+#                predictor_baseline,
+#                export_csv=False,
+#                name_suffix=models[b'linreg_threhold_adjust'])
 
 
 
