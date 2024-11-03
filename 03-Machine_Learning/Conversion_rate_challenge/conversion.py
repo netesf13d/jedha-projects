@@ -8,6 +8,7 @@ import sys
 import time
 # from itertools import product
 # from datetime import datetime
+import warnings
 from typing import Callable
 
 import numpy as np
@@ -18,6 +19,7 @@ import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 # from matplotlib.colors import Colormap, LightSource
 # from matplotlib.collections import PolyCollection
+
 
 
 
@@ -431,6 +433,57 @@ which matches the differences observed in figure 1.
 Second, the threshold seems to be set at a significantly higher level than other countries. These two factors explain the much lower conversion rates observed in figure 1.
 """
 
+#%%
+
+### Effect of the number of pages visited for each source
+
+"""
+We now consider 
+"""
+
+# df_ = df.loc[df['new_user'] == 1]
+npages = np.arange(30)
+source, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
+    df, group_by='source', variables=['total_pages_visited'], xvals=[npages])
+
+
+idx = ~np.isnan(npage_pconv)
+popt, pcov = [], []
+for k, i in enumerate(idx):
+    popt_, pcov_ = curve_fit(sigmoid, npages[i], npage_pconv[k, i], p0=(15, 1))
+    popt.append(popt_)
+    pcov.append(pcov_)
+
+
+## plot
+fig5, axs5 = prob_distrib_plot(
+    npages, npage_counts, npage_pconv, npage_std_pconv,
+    group_labels=source)
+
+axs5[0].text(14, 0.103, f'total counts: {int(np.sum(npage_counts))}')
+axs5[0].set_ylim(0, 0.16)
+axs5[0].set_title("# pages visited distribution")
+axs5[0].set_xlabel('# pages visited')
+axs5[0].legend(loc=1)
+
+for k, popt_ in enumerate(popt):
+    axs5[1].plot(npages, sigmoid(npages, *popt_),
+                  linewidth=1, color=f'C{k}', label='sigmoid fit')
+axs5[1].set_ylim(-0.005, 1.005)
+axs5[1].set_xlabel('# pages visited')
+# axs5[1].legend()
+
+plt.show()
+
+"""
+Here we show, for each country, the distribution of pages visited (left panel) and the conversion probability as a function of the number of pages visited (right panel).
+- The behavior of users from `'Germany'`, `'UK'` and `'US'` is quite similar both in terms of page visits and conversion probability thresholding with a tendency Germany < UK < US
+which matches the differences observed in figure 1.
+- The behavior difference of users from `'China'` is striking. First, the distibution of pages visits is different, with much less visits of more than 13 pages, those which are associated to newsletter subscription.
+Second, the threshold seems to be set at a significantly higher level than other countries. These two factors explain the much lower conversion rates observed in figure 1.
+"""
+
+
 
 #%% 
 
@@ -504,11 +557,15 @@ from sklearn.preprocessing import (OneHotEncoder,
                                    FunctionTransformer,
                                    PolynomialFeatures)
 from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import (LogisticRegression, SGDClassifier)
+from sklearn.svm import LinearSVC
 from sklearn.metrics import (f1_score,
                              confusion_matrix,
                              roc_curve,
                              auc)
+
+from sklearn.exceptions import ConvergenceWarning
+warnings.simplefilter("ignore", ConvergenceWarning)
 
 
 def evaluate_model(pipeline: Pipeline,
@@ -661,7 +718,7 @@ bool_vars = ['new_user']
 quant_vars = ['age', 'total_pages_visited']
 col_preproc = ColumnTransformer(
     [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
-     ('bool_id', FunctionTransformer(lambda x: x), bool_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
      ('quant_scaler', StandardScaler(), quant_vars)])
 
 # full pipeline
@@ -685,7 +742,6 @@ t1 = time.time()
 print(f'model fitting time: {t1-t0} s')
 
 best_thr = model1_ta.best_threshold_
-logit_thr = np.log(best_thr / (1 - best_thr))
 best_score = model1_ta.best_score_
 
 print(f'best threshold = {best_thr:.8f}',
@@ -699,7 +755,9 @@ The receiver operating characteristic (ROC) curve is the natural metric associat
 We produce the mean curve through 10-times cross validation building a ROC curve from each validation set and averaging the results.
 
 We also use the data to compute the mean confusion matrix at the threshold selected above. Compared to that of the non-adjusted linear regression,
-we get 15% less false positives, at the expense of 50% more false negatives. However, since the latter are not involved in the computation of the F1 score,
+we get 15% less false negatives, at the expense of 50% more false positives. However,
+
+ since the latter are not involved in the computation of the F1 score,
 the overall result is an improved value.
 """
 n_splits = 10
@@ -715,14 +773,14 @@ for i, (itr, ival) in enumerate(cv.split(X, y)):
     X_v, y_v = X.iloc[ival], y.iloc[ival]
     clf.fit(X.iloc[itr], y.iloc[itr])
     # confusion matrix
-    y_pred = clf.predict_proba(X_v)[:, 1] > best_thr
+    y_pred = clf.decision_function(X_v)[:, 1] > best_thr
     mean_cm += confusion_matrix(y_v, y_pred) / len(X)
     # ROC
     y_decision = clf.decision_function(X_v)
     fpr, tpr, thr = roc_curve(y_v, y_decision)
     mean_tpr += np.interp(mean_fpr, fpr, tpr, left=0, right=1) / n_splits
-    thr_fpr += np.interp(logit_thr, thr[::-1], fpr[::-1]) / n_splits
-    thr_tpr += np.interp(logit_thr, thr[::-1], tpr[::-1]) / n_splits
+    thr_fpr += np.interp(best_thr, thr[::-1], fpr[::-1]) / n_splits
+    thr_tpr += np.interp(best_thr, thr[::-1], tpr[::-1]) / n_splits
 mean_tpr[0] = 0
 mean_auc = auc(mean_fpr, mean_tpr)
 
@@ -756,7 +814,6 @@ plt.show()
 sys.exit()
 
 #%%
-
 """
 As mentioned in the EDA section, there is an interaction of the variables. We can capture such interaction by introducing
 polynomial features of the form $X_i X_j$. This is done with `preprocessing.PolynomialFeatures`. However, we limit ourselves
@@ -790,7 +847,7 @@ pipeline = Pipeline(
 
 # optimize the L1 regularization parameter
 gsearch = GridSearchCV(
-    pipeline,  param_grid={'classifier__C': np.linspace(0.01, 0.1, num=21)},
+    pipeline,  param_grid={'classifier__C': np.linspace(0.01, 0.11, num=21)},
     n_jobs=8, refit=False, cv=10, verbose=False)
 gsearch.fit(X, y)
 best_C = gsearch.best_params_['classifier__C']
@@ -813,6 +870,7 @@ We can proceed as before and adapt the classification threshold of this model to
 
 model2_ta = TunedThresholdClassifierCV(
     clone(pipeline), scoring='f1', cv=10, random_state=1234)
+print(model2_ta.steps['classifier'].C)
 t0 = time.time()
 model2_ta.fit(X, y)
 t1 = time.time()
@@ -842,7 +900,266 @@ multiple datasets, corresponding to a (country, new_user) pair, and fit a differ
 
 """
 
-dfs = {idx: df_ for idx, df_ in X.groupby(['country', 'new_user'])}
+# split the dataset
+groups = ['new_user']
+Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
+ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
+
+# column preprocessing
+cat_vars_2 = [v for v in cat_vars if v not in groups]
+bool_vars_2 = [v for v in bool_vars if v not in groups]
+quant_vars_2 = [v for v in quant_vars if v not in groups]
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars_2),
+      ('bool_id', FunctionTransformer(None), bool_vars_2),
+      ('quant_scaler', StandardScaler(), quant_vars_2)])
+
+# custom feature engineering
+def poly_features(X: np.ndarray)-> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 26), dtype=float)
+    X_[:, :9] = X # original features
+    X_[:, 9:11] = X[:, 7:9]**2 # age**2, npages**2
+    X_[:, 11] = X[:, 7] * X[:, 8] # age * npages
+    X_[:, 12:19] = X[:, :7] * X[:, [7]] # cat * age
+    X_[:, 19:26] = X[:, :7] * X[:, [8]] # cat * npages
+    return X_
+
+# classifier: SVM classifier with linear kernel
+logreg_clf = LogisticRegression(
+    penalty='elasticnet', # 
+    C=0.1,
+    fit_intercept=True, # intercept already included as a feature by `PolynomialFeatures`
+    class_weight=None,
+    solver='saga', # supports elasticnet penalty
+    random_state=1234,
+    l1_ratio=0.8,
+    )
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('poly_features', FunctionTransformer(poly_features)), # PolynomialFeatures(degree=2, interaction_only=True)),
+      ('classifier', logreg_clf)]
+    )
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+
+"""
+Now we optimize
+"""
+
+# # optimize the regularization parameter
+# for idx, pipeline in pipelines.items():
+#     gsearch = GridSearchCV(
+#         pipeline,  param_grid={'classifier__C': np.logspace(-5, 1, 61)},
+#         scoring='f1', n_jobs=4, refit=False, cv=10, verbose=False)
+#     gsearch.fit(Xs[idx], ys[idx])
+#     best_C = gsearch.best_params_['classifier__C']
+#     print(f'found best C for idx={idx}: {best_C}')
+#     pipeline['classifier'].C = best_C
+
+
+# evaluate
+n_splits = 10
+cm = np.zeros((2, 2), dtype=float) # confusion matrix
+cms = {}
+for idx, pipeline in pipelines.items():
+    cms[idx] = np.zeros((2, 2), dtype=float)
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+    X_, y_ = Xs[idx], ys[idx]
+    for i, (itr, ival) in enumerate(cv.split(X_, y_)):
+        pipeline.fit(X_.iloc[itr], y_.iloc[itr])
+        cms[idx] += confusion_matrix(y_.iloc[ival], pipeline.predict(X_.iloc[ival]))
+        cm += confusion_matrix(y_.iloc[ival], pipeline.predict(X_.iloc[ival]))
+print('===== Partial scores =====')
+for idx, cm_ in cms.items():
+    recall = cm_[1, 1] / np.sum(cm_, axis=1)[1]
+    prec = cm_[1, 1] / np.sum(cm_, axis=0)[1]
+    print(f'{idx} : precision: {prec:.8}; recall: {recall:.8};',
+          f'F1-score = {2*prec*recall/(prec+recall):.8}')
+print('===== Global scores =====')
+recall = cm[1, 1] / np.sum(cm, axis=1)[1]
+prec = cm[1, 1] / np.sum(cm, axis=0)[1]
+print("CV-estimated confusion matrix\n", cm / np.sum(cm))
+print(f'CV-estimated precision: {prec:.8}; recall: {recall:.8}')
+print(f'CV-estimated F1-score = {2*prec*recall/(prec+recall):.8}')
+
+
+# fit on the whole dataset
+model3 = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
+
+
+"""
+Similarly, we can adjust the classification threshold
+It would be difficult to recover a global F1-score estimate since the TunedThresholdClassifierCV won't
+return the confusion matrix at each CV round.
+"""
+
+model3_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
+              for idx, p in pipelines.items()}
+
+t0 = time.time()
+for idx, model in model3_ta.items():
+    model.fit(Xs[idx], ys[idx])
+t1 = time.time()
+print(f'model3_ta fitting time: {t1-t0} s')
+
+best_thrs = {idx: m.best_threshold_ for idx, m in model3_ta.items()}
+best_scores = {idx: m.best_score_ for idx, m in model3_ta.items()}
+for idx in best_thrs:
+    print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
+          f'best F1-score = {best_scores[idx]:.6f}')
+
+
+"""
+Our two models are `dict`s and as such do not have the `Estimator` interface (and most notably the `predict` method).
+To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
+"""
+
+class MimicEstimator():
+    
+    def __init__(self, model: dict, groups: list[str]):
+        self.groups: list[str] = groups
+        self.model: dict = model
+        
+    def predict(self, df: pd.DataFrame)-> np.ndarray:
+        y_pred = np.empty(len(df), dtype=int)
+        Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in df.groupby(self.groups)}
+        for idx, X in Xs.items():
+            y_pred[X.index] = self.model[idx].predict(X)
+        return y_pred
+
+#%%
+
+for idx, pipeline in pipelines.items():
+    print(f'found best C for idx={idx}: {pipeline["classifier"].C}')
+
+print("CV-estimated confusion matrix\n", cm / np.sum(cm))
+print(f'CV-estimated precision: {prec:.8}; recall: {recall:.8}')
+print(f'CV-estimated F1-score = {2*prec*recall/(prec+recall):.8}')
+
+print(f'model3_ta fitting time: {t1-t0} s')
+
+for idx in best_thrs:
+    print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
+          f'best F1-score = {best_scores[idx]:.6f}')
+
+#%%
+"""
+We saw that the main issue with the simple logistic regression was the strong imbalance between the conversion rates, and the fact that
+the logistic regression would include all observations in the error function computation.
+
+The support vector machine brings a solution to this issue, by considering only those observations that lie within a given margin of the decision plane.
+Let us implement this solution.
+"""
+
+# split the dataset
+groups = ['new_user']
+Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
+ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
+
+# column preprocessing
+cat_vars_2 = [v for v in cat_vars if v not in groups]
+bool_vars_2 = [v for v in bool_vars if v not in groups]
+quant_vars_2 = [v for v in quant_vars if v not in groups]
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars_2),
+     ('bool_id', FunctionTransformer(None), bool_vars_2),
+     ('quant_scaler', StandardScaler(), quant_vars_2)])
+
+# custom feature engineering
+def poly_features(X: np.ndarray)-> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 26), dtype=float)
+    X_[:, :9] = X # original features
+    X_[:, 9:11] = X[:, 7:9]**2 # age**2, npages**2
+    X_[:, 11] = X[:, 7] * X[:, 8] # age * npages
+    X_[:, 12:19] = X[:, :7] * X[:, [7]] # cat * age
+    X_[:, 19:26] = X[:, :7] * X[:, [8]] # cat * npages
+    return X_
+
+# classifier
+svc_clf = SGDClassifier(
+    loss='hinge',
+    penalty='l2', # 
+    fit_intercept=True,
+    # intercept_scaling=10,
+    )
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('poly_features', FunctionTransformer(poly_features)), # PolynomialFeatures(degree=2, interaction_only=True)),
+     ('classifier', svc_clf)]
+    )
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+
+"""
+Now we optimize
+"""
+
+# optimize the regularization parameter
+for idx, pipeline in pipelines.items():
+    gsearch = GridSearchCV(
+        pipeline,  param_grid={'classifier__alpha': np.logspace(-6, -2, 41)},
+        scoring=None, n_jobs=4, refit=False, cv=10, verbose=False)
+    gsearch.fit(Xs[idx], ys[idx])
+    best_alpha = gsearch.best_params_['classifier__alpha']
+    print(f'found best alpha for idx={idx}: {best_alpha}')
+    pipeline['classifier'].alpha = best_alpha
+
+# evaluate
+n_splits = 10
+cm = np.zeros((2, 2), dtype=float) # confusion matrix
+for idx, pipeline in pipelines.items():
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+    X_, y_ = Xs[idx], ys[idx]
+    for i, (itr, ival) in enumerate(cv.split(X_, y_)):
+        pipeline.fit(X_.iloc[itr], y_.iloc[itr])
+        cm += confusion_matrix(y_.iloc[ival], pipeline.predict(X_.iloc[ival]))
+recall = cm[1, 1] / np.sum(cm, axis=1)[1]
+prec = cm[1, 1] / np.sum(cm, axis=0)[1]
+print("CV-estimated confusion matrix\n", cm / np.sum(cm))
+print(f'CV-estimated precision: {prec:.8}; recall: {recall:.8}')
+print(f'CV-estimated F1-score = {2*prec*recall/(prec+recall):.8}')
+
+
+# fit on the whole dataset
+model4 = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
+
+
+"""
+Similarly, we can adjust the classification threshold
+It would be difficult to recover a global F1-score estimate since the TunedThresholdClassifierCV won't
+return the confusion matrix at each CV round.
+"""
+
+model4_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
+             for idx, p in pipelines.items()}
+
+t0 = time.time()
+for idx, model in model4_ta.items():
+    model.fit(Xs[idx], ys[idx])
+t1 = time.time()
+print(f'model4_ta fitting time: {t1-t0} s')
+
+best_thrs = {idx: m.best_threshold_ for idx, m in model4_ta.items()}
+best_scores = {idx: m.best_score_ for idx, m in model4_ta.items()}
+for idx in best_thrs:
+    print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
+          f'best F1-score = {best_scores[idx]:.6f}')
 
 
 
@@ -859,11 +1176,13 @@ from hashlib import shake_256
 # def predictor_baseline(X: np.ndarray)-> np.ndarray:
 #     return model.predict(X)
 
+
 models = {
     # 'model1_ta': model1_ta,
-    'model2': model2,
-    'model2_ta': model2_ta,
-    
+    # 'model2': model2,
+    # 'model2_ta': model2_ta,
+    'model4': MimicEstimator(model3, groups),
+    'model4_ta': MimicEstimator(model3_ta, groups),
     }
 # models = {m: shake_256(m).hexdigest(4) for m in models}
 
