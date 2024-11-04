@@ -123,7 +123,9 @@ def prob_distrib_plot(xvals: np.ndarray,
         The figure and axes, for further processing.
 
     """
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
+    fig, axs = plt.subplots(
+        nrows=1, ncols=2, figsize=(9, 4),
+        gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.86, 'bottom': 0.12})
 
     axs[0].grid(visible=True)
     distribs = counts / np.sum(counts, axis=1, keepdims=True)
@@ -131,7 +133,7 @@ def prob_distrib_plot(xvals: np.ndarray,
         axs[0].plot(xvals, distribs[k], color=f'C{k}',
                     linewidth=1, label=f'{label} ({int(np.sum(counts[k]))})')
     axs[0].set_xlim(0, np.max(xvals)+1)
-    axs[0].set_ylim(-np.max(distribs)*0.02, np.max(distribs)*1.02)
+    axs[0].set_ylim(-0.0005, (int(np.max(distribs)*100)+1)/100)
     axs[0].set_ylabel('Prob. density')
 
     axs[1].grid(visible=True)
@@ -161,9 +163,11 @@ new_user, counts, pconv, _ = prob_distrib(
     xvals=[sources, countries])
 
 
-# TODO finish plot
-fig1, axs1 = plt.subplots(nrows=1, ncols=2, figsize=(6, 3.5))
-fig1.suptitle('Figure 1: Conversion probability heatmaps', x=0.02, ha='left')
+##
+fig1, axs1 = plt.subplots(
+    nrows=1, ncols=2, figsize=(6, 3),
+    gridspec_kw={'left': 0.1, 'right': 0.9, 'top': 0.88, 'bottom': 0.14, 'wspace': 0.3})
+fig1.suptitle('Figure 1: Influence of categorical variables on conversion probability', x=0.02, ha='left')
 
 axs1_cb = np.empty_like(axs1, dtype=object)
 for k, ax in enumerate(axs1):
@@ -181,10 +185,10 @@ for k, ax in enumerate(axs1):
     fig1.colorbar(heatmap, cax=axs1_cb[k], orientation="vertical", ticklocation="right")
 
 
-axs1[0].set_title(f"Recurring visitors ({np.sum(counts[0])})")
+axs1[0].set_title(f"Recurring visitors (n={np.sum(counts[0])})\nconversion prob. (%)")
 axs1_cb[0].set_yticks([0, 5, 10, 15])
 
-axs1[1].set_title(f"New visitors ({np.sum(counts[1])})")
+axs1[1].set_title(f"New visitors (n={np.sum(counts[1])})\nconversion prob. (%)")
 axs1[1].tick_params(left=False, labelleft=False)
 axs1_cb[1].set_yticks([0, 0.5, 1, 1.5, 2, 2.5])
 
@@ -230,9 +234,9 @@ for k, i in enumerate(idx):
 fig2, axs2 = prob_distrib_plot(
     ages, age_counts, age_pconv, age_std_pconv,
     group_labels=['recur.', 'new'])
-fig2.suptitle("Figure 2: Influence of 'age'", x=0.02, ha='left')
+fig2.suptitle("Figure 2: Influence of 'age' on the conversion probability", x=0.02, ha='left')
 
-axs2[0].text(40, 0.035, f'total counts: {int(np.sum(age_counts))}')
+axs2[0].text(45, 0.0375, f'total counts: {int(np.sum(age_counts))}')
 axs2[0].axvline(17, color='k', linewidth=1, linestyle='--')
 axs2[0].text(11, 0.04, '17 yo\ncutoff', ha='center', va='center')
 axs2[0].set_title("Age distribution of visitors")
@@ -268,7 +272,7 @@ These patterns are extremely regular and again reveal the artificial nature of t
 """
 
 
-# %%
+#%%
 
 # Number of pages visited
 """
@@ -301,10 +305,11 @@ for k, i in enumerate(idx):
 fig3, axs3 = prob_distrib_plot(
     npages, npage_counts, npage_pconv, npage_std_pconv,
     group_labels=['recur. visitors', 'new visitors'])
-fig3.suptitle("Figure 3: Influence of 'total_pages_visited'", x=0.02, ha='left')
+fig3.suptitle("Figure 3: Influence of 'total_pages_visited' on the conversion probability",
+              x=0.02, ha='left')
 
 axs3[0].text(13, 0.123, f'total counts: {int(np.sum(npage_counts))}')
-axs3[0].set_ylim(-0.005, 0.16)
+axs3[0].set_ylim(-0.002, 0.16)
 axs3[0].set_title("# pages visited distribution")
 axs3[0].set_xlabel('# pages visited')
 axs3[0].legend()
@@ -321,8 +326,6 @@ axs3[1].text(21, 0.6, popt_txt[1], ha='center', va='center', fontsize=7)
 
 axs3[1].set_xlim(0, 30)
 axs3[1].set_ylim(-0.005, 1.005)
-# axs3[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], [0, 5, 10, 15, 20])
-# axs3[1].set_yticks([0, 0.05, 0.1, 0.15, 0.2], minor=True)
 axs3[1].set_title("Conversion probability")
 axs3[1].set_xlabel('# pages visited')
 axs3[1].set_ylabel('Conversion probability')
@@ -384,7 +387,7 @@ fig4, axs4 = prob_distrib_plot(
 fig4.suptitle("Figure 4: Cross-influence of 'country' and 'total_pages_visited'", x=0.02, ha='left')
 
 axs4[0].text(14, 0.103, f'total counts: {int(np.sum(npage_counts))}')
-axs4[0].set_ylim(0, 0.16)
+axs4[0].set_ylim(-0.001, 0.16)
 axs4[0].set_title("# pages visited distribution")
 axs4[0].set_xlabel('# pages visited')
 axs4[0].legend(loc=1)
@@ -394,7 +397,6 @@ for k, popt_ in enumerate(popt):
                  linewidth=1, color=f'C{k}', label='sigmoid fit')
 axs4[1].set_ylim(-0.005, 1.005)
 axs4[1].set_xlabel('# pages visited')
-# axs4[1].legend()
 
 plt.show()
 
@@ -433,9 +435,10 @@ for k, i in enumerate(idx):
 fig5, axs5 = prob_distrib_plot(
     npages, npage_counts, npage_pconv, npage_std_pconv,
     group_labels=source)
-fig5.suptitle("Figure 5: Cross-influence of 'source' and 'total_pages_visited'", x=0.02, ha='left')
+fig5.suptitle("Figure 5: Cross-influence of 'source' and 'total_pages_visited' on the conversion probability",
+              x=0.02, ha='left')
 
-axs5[0].text(14, 0.103, f'total counts: {int(np.sum(npage_counts))}')
+axs5[0].text(17, 0.11, f'total counts: {int(np.sum(npage_counts))}')
 axs5[0].set_ylim(0, 0.16)
 axs5[0].set_title("# pages visited distribution")
 axs5[0].set_xlabel('# pages visited')
@@ -446,7 +449,7 @@ for k, popt_ in enumerate(popt):
                  linewidth=1, color=f'C{k}', label='sigmoid fit')
 axs5[1].set_ylim(-0.005, 1.005)
 axs5[1].set_xlabel('# pages visited')
-# axs5[1].legend()
+axs5[1].legend(loc=2)
 
 plt.show()
 
@@ -471,7 +474,8 @@ fig6, axs6 = plt.subplots(
     nrows=1, ncols=2,
     gridspec_kw={'left': 0.1, 'right': 0.95, 'top': 0.9, 'bottom': 0.1},
     subplot_kw=dict(projection='3d'))
-fig6.suptitle("Figure 6: Cross-influence of 'age' and 'total_pages_visited'", x=0.02, ha='left')
+fig6.suptitle("Figure 6: Cross-influence of 'age' and 'total_pages_visited' on the conversion probability",
+              x=0.02, ha='left')
 
 # new visitors
 axs6[0].view_init(elev=20, azim=-110)
@@ -581,7 +585,7 @@ def print_metrics(cm: np.ndarray)-> None:
 
 def evaluate_model(model,
                    xtest_fname: str = 'conversion_data_test.csv',
-                   ytest_fname:str = 'conversion_target_test.csv'
+                   ytest_fname: str = 'conversion_data_test_labels.csv'
                    )-> tuple[np.ndarray, np.ndarray]:
     """
     Evaluate the model on the test set. The predictions are exported as
@@ -797,14 +801,104 @@ of the various optimization procedures.
 A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
 multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
 
+#### Utilities
+
+"""
+
+def split_data(groups: list[str])-> tuple[dict, dict]:
+    """
+    Split the data as a dict : group_index -> dataframe.
+    """
+    Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
+    ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
+    return Xs, ys
+
+
+def multimodel_gridsearch_cv(models: dict, Xs: dict, ys: dict,
+                             param_name: str, param_vals: np.ndarray,
+                             n_splits: int = 10)-> np.ndarray:
+    """
+    Grid search parameter optimization of a multi-model by cross-validation.
+    The `models`, `Xs` and `ys` are dict : group_index -> model/data.
+    
+    The parameters must be in the 'classifier' step of the model.
+    """
+    best_params = {}
+    for idx, model in models.items():
+        gsearch = GridSearchCV(
+            model,  param_grid={f'classifier__{param_name}': np.logspace(-3, 0, 31)},
+            scoring='f1', n_jobs=4, refit=False, cv=n_splits)
+        gsearch.fit(Xs[idx], ys[idx])
+        best_params[idx] = gsearch.best_params_[f'classifier__{param_name}']
+        print(f'found best {param_name} for idx={idx}: {best_params[idx]}')
+        # pipeline['classifier'].shrinkage = best_shrinkage
+    return best_params
+
+
+def multimodel_cv_eval(models: dict,
+                       Xs: dict,
+                       ys: dict,
+                       n_splits: int = 10,
+                       print_partial_scores: bool = False
+                       )-> tuple[dict, np.ndarray]:
+    """
+    Evaluation of a multi-model by cross-validation.
+    The `models`, `Xs` and `ys` are dict : group_index -> model/data.
+    """
+    cm = np.zeros((2, 2), dtype=float)  # confusion matrix
+    cms = {}
+    for idx, model in models.items():
+        cms[idx] = np.zeros((2, 2), dtype=float)
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+        X_, y_ = Xs[idx], ys[idx]
+        for i, (itr, ival) in enumerate(cv.split(X_, y_)):
+            model.fit(X_.iloc[itr], y_.iloc[itr])
+            X_v, y_v = X_.iloc[ival], y_.iloc[ival]
+            cms[idx] += confusion_matrix(y_v, model.predict(X_v))
+            cm += confusion_matrix(y_v, model.predict(X_v))
+    if print_partial_scores:
+        print('===== Partial scores =====')
+        for idx, cm_ in cms.items():
+            print(f'== index: {idx} ==')
+            print_metrics(cm_)
+    print('\n===== Global scores =====')
+    print_metrics(cm)
+    return cms, cm
+
+
+class MimicEstimator():
+    """
+    Wrapper around a dict of models providing a `predict` for model evaluation
+    on test data.
+    """
+
+    def __init__(self, model: dict, groups: list[str]):
+        self.groups: list[str] = groups
+        self.model: dict = model
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        y_pred = np.empty(len(df), dtype=int)
+        Xs = {idx: df_.drop(groups, axis=1)
+              for idx, df_ in df.groupby(self.groups)}
+        for idx, X in Xs.items():
+            y_pred[X.index] = self.model[idx].predict(X)
+        return y_pred
+
+#%%
+
+
+"""
+
+
 #### Model construction
 
 """
 
 # split the dataset
 groups = ['new_user', 'country']
-Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
-ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
+Xs, ys = split_data(groups)
+# Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
+# ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
 
 # column preprocessing
 cat_vars_2 = [v for v in cat_vars if v not in groups]
@@ -886,24 +980,7 @@ for idx, pipeline in pipelines.items():
 """
 #### Model evaluation by cross-validation
 """
-n_splits = 10
-cm = np.zeros((2, 2), dtype=float)  # confusion matrix
-cms = {}
-for idx, pipeline in pipelines.items():
-    cms[idx] = np.zeros((2, 2), dtype=float)
-    cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
-    X_, y_ = Xs[idx], ys[idx]
-    for i, (itr, ival) in enumerate(cv.split(X_, y_)):
-        pipeline.fit(X_.iloc[itr], y_.iloc[itr])
-        cms[idx] += confusion_matrix(y_.iloc[ival],
-                                     pipeline.predict(X_.iloc[ival]))
-        cm += confusion_matrix(y_.iloc[ival], pipeline.predict(X_.iloc[ival]))
-print('===== Partial scores =====')
-for idx, cm_ in cms.items():
-    print(f'index: {idx}')
-    print_metrics(cm_)
-print('\n===== Global scores =====')
-print_metrics(cm)
+multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 
 
 """
@@ -941,19 +1018,6 @@ Our two models are `dict`s and as such do not have the `Estimator` interface (an
 To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
 """
 
-class MimicEstimator():
-
-    def __init__(self, model: dict, groups: list[str]):
-        self.groups: list[str] = groups
-        self.model: dict = model
-
-    def predict(self, df: pd.DataFrame) -> np.ndarray:
-        y_pred = np.empty(len(df), dtype=int)
-        Xs = {idx: df_.drop(groups, axis=1)
-              for idx, df_ in df.groupby(self.groups)}
-        for idx, X in Xs.items():
-            y_pred[X.index] = self.model[idx].predict(X)
-        return y_pred
 
 
 ##
@@ -997,48 +1061,56 @@ Solve with `neighbors.NeighborhoodComponentsAnalysis`
 
 """
 
-from sklearn.neighbors import (NeighborhoodComponentsAnalysis,
-                               KNeighborsClassifier)
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
+
+# split the dataset
+groups = ['new_user', 'country']
+Xs, ys = split_data(groups)
 
 # preprocessing
 cat_vars = ['country', 'source']
 bool_vars = ['new_user']
 quant_vars = ['age', 'total_pages_visited']
 col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
+    [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
+     ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
+     ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
 
-# 
-nnca = NeighborhoodComponentsAnalysis(8, init=np.diag(model1.coef_[0]))
+# classifier
+lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
 
-#
-knn = KNeighborsClassifier()
-
-#
+# full pipelines
 pipeline = Pipeline(
     [('column_preprocessing', col_preproc),
-     ('scaling', nnca),
-     ('classifier', knn)]
+     ('classifier', lda)]
 )
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+# optimize regularization
+best_shrinkages = multimodel_gridsearch_cv(
+    pipelines, Xs, ys, param_name='shrinkage', param_vals=np.logspace(-3, 0, 31))
+for idx, pipeline in pipelines.items():
+    pipeline['classifier'].shrinkage = best_shrinkages[idx]
+
+# evaluation
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 
 
-# Simple train-test split
-X_tr, X_test, y_tr, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
+"""
+lovely
+"""
 
-X_ = col_preproc.fit_transform(X_tr)
-nnca.fit(X_, y_tr)
+# # fit on the whole dataset
+# lda_model = {idx: pipeline.fit(Xs[idx], ys[idx])
+#              for idx, pipeline in pipelines.items()}
 
-# n_splits = 10
-# cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+# # Threshold adjust
+# lda_model_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
+#                 for idx, p in pipelines.items()}
 
-# cm = np.zeros((2, 2), dtype=float)  # confusion matrix
-# for i, (itr, ival) in enumerate(cv.split(X, y)):
-#     pipeline.fit(X.iloc[itr], y.iloc[itr])
-#     cm += confusion_matrix(y.iloc[ival], pipeline.predict(X.iloc[ival]))
-
-# print('\n===== Global scores =====')
+# print('\n===== Logistic regression with adjusted classification threshold =====')
+# _, cm = evaluate_model(model1_ta)
 # print_metrics(cm)
 
 
