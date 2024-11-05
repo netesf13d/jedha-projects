@@ -519,60 +519,61 @@ for both new (left panel) and recurring (right panel) visitors.
 ## <a name="linear"></a>Logistic regression
 """
 
+from sklearn.base import clone
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.metrics import (f1_score,
-                             confusion_matrix,
+from sklearn.metrics import (confusion_matrix,
                              roc_curve,
                              auc)
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import (LogisticRegression, SGDClassifier)
+# from sklearn.svm import LinearSVC
+# from sklearn.linear_model import (LogisticRegression, SGDClassifier)
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import (OneHotEncoder,
                                    StandardScaler,
                                    FunctionTransformer,
-                                   PolynomialFeatures)
-from sklearn.impute import SimpleImputer
+                                   # PolynomialFeatures
+                                   )
+# from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import (GridSearchCV,
                                      train_test_split,
-                                     cross_validate,
+                                     # cross_validate,
                                      StratifiedKFold,
                                      TunedThresholdClassifierCV)
-from sklearn.base import clone
-from scipy.optimize import curve_fit
+
+# from scipy.optimize import curve_fit
 warnings.simplefilter("ignore", ConvergenceWarning)
 
 
-def evaluate_model2(pipeline: Pipeline,
-                   export_csv: bool = False,
-                   name_suffix: str = 'EXAMPLE') -> np.ndarray:
-    """
-    Evaluate the model on the test set. The predictions are exported as
-    'conversion_data_test_predictions_{name_suffix}.csv'
+# def evaluate_model2(pipeline: Pipeline,
+#                    export_csv: bool = False,
+#                    name_suffix: str = 'EXAMPLE') -> np.ndarray:
+#     """
+#     Evaluate the model on the test set. The predictions are exported as
+#     'conversion_data_test_predictions_{name_suffix}.csv'
 
-    Parameters
-    ----------
-    Pipeline : Callable: pd.DataFrame -> T
-        The feature preprocessor.
-    export_csv : bool, optional
-        Export the test data as a csv file for challenge assessment.
-        The default is False.
-    name_suffix : str, optional
-        Suffix appended to the output filename. The default is 'EXAMPLE'.
+#     Parameters
+#     ----------
+#     Pipeline : Callable: pd.DataFrame -> T
+#         The feature preprocessor.
+#     export_csv : bool, optional
+#         Export the test data as a csv file for challenge assessment.
+#         The default is False.
+#     name_suffix : str, optional
+#         Suffix appended to the output filename. The default is 'EXAMPLE'.
 
-    Returns
-    -------
-    Y_pred : 1D np.ndarray
-        The model's predictions on the test set.
-    """
-    df = pd.read_csv('./conversion_data_test.csv')
-    Y_pred = pipeline.predict(df)
+#     Returns
+#     -------
+#     Y_pred : 1D np.ndarray
+#         The model's predictions on the test set.
+#     """
+#     df = pd.read_csv('./conversion_data_test.csv')
+#     Y_pred = pipeline.predict(df)
 
-    if export_csv:
-        fname = f'conversion_data_test_predictions_{name_suffix}.csv'
-        np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
+#     if export_csv:
+#         fname = f'conversion_data_test_predictions_{name_suffix}.csv'
+#         np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
 
-    return Y_pred
+#     return Y_pred
 
 
 def print_metrics(cm: np.ndarray)-> None:
@@ -608,6 +609,8 @@ We reproduce here the basic linear regression from the template, this time inclu
 We do a simple train-test split using the train set, without relying on the test set provided due to limited access.
 """
 
+from sklearn.linear_model import LogisticRegression
+
 """
 #### Model construction and training
 """
@@ -628,8 +631,8 @@ scaler = StandardScaler()
 X_tr = scaler.fit_transform(X_tr)
 
 # fit logistic regression classifier
-model1 = LogisticRegression()
-model1.fit(X_tr, y_tr)
+lr_model = LogisticRegression()
+lr_model.fit(X_tr, y_tr)
 
 
 """
@@ -637,12 +640,12 @@ model1.fit(X_tr, y_tr)
 """
 
 print('===== Train set metrics =====')
-y_tr_pred = model1.predict(X_tr)
+y_tr_pred = lr_model.predict(X_tr)
 print_metrics(confusion_matrix(y_tr, y_tr_pred))
 
 print('\n===== Test set metrics =====')
 X_test = scaler.transform(X_test)  # no fit this time
-y_test_pred = model1.predict(X_test)
+y_test_pred = lr_model.predict(X_test)
 print_metrics(confusion_matrix(y_test, y_test_pred))
 
 
@@ -691,16 +694,16 @@ Our model can adjust by cross-validation this threshold probability so as to max
 pipeline into a `model_selection.TunedThresholdClassifierCV`.
 """
 
-model1_ta = TunedThresholdClassifierCV(pipeline, scoring='f1', cv=10,
-                                       random_state=1234,
-                                       store_cv_results=True)
+lr_model_ta = TunedThresholdClassifierCV(
+    pipeline, scoring='f1', cv=10, refit=False, random_state=1234)
+
 t0 = time.time()
-model1_ta.fit(X, y)
+lr_model_ta.fit(X, y)
 t1 = time.time()
 print(f'model fitting time: {t1-t0} s')
 
-best_thr = model1_ta.best_threshold_
-best_score = model1_ta.best_score_
+best_thr = lr_model_ta.best_threshold_
+best_score = lr_model_ta.best_score_
 print(f'best threshold = {best_thr:.8f}',
       f'\nbest F1-score = {best_score:.8f}')
 
@@ -787,6 +790,10 @@ plt.show()
 # _, cm = evaluate_model(model1_ta)
 # print_metrics(cm)
 
+"""
+... comment
+"""
+
 
 # %%
 
@@ -804,6 +811,62 @@ multiple datasets, corresponding to a (country, new_user) pair, and fit a differ
 #### Utilities
 
 """
+
+def cv_eval(model, X: np.ndarray, y: np.ndarray,
+            n_splits: int = 10,
+            verbose: bool = False)-> np.ndarray:
+    """
+    Evaluation of a multi-model by cross-validation.
+    Returns the confusion matrix.
+    """
+    cm = np.zeros((2, 2), dtype=int)  # confusion matrix
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+    for i, (itr, ival) in enumerate(cv.split(X, y)):
+        model.fit(X.iloc[itr], y.iloc[itr])
+        cm += confusion_matrix(y.iloc[ival], model.predict(X.iloc[ival]))
+    if verbose:
+        print_metrics(cm)
+    return cm
+
+
+def gridsearch_cv(model, X: np.ndarray, y: np.ndarray,
+                  param_name: str, param_vals: np.ndarray,
+                  n_splits: int = 10)-> float:
+    """
+    Grid search parameter optimization of a model by cross-validation.
+    The parameters must be in the 'classifier' step of the model.
+    """
+    gsearch = GridSearchCV(
+        model,  param_grid={f'classifier__{param_name}': param_vals},
+        scoring='f1', n_jobs=4, refit=False, cv=n_splits)
+    gsearch.fit(X, y)
+    best_param = gsearch.best_params_[f'classifier__{param_name}']
+    print(f'found best {param_name}: {best_param}')
+    return best_param
+
+
+def tune_threshold_cv(model, X: np.ndarray, y: np.ndarray,
+                      n_splits: int = 10,
+                      verbose: bool = True):
+    """
+    Tune the decision threhold of the model to maximize the F1 score by 
+    cross-validation.
+    """
+    model_ta = TunedThresholdClassifierCV(
+        model, scoring='f1', cv=n_splits, refit=True, random_state=1234)
+    t0 = time.time()
+    model_ta.fit(X, y)
+    t1 = time.time()
+    
+    best_thr = model_ta.best_threshold_
+    best_score = model_ta.best_score_
+    
+    if verbose:
+        print(f'model fitting time: {t1-t0} s')
+        print(f'best threshold = {best_thr:.8f}\nbest F1-score = {best_score:.8f}')
+    
+    return model_ta
+
 
 def split_data(groups: list[str])-> tuple[dict, dict]:
     """
@@ -825,19 +888,14 @@ def multimodel_gridsearch_cv(models: dict, Xs: dict, ys: dict,
     """
     best_params = {}
     for idx, model in models.items():
-        gsearch = GridSearchCV(
-            model,  param_grid={f'classifier__{param_name}': np.logspace(-3, 0, 31)},
-            scoring='f1', n_jobs=4, refit=False, cv=n_splits)
-        gsearch.fit(Xs[idx], ys[idx])
-        best_params[idx] = gsearch.best_params_[f'classifier__{param_name}']
-        print(f'found best {param_name} for idx={idx}: {best_params[idx]}')
-        # pipeline['classifier'].shrinkage = best_shrinkage
+        print(f'{idx} ::', end='')
+        best_params[idx] = gridsearch_cv(
+            model, Xs[idx], ys[idx], param_name, param_vals, n_splits)
+        
     return best_params
 
 
-def multimodel_cv_eval(models: dict,
-                       Xs: dict,
-                       ys: dict,
+def multimodel_cv_eval(models: dict, Xs: dict, ys: dict,
                        n_splits: int = 10,
                        print_partial_scores: bool = False
                        )-> tuple[dict, np.ndarray]:
@@ -845,17 +903,12 @@ def multimodel_cv_eval(models: dict,
     Evaluation of a multi-model by cross-validation.
     The `models`, `Xs` and `ys` are dict : group_index -> model/data.
     """
-    cm = np.zeros((2, 2), dtype=float)  # confusion matrix
     cms = {}
     for idx, model in models.items():
-        cms[idx] = np.zeros((2, 2), dtype=float)
-        cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
         X_, y_ = Xs[idx], ys[idx]
-        for i, (itr, ival) in enumerate(cv.split(X_, y_)):
-            model.fit(X_.iloc[itr], y_.iloc[itr])
-            X_v, y_v = X_.iloc[ival], y_.iloc[ival]
-            cms[idx] += confusion_matrix(y_v, model.predict(X_v))
-            cm += confusion_matrix(y_v, model.predict(X_v))
+        cms[idx] = cv_eval(model, X_, y_, n_splits)
+    cm = sum(cm_ for cm_ in cms.values()) # confusion matrix
+    
     if print_partial_scores:
         print('===== Partial scores =====')
         for idx, cm_ in cms.items():
@@ -863,6 +916,7 @@ def multimodel_cv_eval(models: dict,
             print_metrics(cm_)
     print('\n===== Global scores =====')
     print_metrics(cm)
+    
     return cms, cm
 
 
@@ -883,6 +937,7 @@ class MimicEstimator():
         for idx, X in Xs.items():
             y_pred[X.index] = self.model[idx].predict(X)
         return y_pred
+
 
 #%%
 
@@ -961,20 +1016,20 @@ pipeline = Pipeline(
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
 
-"""
-#### Optional: parameters optimization
+# """
+# #### Optional: parameters optimization
 
-```python
-for idx, pipeline in pipelines.items():
-    gsearch = GridSearchCV(
-        pipeline,  param_grid={'classifier__C': np.logspace(-5, 1, 61)},
-        scoring='f1', n_jobs=4, refit=False, cv=10, verbose=False)
-    gsearch.fit(Xs[idx], ys[idx])
-    best_C = gsearch.best_params_['classifier__C']
-    print(f'found best C for idx={idx}: {best_C}')
-    pipeline['classifier'].C = best_C
-```
-"""
+# ```python
+# for idx, pipeline in pipelines.items():
+#     gsearch = GridSearchCV(
+#         pipeline,  param_grid={'classifier__C': np.logspace(-5, 1, 61)},
+#         scoring='f1', n_jobs=4, refit=False, cv=10, verbose=False)
+#     gsearch.fit(Xs[idx], ys[idx])
+#     best_C = gsearch.best_params_['classifier__C']
+#     print(f'found best C for idx={idx}: {best_C}')
+#     pipeline['classifier'].C = best_C
+# ```
+# """
 
 
 """
@@ -991,24 +1046,22 @@ It would be difficult to recover a global F1-score estimate since the TunedThres
 return the confusion matrix at each CV round.
 """
 # fit on the whole dataset
-model2 = {idx: pipeline.fit(Xs[idx], ys[idx])
-          for idx, pipeline in pipelines.items()}
 
-# Threshold adjust
-model2_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
-             for idx, p in pipelines.items()}
 
-t0 = time.time()
-for idx, model in model2_ta.items():
-    model.fit(Xs[idx], ys[idx])
-t1 = time.time()
-print(f'model2_ta fitting time: {t1-t0} s')
+# model2_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
+#              for idx, p in pipelines.items()}
 
-best_thrs = {idx: m.best_threshold_ for idx, m in model2_ta.items()}
-best_scores = {idx: m.best_score_ for idx, m in model2_ta.items()}
-for idx in best_thrs:
-    print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
-          f'best F1-score = {best_scores[idx]:.6f}')
+# t0 = time.time()
+# for idx, model in model2_ta.items():
+#     model.fit(Xs[idx], ys[idx])
+# t1 = time.time()
+# print(f'model2_ta fitting time: {t1-t0} s')
+
+# best_thrs = {idx: m.best_threshold_ for idx, m in model2_ta.items()}
+# best_scores = {idx: m.best_score_ for idx, m in model2_ta.items()}
+# for idx in best_thrs:
+#     print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
+#           f'best F1-score = {best_scores[idx]:.6f}')
 
 
 """
@@ -1018,20 +1071,25 @@ Our two models are `dict`s and as such do not have the `Estimator` interface (an
 To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
 """
 
+# fit on the whole dataset
+lr_model = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
 
+# Threshold adjust
+lr_model_ta = {idx: tune_threshold_cv(pipeline, Xs[idx], ys[idx], verbose=True)
+             for idx, pipeline in pipelines.items()}
 
 ##
 # print('===== Improved logistic regression =====')
-# _, cm = evaluate_model(MimicEstimator(model2))
+# _, cm = evaluate_model(MimicEstimator(lr_model))
 # print_metrics(cm)
 
 ##
 # print('\n===== Improved logistic regression with adjusted classification threshold =====')
-# _, cm = evaluate_model(MimicEstimator(model2_ta))
+# _, cm = evaluate_model(MimicEstimator(lr_model_ta))
 # print_metrics(cm)
 
 """
-The regularization and ...
+...The regularization and ...
 """
 
 
@@ -1040,9 +1098,56 @@ The regularization and ...
 """
 ## <a name="trees"></a>Decision trees and random forests
 
-
+### Decision tree
 """
 
+from sklearn.tree import DecisionTreeClassifier
+
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+# feature engineering
+def poly_features(X: np.ndarray) -> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 29), dtype=float)
+    X_[:, :10] = X  # original features
+    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
+    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
+    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
+    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
+    return X_
+
+# classifier
+dtc = DecisionTreeClassifier(max_depth=100, random_state=1234)
+
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     # ('poly_features', FunctionTransformer(poly_features)),
+     ('classifier', dtc)]
+)
+
+
+# optimize
+# best_ccp_alpha = gridsearch_cv(pipeline, X, y, param_name='ccp_alpha',
+#                                param_vals=np.logspace(-1, 3, 41))
+# pipeline['classifier'].ccp_alpha = best_ccp_alpha
+best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
+                               param_vals=np.arange(1, 21))
+pipeline['classifier'].max_depth = best_max_depth
+
+#
+_ = cv_eval(pipeline, X, y, verbose=True)
 
 
 
@@ -1055,13 +1160,89 @@ The regularization and ...
 Problem with KNN: no metric, all features have same relevance.
 Solve with `neighbors.NeighborhoodComponentsAnalysis`
 
+"""
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+
+
+"""
 
 ### Linear discriminant analysis
 
 
 """
 
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+# feature engineering
+def poly_features(X: np.ndarray) -> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 29), dtype=float)
+    X_[:, :10] = X  # original features
+    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
+    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
+    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
+    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
+    return X_
+
+# classifier
+lda1 = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
+# lr1 = LogisticRegression(
+#     penalty='l2',
+#     C=0.1,
+#     fit_intercept=True,
+#     class_weight=None,
+#     solver='lbfgs',
+#     random_state=1234,
+#     # l1_ratio=0.8,
+# )
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('poly_features', FunctionTransformer(poly_features)),
+     ('classifier', lda1)]
+)
+
+# optimization
+best_shrinkage = gridsearch_cv(
+    pipeline, X, y, param_name='shrinkage', param_vals=np.logspace(-3, -2, 41))
+pipeline['classifier'].shrinkage = best_shrinkage
+# best_C = gridsearch_cv(
+#     pipeline, X, y, param_name='C', param_vals=np.logspace(-3, 1, 41))
+# pipeline['classifier'].C = best_C
+
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+
+lda_model_ta = TunedThresholdClassifierCV(
+    pipeline, scoring='f1', cv=10, refit=True, random_state=1234)
+t0 = time.time()
+lda_model_ta.fit(X, y)
+t1 = time.time()
+print(f'model fitting time: {t1-t0} s')
+
+best_thr = lda_model_ta.best_threshold_
+best_score = lda_model_ta.best_score_
+print(f'best threshold = {best_thr:.8f}',
+      f'\nbest F1-score = {best_score:.8f}')
+
+
+
+#%%
+"""
+
+"""
+
+
 
 
 # split the dataset
@@ -1093,25 +1274,38 @@ best_shrinkages = multimodel_gridsearch_cv(
 for idx, pipeline in pipelines.items():
     pipeline['classifier'].shrinkage = best_shrinkages[idx]
 
-# evaluation
+## CV-evaluation
 _ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 
 
 """
-lovely
+... comment
 """
 
-# # fit on the whole dataset
-# lda_model = {idx: pipeline.fit(Xs[idx], ys[idx])
-#              for idx, pipeline in pipelines.items()}
+"""
+#### Evaluate the model
+"""
 
-# # Threshold adjust
-# lda_model_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
-#                 for idx, p in pipelines.items()}
+# fit on the whole dataset
+lda_model = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
 
-# print('\n===== Logistic regression with adjusted classification threshold =====')
-# _, cm = evaluate_model(model1_ta)
+# Threshold adjust
+lda_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    lda_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+# print('\n===== Linear discriminant analysis =====')
+# _, cm = evaluate_model(lda_model)
 # print_metrics(cm)
+
+# print('\n===== Linear discriminant analysis with adjusted classification threshold =====')
+# _, cm = evaluate_model(lda_model_ta)
+# print_metrics(cm)
+
+"""
+... comment...
+"""
 
 
 
@@ -1134,21 +1328,16 @@ Let us implement this solution.
 
 # split the dataset
 groups = ['new_user']
-Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
-ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
+Xs, ys = split_data(groups)
 
 # column preprocessing
-cat_vars_2 = [v for v in cat_vars if v not in groups]
-bool_vars_2 = [v for v in bool_vars if v not in groups]
-quant_vars_2 = [v for v in quant_vars if v not in groups]
 col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars_2),
-     ('bool_id', FunctionTransformer(None), bool_vars_2),
-     ('quant_scaler', StandardScaler(), quant_vars_2)])
+    [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
+     ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
+     ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
+
 
 # custom feature engineering
-
-
 def poly_features(X: np.ndarray) -> np.ndarray:
     """
     Custom polynomial features construction:
@@ -1166,7 +1355,7 @@ def poly_features(X: np.ndarray) -> np.ndarray:
 
 
 # classifier
-svc_clf = SGDClassifier(
+svc = SGDClassifier(
     loss='hinge',
     penalty='l2',
     fit_intercept=True,
@@ -1178,7 +1367,7 @@ pipeline = Pipeline(
     [('column_preprocessing', col_preproc),
      # PolynomialFeatures(degree=2, interaction_only=True)),
      ('poly_features', FunctionTransformer(poly_features)),
-     ('classifier', svc_clf)]
+     ('classifier', svc)]
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
@@ -1187,35 +1376,19 @@ pipelines = {idx: clone(pipeline) for idx in Xs}
 Now we optimize
 """
 
-# optimize the regularization parameter
+## optimize the regularization parameter
+best_alphas = multimodel_gridsearch_cv(
+    pipelines, Xs, ys, param_name='alpha', param_vals=np.logspace(-6, -2, 41))
 for idx, pipeline in pipelines.items():
-    gsearch = GridSearchCV(
-        pipeline,  param_grid={'classifier__alpha': np.logspace(-6, -2, 41)},
-        scoring=None, n_jobs=4, refit=False, cv=10, verbose=False)
-    gsearch.fit(Xs[idx], ys[idx])
-    best_alpha = gsearch.best_params_['classifier__alpha']
-    print(f'found best alpha for idx={idx}: {best_alpha}')
-    pipeline['classifier'].alpha = best_alpha
+    pipeline['classifier'].alpha = best_alphas[idx]
 
-# evaluate
-n_splits = 10
-cm = np.zeros((2, 2), dtype=float)  # confusion matrix
-for idx, pipeline in pipelines.items():
-    cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
-    X_, y_ = Xs[idx], ys[idx]
-    for i, (itr, ival) in enumerate(cv.split(X_, y_)):
-        pipeline.fit(X_.iloc[itr], y_.iloc[itr])
-        cm += confusion_matrix(y_.iloc[ival], pipeline.predict(X_.iloc[ival]))
-recall = cm[1, 1] / np.sum(cm, axis=1)[1]
-prec = cm[1, 1] / np.sum(cm, axis=0)[1]
-print("CV-estimated confusion matrix\n", cm / np.sum(cm))
-print(f'CV-estimated precision: {prec:.8}; recall: {recall:.8}')
-print(f'CV-estimated F1-score = {2*prec*recall/(prec+recall):.8}')
+
+## CV-evaluation
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 
 
 # fit on the whole dataset
-model4 = {idx: pipeline.fit(Xs[idx], ys[idx])
-          for idx, pipeline in pipelines.items()}
+svc_model = {idx: p.fit(Xs[idx], ys[idx]) for idx, p in pipelines.items()}
 
 
 """
@@ -1224,26 +1397,80 @@ It would be difficult to recover a global F1-score estimate since the TunedThres
 return the confusion matrix at each CV round.
 """
 
-model4_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
-             for idx, p in pipelines.items()}
+# Threshold adjust
+svc_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    svc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
 
-t0 = time.time()
-for idx, model in model4_ta.items():
-    model.fit(Xs[idx], ys[idx])
-t1 = time.time()
-print(f'model4_ta fitting time: {t1-t0} s')
 
-best_thrs = {idx: m.best_threshold_ for idx, m in model4_ta.items()}
-best_scores = {idx: m.best_score_ for idx, m in model4_ta.items()}
-for idx in best_thrs:
-    print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
-          f'best F1-score = {best_scores[idx]:.6f}')
+"""
+#### Model evaluation on test data
+
+"""
+
+
+
+
+
+#%%
+"""
+## <a name="nn"></a>Neural networks
 
 
 
 """
-### Gaussian processes
-"""
+
+from sklearn.neural_network import MLPClassifier
+
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+# feature engineering
+def poly_features(X: np.ndarray) -> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 29), dtype=float)
+    X_[:, :10] = X  # original features
+    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
+    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
+    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
+    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
+    return X_
+
+# classifier
+mlp = MLPClassifier(hidden_layer_sizes=(100, 100, 50, 20),
+                    activation='relu',
+                    batch_size=2000,
+                    early_stopping=True)
+
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     # ('poly_features', FunctionTransformer(poly_features)),
+     ('classifier', mlp)]
+)
+
+
+# optimize
+# best_ccp_alpha = gridsearch_cv(pipeline, X, y, param_name='ccp_alpha',
+#                                param_vals=np.logspace(-1, 3, 41))
+# pipeline['classifier'].ccp_alpha = best_ccp_alpha
+# best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
+#                                param_vals=[10, 20, 50, 100, 200, 500])
+# pipeline['classifier'].max_depth = best_max_depth
+
+#
+_ = cv_eval(pipeline, X, y, verbose=True)
 
 
 
