@@ -6,21 +6,11 @@
 
 import sys
 import time
-# from itertools import product
-# from datetime import datetime
 import warnings
-# from typing import Callable
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
-from scipy.special import expit
 
-import matplotlib.pyplot as plt
-# import matplotlib.gridspec as gridspec
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-# from matplotlib.colors import Colormap, LightSource
-# from matplotlib.collections import PolyCollection
 
 
 # =============================================================================
@@ -40,10 +30,23 @@ df = df.loc[df['age'] < 80]
 # """
 
 
-# %%
-# =============================================================================
-# Preliminary EDA
-# =============================================================================
+# %% EDA
+# TODO comment
+"""
+## <a name="eda"></a>Preliminary EDA
+
+"""
+
+# %%% EDA utils
+# TODO comment
+"""
+### 
+
+"""
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.optimize import curve_fit
 
 
 def prob_distrib(df: pd.DataFrame,
@@ -95,7 +98,6 @@ def prob_distrib(df: pd.DataFrame,
     return group_vals, counts, pconv, std_pconv
 
 
-# TODO adjust plot
 def prob_distrib_plot(xvals: np.ndarray,
                       counts: np.ndarray,
                       pconv: np.ndarray,
@@ -149,12 +151,23 @@ def prob_distrib_plot(xvals: np.ndarray,
     return fig, axs
 
 
-# %%
+# %%% EDA tables
+# TODO comment
+"""
+### Some tables
+"""
+
 ##
 df.groupby(['country', 'converted']).count()['age'] # the name 'age' is irrelevant here
 ##
 df.groupby(['source', 'converted']).count()['age']
 
+
+# %%% EDA heatmap
+# TODO comment
+"""
+### Conversion probability heatmap
+"""
 
 sources = ['Ads', 'Direct', 'Seo']
 countries = ['China', 'Germany', 'UK', 'US']
@@ -204,7 +217,12 @@ We can make the following remarks:
 """
 
 
-# %%
+# %%% EDA age
+# TODO comment
+"""
+### Influence of age on the conversion probability
+"""
+
 # Age data
 # prepare age data
 ages = np.arange(80)
@@ -272,10 +290,11 @@ These patterns are extremely regular and again reveal the artificial nature of t
 """
 
 
-#%%
-
-# Number of pages visited
+# %%% EDA npages
+# TODO comment
 """
+### Influence of the number of pages visited on the conversion probability
+
 We proceed in a similar fashion this time with the quantity `'total_pages_visited'`
 """
 npages = np.arange(30)
@@ -352,11 +371,10 @@ built the same way as in the previous figure.
 We again stress that such regularity is unlikely in any realistic context.
 """
 
-# %%
-
-# Effect of the number of pages visited for each country
-
+# %%% country x npages
 """
+### Effect of the number of pages visited for each country
+
 We noted above that the country of origin has a significant impact on the conversion probability.
 We consider the two following hypotheses to explain this trend:
 - The country of orgin has an impact on the distribution of number of pages visited, but not on the subscription threshold (the inflection point of the sigmoid).
@@ -408,12 +426,11 @@ which matches the differences observed in figure 1.
 Second, the threshold seems to be set at a significantly higher level than other countries. These two factors explain the much lower conversion rates observed in figure 1.
 """
 
-# %%
-
-# Effect of the number of pages visited for each source
-
+# %%% source x npages
 # TODO comment
 """
+### Effect of the number of pages visited for each source
+
 We now consider 
 """
 
@@ -458,9 +475,11 @@ The plot shows...
 """
 
 
-# %%
-
-# Combined effect of age and number of pages visited
+# %%% Age x npages
+# TODO comment
+"""
+### Combined effect of age and number of pages visited
+"""
 
 new_user, npages = np.arange(80), np.arange(30)
 country, counts, pconv, std_pconv = prob_distrib(
@@ -514,34 +533,48 @@ for both new (left panel) and recurring (right panel) visitors.
 - In both conditions, there is a small linear dependence of the inflection point with age, with a lower inflection point for younger visitors.
 """
 
-# %%
+# %% General Utils
+# TODO comment
 """
-## <a name="linear"></a>Logistic regression
+## <a name="utils"></a>Utilities
 """
+
+from scipy.special import expit
 
 from sklearn.base import clone
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (confusion_matrix,
                              roc_curve,
                              auc)
-# from sklearn.svm import LinearSVC
-# from sklearn.linear_model import (LogisticRegression, SGDClassifier)
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import (OneHotEncoder,
-                                   StandardScaler,
-                                   FunctionTransformer,
-                                   # PolynomialFeatures
-                                   )
-# from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import (GridSearchCV,
                                      train_test_split,
-                                     # cross_validate,
                                      StratifiedKFold,
                                      TunedThresholdClassifierCV)
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import (OneHotEncoder,
+                                   OrdinalEncoder,
+                                   StandardScaler,
+                                   FunctionTransformer)
 
-# from scipy.optimize import curve_fit
+
 warnings.simplefilter("ignore", ConvergenceWarning)
+
+
+# def poly_features(X: np.ndarray) -> np.ndarray:
+#     """
+#     Custom polynomial features construction:
+#         - Original features, Xi
+#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
+#     """
+#     X_ = np.empty((len(X), 26), dtype=float)
+#     X_[:, :9] = X  # original features
+#     X_[:, 9:11] = X[:, 7:9]**2  # age**2, npages**2
+#     X_[:, 11] = X[:, 7] * X[:, 8]  # age * npages
+#     X_[:, 12:19] = X[:, :7] * X[:, [7]]  # cat * age
+#     X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
+#     return X_
 
 
 # def evaluate_model2(pipeline: Pipeline,
@@ -601,217 +634,6 @@ def evaluate_model(model,
     return y_pred, cm
 
 
-# %%
-"""
-### A first model
-
-We reproduce here the basic linear regression from the template, this time including all the features in the fit.
-We do a simple train-test split using the train set, without relying on the test set provided due to limited access.
-"""
-
-from sklearn.linear_model import LogisticRegression
-
-"""
-#### Model construction and training
-"""
-
-# Data to fit
-y = df.loc[:, 'converted']
-X_df = df.drop('converted', axis=1)
-
-# One-hot encoding with pandas
-X_df = pd.get_dummies(X_df)
-X = X_df.drop(['country_US', 'source_Seo'], axis=1)
-
-# Simple train-test split
-X_tr, X_test, y_tr, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
-
-# Data scaling: scale everything, including categorical data
-scaler = StandardScaler()
-X_tr = scaler.fit_transform(X_tr)
-
-# fit logistic regression classifier
-lr_model = LogisticRegression()
-lr_model.fit(X_tr, y_tr)
-
-
-"""
-#### Performance assessment
-"""
-
-print('===== Train set metrics =====')
-y_tr_pred = lr_model.predict(X_tr)
-print_metrics(confusion_matrix(y_tr, y_tr_pred))
-
-print('\n===== Test set metrics =====')
-X_test = scaler.transform(X_test)  # no fit this time
-y_test_pred = lr_model.predict(X_test)
-print_metrics(confusion_matrix(y_test, y_test_pred))
-
-
-# %%
-
-"""
-### Improving the simple model
-
-Let us now make some improvements to the previous code, without changing the model (almost).
-
-#### Model construction and training
-
-A first improvement is to make it work in a more integrated fashion. We thus do the following:
-- The data preprocessing, encoding of categorical variables and scaling of quantitative variables, is wrapped in a `compose.ColumnTransformer`
-- The preprocessing and classification are wrapped in a `pipeline.Pipeline`, exposing a single interface for all steps
-
-Note that one-hot encoding can be done with pandas
-```python
-X = pd.get_dummies(X).drop(['country_US', 'source_Seo'], axis=1)
-```
-"""
-
-##
-# data preparation
-y = df.loc[:, 'converted']
-X = df.drop('converted', axis=1)
-
-# preprocessing
-cat_vars = ['country', 'source']
-bool_vars = ['new_user']
-quant_vars = ['age', 'total_pages_visited']
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
-
-# full pipeline
-pipeline = Pipeline([('column_preprocessing', col_preproc),
-                     ('classifier', LogisticRegression())])
-
-"""
-The default logistic regression classifier uses a threshold probability of 0.5 to classify an observation.
-This corresponds to the minimization of the logistic loss.
-However, we recall that the performance of our model is assessed not by the average logistic loss but through the F1-score.
-Our model can adjust by cross-validation this threshold probability so as to maximize the F1-score. This is done by wrapping the
-pipeline into a `model_selection.TunedThresholdClassifierCV`.
-"""
-
-lr_model_ta = TunedThresholdClassifierCV(
-    pipeline, scoring='f1', cv=10, random_state=1234)
-
-t0 = time.time()
-lr_model_ta.fit(X, y)
-t1 = time.time()
-print(f'model fitting time: {t1-t0} s')
-
-best_thr = lr_model_ta.best_threshold_
-best_score = lr_model_ta.best_score_
-print(f'best threshold = {best_thr:.8f}',
-      f'\nbest F1-score = {best_score:.8f}')
-
-
-# %%
-"""
-#### Model evaluation: confusion matrix and ROC
-
-The receiver operating characteristic (ROC) curve is the natural metric associated to the classification threshold variation.
-We produce the mean curve through 10-times cross validation building a ROC curve from each validation set and averaging the results.
-
-We also use the data to compute the mean confusion matrix at the threshold selected above. Compared to that of the non-adjusted linear regression,
-we get 15% less false negatives, at the expense of 50% more false positives. However,
-
- since the latter are not involved in the computation of the F1 score,
-the overall result is an improved value.
-"""
-n_splits = 10
-cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
-clf = Pipeline([('column_preprocessing', col_preproc),
-                ('classifier', LogisticRegression())])
-
-mean_cm = np.zeros((2, 2), dtype=float)  # confusion matrix
-mean_fpr = np.linspace(0, 1, 101)  # false-positive rates
-mean_tpr = np.zeros(101, dtype=float)  # true-positive rates
-thr_fpr, thr_tpr = 0, 0  # fpr, tpr at threshold
-for i, (itr, ival) in enumerate(cv.split(X, y)):
-    X_v, y_v = X.iloc[ival], y.iloc[ival]
-    clf.fit(X.iloc[itr], y.iloc[itr])
-    # confusion matrix
-    y_pred = clf.predict_proba(X_v)[:, 1] > best_thr
-    mean_cm += confusion_matrix(y_v, y_pred) / len(X)
-    # ROC
-    y_decision = clf.decision_function(X_v)
-    fpr, tpr, thr = roc_curve(y_v, y_decision)
-    mean_tpr += np.interp(mean_fpr, fpr, tpr, left=0, right=1) / n_splits
-    thr_fpr += np.interp(best_thr, expit(thr[::-1]), fpr[::-1]) / n_splits
-    thr_tpr += np.interp(best_thr, expit(thr[::-1]), tpr[::-1]) / n_splits
-mean_tpr[0] = 0
-mean_auc = auc(mean_fpr, mean_tpr)
-
-
-print('===== CV-estimated metrics =====')
-print_metrics(mean_cm)
-
-
-# %%
-"""
-We plot the ROC curve in figure 7. The location of our selected threshold is indicated on the curve as an orange cross.
-"""
-
-fig7, ax7 = plt.subplots(figsize=(5, 5))
-fig7.suptitle('Figure 7: ROC curve', x=0.02, ha='left')
-
-ax7.plot(mean_fpr, mean_tpr, label=f'Mean ROC (AUC = {mean_auc:.4f})')
-ax7.plot(thr_fpr, thr_tpr, marker='X', markersize=7, markeredgewidth=0.1)
-
-ax7.legend(loc=4)
-ax7.set_title('mean ROC curve')
-ax7.set_xlabel('False positive rate')
-ax7.set_ylabel('True positive rate')
-ax7.set_xlim(-0.01, 1.01)
-ax7.set_ylim(-0.01, 1.01)
-ax7.grid(visible=True, alpha=0.3)
-
-thr_txt = (f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}\n'
-           f'TPR = {thr_tpr:.4}\nFPR = {thr_fpr:.4}')
-ax7.text(0.23, 0.74, thr_txt, ha='center', va='center')
-
-plt.show()
-
-
-"""
-#### Performance assessment on test data
-"""
-
-##
-# print('===== Basic logistic regression =====')
-# _, cm = evaluate_model(model1)
-# print_metrics(cm)
-
-##
-# print('\n===== Logistic regression with adjusted classification threshold =====')
-# _, cm = evaluate_model(model1_ta)
-# print_metrics(cm)
-
-"""
-... comment
-"""
-
-
-# %%
-
-"""
-### Further improvements
-
-
-The application of the `PolynomialFeatures` preprocessor caused the apparition of many useless features 
-The many (and mostly useless) features added through application of the `PolynomialFeatures` preprocessor were the cause of a significant slowdown
-of the various optimization procedures. 
-
-A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
-multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
-
-#### Utilities
-
-"""
-
 def cv_eval(model, X: np.ndarray, y: np.ndarray,
             n_splits: int = 10,
             verbose: bool = False)-> np.ndarray:
@@ -866,6 +688,11 @@ def tune_threshold_cv(model, X: np.ndarray, y: np.ndarray,
         print(f'best threshold = {best_thr:.8f}\nbest F1-score = {best_score:.8f}')
     
     return model_ta
+
+"""
+Some utilities
+
+"""
 
 
 def split_data(groups: list[str])-> tuple[dict, dict]:
@@ -938,11 +765,301 @@ class MimicEstimator():
             y_pred[X.index] = self.model[idx].predict(X)
         return y_pred
 
-sys.exit()
-#%%
+"""
+Model containers
+"""
+
+models = {}
+f1_scores = {}
+
+
+
+# %% LogReg
+# TODO comment
+"""
+## <a name="linear"></a>Logistic regression
 
 
 """
+
+from sklearn.linear_model import LogisticRegression
+
+
+# %%% LR : basic
+# TODO comment
+"""
+### A first model
+
+We reproduce here the basic linear regression from the template, this time including all the features in the fit.
+We do a simple train-test split using the train set, without relying on the test set provided due to limited access at the time of writing.
+
+
+#### Model construction and training
+"""
+
+# Data to fit
+y = df.loc[:, 'converted']
+X_df = df.drop('converted', axis=1)
+
+# One-hot encoding with pandas
+X_df = pd.get_dummies(X_df)
+X = X_df.drop(['country_US', 'source_Seo'], axis=1)
+
+# Simple train-test split
+X_tr, X_test, y_tr, y_test = train_test_split(
+    X, y, test_size=0.1, stratify=y, random_state=1234)
+
+# Data scaling: scale everything, including categorical data
+scaler = StandardScaler()
+X_tr = scaler.fit_transform(X_tr)
+
+# fit logistic regression classifier
+lr_model = LogisticRegression()
+lr_model.fit(X_tr, y_tr)
+
+
+"""
+#### Performance assessment
+"""
+
+print('===== Train set metrics =====')
+y_tr_pred = lr_model.predict(X_tr)
+print_metrics(confusion_matrix(y_tr, y_tr_pred))
+
+print('\n===== Test set metrics =====')
+X_test = scaler.transform(X_test)  # no fit this time
+y_test_pred = lr_model.predict(X_test)
+print_metrics(confusion_matrix(y_test, y_test_pred))
+
+"""
+
+"""
+
+t0 = time.time()
+lr_model.fit(X, y)
+t1 = time.time()
+print(f'model fitting time: {t1-t0} s')
+
+
+# %%% LR : threshold adjust
+# TODO comment
+"""
+### Adjusting the decision threshold
+
+Let us now make some improvements to the previous code, without changing the model (almost).
+
+#### Model construction and training
+
+A first improvement is to make it work in a more integrated fashion. We thus do the following:
+- The data preprocessing, encoding of categorical variables and scaling of quantitative variables, is wrapped in a `compose.ColumnTransformer`
+- The preprocessing and classification are wrapped in a `pipeline.Pipeline`, exposing a single interface for all steps
+
+Note that one-hot encoding can be done with pandas
+```python
+X = pd.get_dummies(X).drop(['country_US', 'source_Seo'], axis=1)
+```
+"""
+
+##
+# data preparation
+y = df.loc[:, 'converted']
+X = df.drop('converted', axis=1)
+
+# preprocessing
+cat_vars = ['country', 'source']
+bool_vars = ['new_user']
+quant_vars = ['age', 'total_pages_visited']
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+# full pipeline
+pipeline = Pipeline([('column_preprocessing', col_preproc),
+                     ('classifier', LogisticRegression())])
+
+"""
+The default logistic regression classifier uses a threshold probability of 0.5 to classify an observation.
+This corresponds to the minimization of the logistic loss.
+However, we recall that the performance of our model is assessed not by the average logistic loss but through the F1-score.
+Our model can adjust by cross-validation this threshold probability so as to maximize the F1-score. This is done by wrapping the
+pipeline into a `model_selection.TunedThresholdClassifierCV`.
+"""
+
+lr_model_ta = TunedThresholdClassifierCV(
+    pipeline, scoring='f1', cv=10, random_state=1234)
+
+t0 = time.time()
+lr_model_ta.fit(X, y)
+t1 = time.time()
+print(f'model fitting time: {t1-t0} s')
+
+best_thr = lr_model_ta.best_threshold_
+best_score = lr_model_ta.best_score_
+print(f'best threshold = {best_thr:.8f}',
+      f'\nbest F1-score = {best_score:.8f}')
+
+
+# %%% LR : ROC
+# TODO comment
+"""
+### Receiver operating charcteristic (ROC) curve
+
+The receiver operating characteristic curve is the natural metric associated to the classification threshold variation.
+We produce the mean curve through 10-times cross validation building a ROC curve from each validation set and averaging the results.
+
+We also use the data to compute the mean confusion matrix at the threshold selected above. Compared to that of the non-adjusted linear regression,
+we get 15% less false negatives, at the expense of 50% more false positives. However,
+
+ since the latter are not involved in the computation of the F1 score,
+the overall result is an improved value.
+"""
+n_splits = 10
+cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
+clf = Pipeline([('column_preprocessing', col_preproc),
+                ('classifier', LogisticRegression())])
+
+mean_cm = np.zeros((2, 2), dtype=float)  # confusion matrix
+mean_fpr = np.linspace(0, 1, 401)  # false-positive rates
+mean_tpr = np.zeros(401, dtype=float)  # true-positive rates
+thr_fpr, thr_tpr = 0, 0  # fpr, tpr at threshold
+for i, (itr, ival) in enumerate(cv.split(X, y)):
+    X_v, y_v = X.iloc[ival], y.iloc[ival]
+    clf.fit(X.iloc[itr], y.iloc[itr])
+    # confusion matrix
+    y_pred = clf.predict_proba(X_v)[:, 1] > best_thr
+    mean_cm += confusion_matrix(y_v, y_pred) / len(X)
+    # ROC
+    y_decision = clf.decision_function(X_v)
+    fpr, tpr, thr = roc_curve(y_v, y_decision)
+    mean_tpr += np.interp(mean_fpr, fpr, tpr, left=0, right=1) / n_splits
+    thr_fpr += np.interp(best_thr, expit(thr[::-1]), fpr[::-1]) / n_splits
+    thr_tpr += np.interp(best_thr, expit(thr[::-1]), tpr[::-1]) / n_splits
+mean_tpr[0] = 0
+mean_auc = auc(mean_fpr, mean_tpr)
+
+
+print('===== CV-estimated metrics =====')
+print_metrics(mean_cm)
+
+
+"""
+We plot the ROC curve in figure 7. The location of our selected threshold is indicated on the curve as an orange cross.
+"""
+
+fig7, ax7 = plt.subplots(figsize=(5, 5))
+fig7.suptitle('Figure 7: ROC curve', x=0.02, ha='left')
+
+ax7.plot(mean_fpr, mean_tpr, label=f'Mean ROC (AUC = {mean_auc:.4f})')
+ax7.plot(thr_fpr, thr_tpr, marker='X', markersize=7, markeredgewidth=0.1)
+
+ax7.legend(loc=4)
+ax7.set_title('mean ROC curve')
+ax7.set_xlabel('False positive rate')
+ax7.set_ylabel('True positive rate')
+ax7.set_xlim(-0.01, 1.01)
+ax7.set_ylim(-0.01, 1.01)
+ax7.grid(visible=True, alpha=0.3)
+
+thr_txt = (f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}\n'
+           f'TPR = {thr_tpr:.4}\nFPR = {thr_fpr:.4}')
+ax7.text(0.23, 0.74, thr_txt, ha='center', va='center')
+
+plt.show()
+
+
+"""
+... comment
+"""
+
+# %%% LR : polynomial features
+# TODO
+# TODO comment
+"""
+### Adding polynomial features
+
+
+The application of the `PolynomialFeatures` preprocessor caused the apparition of many useless features 
+The many (and mostly useless) features added through application of the `PolynomialFeatures` preprocessor were the cause of a significant slowdown
+of the various optimization procedures. 
+
+A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
+multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
+
+
+#### Model construction
+
+"""
+
+# preprocessing
+col_preproc_full = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+# custom feature engineering
+def poly_features_full(X: np.ndarray) -> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+        
+    This function is adapted to the *full* dataset preprocessed with one-hot
+    encoding of the categorical variables 'country' and 'source'.
+    """
+    X_ = np.empty((len(X), 29), dtype=float)
+    X_[:, :10] = X  # original features
+    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
+    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
+    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
+    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
+    return X_
+
+# # scale quantitative data
+# poly_scaler = ColumnTransformer(
+#     [('id_1', FunctionTransformer(None), slice(0, 10)),
+#      ('poly_scaler', StandardScaler(), slice(10, 13)),
+#      ('id_2', FunctionTransformer(None), slice(13, None))])
+
+# classifier
+lr = LogisticRegression(
+    penalty='elasticnet',
+    C=0.1,
+    fit_intercept=True,
+    class_weight=None,
+    solver='saga',  # supports elasticnet penalty
+    random_state=1234,
+    l1_ratio=0.8)
+
+
+# full pipeline
+pipeline = Pipeline([('column_preprocessing', col_preproc_full),
+                     ('poly_features', FunctionTransformer(poly_features_full)),
+                     # ('poly_scaler', poly_scaler),
+                     ('classifier', lr)])
+
+# evaluate by cross-validation
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+
+# adjujst threshold
+lr_model_polyfeatures_ta = tune_threshold_cv(pipeline, X, y)
+
+
+
+# %%% LR : split
+# TODO comment
+"""
+### Splitting the model
+
+
+The application of the `PolynomialFeatures` preprocessor caused the apparition of many useless features 
+The many (and mostly useless) features added through application of the `PolynomialFeatures` preprocessor were the cause of a significant slowdown
+of the various optimization procedures. 
+
+A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
+multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
 
 
 #### Model construction
@@ -952,24 +1069,31 @@ sys.exit()
 # split the dataset
 groups = ['new_user', 'country']
 Xs, ys = split_data(groups)
-# Xs = {idx: df_.drop(groups, axis=1) for idx, df_ in X.groupby(groups)}
-# ys = {idx: y.loc[X_.index] for idx, X_ in Xs.items()}
 
 # column preprocessing
-cat_vars_2 = [v for v in cat_vars if v not in groups]
-bool_vars_2 = [v for v in bool_vars if v not in groups]
-quant_vars_2 = [v for v in quant_vars if v not in groups]
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars_2),
-     ('id_', FunctionTransformer(None), bool_vars_2 + quant_vars_2)])
+split_cat_vars = [v for v in cat_vars if v not in groups]
+split_bool_vars = [v for v in bool_vars if v not in groups]
+split_quant_vars = [v for v in quant_vars if v not in groups]
+col_preproc_split = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), split_cat_vars),
+     ('bool_id', FunctionTransformer(None), split_bool_vars),
+     ('quant_scaler', StandardScaler(), split_quant_vars)])
+# col_preproc = ColumnTransformer(
+#     [('cat_ohe', OneHotEncoder(drop=None), split_cat_vars),
+#      ('id_', FunctionTransformer(None), split_bool_vars + split_quant_vars)])
+
 
 # custom feature engineering
-def poly_features(X: np.ndarray) -> np.ndarray:
+def poly_features_split(X: np.ndarray) -> np.ndarray:
     """
     Custom polynomial features construction:
         - Original features, Xi
         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
         - Products of categorical and quantitative features, Xi_cat * Xj_quant
+        
+    This function is adapted to datasets *split* according to 'new_user' and
+    'country', preprocessed with one-hot encoding of the remaining categorical
+    variable 'source'.
     """
     X_ = np.empty((len(X), 13), dtype=float)
     X_[:, :5] = X  # original features
@@ -979,27 +1103,12 @@ def poly_features(X: np.ndarray) -> np.ndarray:
     X_[:, 10:13] = X[:, :3] * X[:, [4]]  # cat * npages
     return X_
 
-# def poly_features(X: np.ndarray) -> np.ndarray:
-#     """
-#     Custom polynomial features construction:
-#         - Original features, Xi
-#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
-#     """
-#     X_ = np.empty((len(X), 26), dtype=float)
-#     X_[:, :9] = X  # original features
-#     X_[:, 9:11] = X[:, 7:9]**2  # age**2, npages**2
-#     X_[:, 11] = X[:, 7] * X[:, 8]  # age * npages
-#     X_[:, 12:19] = X[:, :7] * X[:, [7]]  # cat * age
-#     X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
-#     return X_
 
-
-# classifier: SVM classifier with linear kernel
-logreg_clf = LogisticRegression(
+# classifier
+lr_split = LogisticRegression(
     penalty='elasticnet',
     C=0.1,
-    fit_intercept=True,  # intercept already included as a feature by `PolynomialFeatures`
+    fit_intercept=True,
     class_weight=None,
     solver='saga',  # supports elasticnet penalty
     random_state=1234,
@@ -1009,33 +1118,20 @@ logreg_clf = LogisticRegression(
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
     [('column_preprocessing', col_preproc),
-     ('poly_features', FunctionTransformer(poly_features)),
-     ('scaler', StandardScaler()),
-     ('classifier', logreg_clf)]
+     ('poly_features', FunctionTransformer(poly_features_split)),
+     ('classifier', lr)]
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
-
-# """
-# #### Optional: parameters optimization
-
-# ```python
-# for idx, pipeline in pipelines.items():
-#     gsearch = GridSearchCV(
-#         pipeline,  param_grid={'classifier__C': np.logspace(-5, 1, 61)},
-#         scoring='f1', n_jobs=4, refit=False, cv=10, verbose=False)
-#     gsearch.fit(Xs[idx], ys[idx])
-#     best_C = gsearch.best_params_['classifier__C']
-#     print(f'found best C for idx={idx}: {best_C}')
-#     pipeline['classifier'].C = best_C
-# ```
-# """
+# multimodel_gridsearch_cv(pipelines, Xs, ys,
+#                          param_name: str, param_vals: np.ndarray)
 
 
 """
 #### Model evaluation by cross-validation
 """
-multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
+
 
 
 """
@@ -1045,38 +1141,40 @@ Similarly, we can adjust the classification threshold
 It would be difficult to recover a global F1-score estimate since the TunedThresholdClassifierCV won't
 return the confusion matrix at each CV round.
 """
-# fit on the whole dataset
+
+# # fit on the whole dataset
+# split_lr_model_polyfeatures = {idx: pipeline.fit(Xs[idx], ys[idx])
+#                          for idx, pipeline in pipelines.items()}
+
+# adjust threshold
+# split_lr_model_pf_ta = {idx: tune_threshold_cv(pipeline, Xs[idx], ys[idx])
+#                             for idx, pipeline in pipelines.items()}
+split_lr_model_pf_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    split_lr_model_pf_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
 
 
-# model2_ta = {idx: TunedThresholdClassifierCV(clone(p), scoring='f1', cv=10, random_state=1234)
-#              for idx, p in pipelines.items()}
 
-# t0 = time.time()
-# for idx, model in model2_ta.items():
-#     model.fit(Xs[idx], ys[idx])
-# t1 = time.time()
-# print(f'model2_ta fitting time: {t1-t0} s')
-
-# best_thrs = {idx: m.best_threshold_ for idx, m in model2_ta.items()}
-# best_scores = {idx: m.best_score_ for idx, m in model2_ta.items()}
-# for idx in best_thrs:
-#     print(f'{idx} : best threshold = {best_thrs[idx]:.6f};',
-#           f'best F1-score = {best_scores[idx]:.6f}')
-
+# %%% LR : test eval
 
 """
-#### Performance assessment on test data
+### Model evaluation on test data
 
 Our two models are `dict`s and as such do not have the `Estimator` interface (and most notably the `predict` method).
 To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
 """
 
-# fit on the whole dataset
-lr_model = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
+##
+# print('===== Basic logistic regression =====')
+# _, cm = evaluate_model(lr_model)
+# print_metrics(cm)
 
-# Threshold adjust
-lr_model_ta = {idx: tune_threshold_cv(pipeline, Xs[idx], ys[idx], verbose=True)
-             for idx, pipeline in pipelines.items()}
+##
+# print('\n===== Logistic regression with adjusted decision threshold =====')
+# _, cm = evaluate_model(lr_model_ta)
+# print_metrics(cm)
+
 
 ##
 # print('===== Improved logistic regression =====')
@@ -1088,74 +1186,12 @@ lr_model_ta = {idx: tune_threshold_cv(pipeline, Xs[idx], ys[idx], verbose=True)
 # _, cm = evaluate_model(MimicEstimator(lr_model_ta))
 # print_metrics(cm)
 
+
+
+# %% LDA
+# TODO comment
 """
-...The regularization and ...
-"""
-
-
-#%%
-
-"""
-## <a name="trees"></a>Decision trees and random forests
-
-### Decision tree
-"""
-
-from sklearn.tree import DecisionTreeClassifier
-
-
-# column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
-
-# feature engineering
-def poly_features(X: np.ndarray) -> np.ndarray:
-    """
-    Custom polynomial features construction:
-        - Original features, Xi
-        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-        - Products of categorical and quantitative features, Xi_cat * Xj_quant
-    """
-    X_ = np.empty((len(X), 29), dtype=float)
-    X_[:, :10] = X  # original features
-    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
-    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
-    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
-    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
-    return X_
-
-# classifier
-dtc = DecisionTreeClassifier(max_depth=100, random_state=1234)
-
-
-# full pipeline, including polynomial feature generation
-pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
-     # ('poly_features', FunctionTransformer(poly_features)),
-     ('classifier', dtc)]
-)
-
-
-# optimize
-# best_ccp_alpha = gridsearch_cv(pipeline, X, y, param_name='ccp_alpha',
-#                                param_vals=np.logspace(-1, 3, 41))
-# pipeline['classifier'].ccp_alpha = best_ccp_alpha
-best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
-                               param_vals=np.arange(1, 21))
-pipeline['classifier'].max_depth = best_max_depth
-
-#
-_ = cv_eval(pipeline, X, y, verbose=True)
-
-
-
-
-#%%
-
-"""
-## <a name="prototype"></a>Prototype methods
+## <a name="lda"></a>Linear discriminant analysis
 
 Problem with KNN: no metric, all features have same relevance.
 Solve with `neighbors.NeighborhoodComponentsAnalysis`
@@ -1164,37 +1200,36 @@ Solve with `neighbors.NeighborhoodComponentsAnalysis`
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
+# %%% LDA : Simple
+# TODO comment
 """
-
-### Linear discriminant analysis
-
-
+### Simple model
 """
 
 # column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
+# col_preproc = ColumnTransformer(
+#     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+#      ('bool_id', FunctionTransformer(None), bool_vars),
+#      ('quant_scaler', StandardScaler(), quant_vars)])
 
 # feature engineering
-def poly_features(X: np.ndarray) -> np.ndarray:
-    """
-    Custom polynomial features construction:
-        - Original features, Xi
-        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-        - Products of categorical and quantitative features, Xi_cat * Xj_quant
-    """
-    X_ = np.empty((len(X), 29), dtype=float)
-    X_[:, :10] = X  # original features
-    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
-    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
-    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
-    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
-    return X_
+# def poly_features(X: np.ndarray) -> np.ndarray:
+#     """
+#     Custom polynomial features construction:
+#         - Original features, Xi
+#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
+#     """
+#     X_ = np.empty((len(X), 29), dtype=float)
+#     X_[:, :10] = X  # original features
+#     X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
+#     X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
+#     X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
+#     X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
+#     return X_
 
 # classifier
-lda1 = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
+lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
 # lr1 = LogisticRegression(
 #     penalty='l2',
 #     C=0.1,
@@ -1207,9 +1242,9 @@ lda1 = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
 
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
-     ('poly_features', FunctionTransformer(poly_features)),
-     ('classifier', lda1)]
+    [('column_preprocessing', col_preproc_full),
+     ('poly_features', FunctionTransformer(poly_features_full)),
+     ('classifier', lda)]
 )
 
 # optimization
@@ -1220,50 +1255,53 @@ pipeline['classifier'].shrinkage = best_shrinkage
 #     pipeline, X, y, param_name='C', param_vals=np.logspace(-3, 1, 41))
 # pipeline['classifier'].C = best_C
 
+# assessment
 _ = cv_eval(pipeline, X, y, verbose=True)
 
+# fit
+lda_model_ta = tune_threshold_cv(pipeline, X, y)
 
-lda_model_ta = TunedThresholdClassifierCV(
-    pipeline, scoring='f1', cv=10, refit=True, random_state=1234)
-t0 = time.time()
-lda_model_ta.fit(X, y)
-t1 = time.time()
-print(f'model fitting time: {t1-t0} s')
+# lda_model_ta = TunedThresholdClassifierCV(
+#     pipeline, scoring='f1', cv=10, refit=True, random_state=1234)
+# t0 = time.time()
+# lda_model_ta.fit(X, y)
+# t1 = time.time()
+# print(f'model fitting time: {t1-t0} s')
 
-best_thr = lda_model_ta.best_threshold_
-best_score = lda_model_ta.best_score_
-print(f'best threshold = {best_thr:.8f}',
-      f'\nbest F1-score = {best_score:.8f}')
+# best_thr = lda_model_ta.best_threshold_
+# best_score = lda_model_ta.best_score_
+# print(f'best threshold = {best_thr:.8f}',
+#       f'\nbest F1-score = {best_score:.8f}')
 
 
 
-#%%
+
+
+# %%% LDA : split
+# TODO comment
 """
 
 """
-
-
-
 
 # split the dataset
-groups = ['new_user', 'country']
-Xs, ys = split_data(groups)
+# groups = ['new_user', 'country']
+# Xs, ys = split_data(groups)
 
 # preprocessing
-cat_vars = ['country', 'source']
-bool_vars = ['new_user']
-quant_vars = ['age', 'total_pages_visited']
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
-     ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
-     ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
+# cat_vars = ['country', 'source']
+# bool_vars = ['new_user']
+# quant_vars = ['age', 'total_pages_visited']
+# col_preproc = ColumnTransformer(
+#     [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
+#      ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
+#      ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
 
 # classifier
 lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
 
 # full pipelines
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
+    [('column_preprocessing', col_preproc_split),
      ('classifier', lda)]
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
@@ -1287,7 +1325,7 @@ _ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 """
 
 # fit on the whole dataset
-lda_model = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
+# lda_model = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
 
 # Threshold adjust
 lda_model_ta = {}
@@ -1308,14 +1346,124 @@ for idx, p in pipelines.items():
 """
 
 
-
-#%%
+# %% Trees
+# TODO comment
 """
-## <a name="kernels"></a>Kernel methods
-
+## <a name="tree"></a>Decision trees
 
 """
 
+from sklearn.tree import DecisionTreeClassifier
+
+# %%% Tree : simple
+# TODO comment
+"""
+entropy/gini/log_loss => no significant change
+
+for such a simple problem, pruning the tree is not necessary
+
+Trees are insensitive to variables scaling
+"""
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
+
+# classifier
+dtc = DecisionTreeClassifier(criterion='gini', max_depth=7, random_state=1234)
+
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline([('column_preprocessing', col_preproc),
+                     ('classifier', dtc)])
+
+# optimize
+best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
+                               param_vals=np.arange(2, 16, 1))
+pipeline['classifier'].max_depth = best_max_depth
+
+# model ssessment
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+# fit
+dtc_model = pipeline
+t0 = time.time()
+dtc_model.fit(X, y)
+t1 = time.time()
+print(f'model fitting time: {t1-t0} s')
+
+
+# %%% Tree with polynomial features
+
+
+# TODO comment
+# feature engineering
+def poly_features(X: np.ndarray) -> np.ndarray:
+    """
+    Custom polynomial features construction for ordinal-encoded categorical
+    variables:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 24), dtype=float)
+    X_[:, :5] = X  # original features
+    X_[:, 5:7] = X[:, -2:]**2  # age**2, npages**2
+    X_[:, 7] = X[:, -2] * X[:, -1]  # age * npages
+    for i in range(4): # 4 countries
+        X_[:, 8+i] = (X[:, 0] == i) * X[:, -2] # country * age
+        X_[:, 16+i] = (X[:, 0] == i) * X[:, -1] # country * npages
+    for i in range(3): # 3 sources
+        X_[:, 12+i] = (X[:, 1] == i) * X[:, -2] # source * age
+        X_[:, 20+i] = (X[:, 1] == i) * X[:, -1] # source * npages
+    X_[:, 15] = X[:, 2] * X[:, -2] # new_user * age
+    X_[:, 23] = X[:, 2] * X[:, -1] # new_user * npages
+    return X_
+
+# classifier
+dtc = DecisionTreeClassifier(criterion='gini',
+                             max_depth=best_max_depth,
+                             random_state=1234)
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('poly_features', FunctionTransformer(poly_features)),
+     ('classifier', dtc)]
+)
+
+# 
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+"""
+Adding polynomial features does not improve significantly the score, as expected since trees naturally capture the non-linear relationship between features.
+"""
+
+# %%% Split trees
+# TODO comment
+# TODO
+"""
+Split 
+"""
+
+
+
+
+
+# %% SVM
+# TODO comment
+"""
+## <a name="svm"></a>Support Vector Machines
+
+As an illustration of kernel methods for classification, we build a support vector classifier.
+
+"""
+
+from sklearn.svm import LinearSVC
+
+# %%% Simple SVM
+# TODO comment
 """
 ### Support Vector Machines
 
@@ -1326,16 +1474,11 @@ The support vector machine brings a solution to this issue, by considering only 
 Let us implement this solution.
 """
 
-# split the dataset
-groups = ['new_user']
-Xs, ys = split_data(groups)
-
 # column preprocessing
 col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
-     ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
-     ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
-
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
 
 # custom feature engineering
 def poly_features(X: np.ndarray) -> np.ndarray:
@@ -1355,12 +1498,11 @@ def poly_features(X: np.ndarray) -> np.ndarray:
 
 
 # classifier
-svc = SGDClassifier(
-    loss='hinge',
-    penalty='l2',
-    fit_intercept=True,
-    # intercept_scaling=10,
-)
+svc = LinearSVC(loss='hinge',
+                penalty='l2',
+                fit_intercept=True,
+                # intercept_scaling=10
+                )
 
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
@@ -1411,19 +1553,90 @@ for idx, p in pipelines.items():
 
 
 
+# %%% Split model
+# TODO comment
+"""
+### Split SVM
+
+Let us make a composite model
+"""
+
+# split the dataset
+groups = ['new_user', 'country']
+Xs, ys = split_data(groups)
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
+     ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
+     ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
 
 
-#%%
+# custom feature engineering
+def poly_features(X: np.ndarray) -> np.ndarray:
+    """
+    Custom polynomial features construction:
+        - Original features, Xi
+        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+    """
+    X_ = np.empty((len(X), 26), dtype=float)
+    X_[:, :9] = X  # original features
+    X_[:, 9:11] = X[:, 7:9]**2  # age**2, npages**2
+    X_[:, 11] = X[:, 7] * X[:, 8]  # age * npages
+    X_[:, 12:19] = X[:, :7] * X[:, [7]]  # cat * age
+    X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
+    return X_
+
+
+# classifier
+svc = LinearSVC(
+    loss='hinge',
+    penalty='l2',
+    fit_intercept=True,
+    # intercept_scaling=10,
+)
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     # PolynomialFeatures(degree=2, interaction_only=True)),
+     ('poly_features', FunctionTransformer(poly_features)),
+     ('classifier', svc)]
+)
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+
+"""
+Now we optimize
+"""
+
+## optimize the regularization parameter
+best_alphas = multimodel_gridsearch_cv(
+    pipelines, Xs, ys, param_name='alpha', param_vals=np.logspace(-6, -2, 41))
+for idx, pipeline in pipelines.items():
+    pipeline['classifier'].alpha = best_alphas[idx]
+
+
+## CV-evaluation
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
+
+
+
+# %% NN
+# TODO comment
 """
 ## <a name="nn"></a>Neural networks
 
-
-
 """
-
 from sklearn.neural_network import MLPClassifier
 
 
+# %%% Basic model
+# TODO comment
+"""
+### Simple multi-layer perceptron
+"""
 # column preprocessing
 col_preproc = ColumnTransformer(
     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
@@ -1447,9 +1660,11 @@ def poly_features(X: np.ndarray) -> np.ndarray:
     return X_
 
 # classifier
-mlp = MLPClassifier(hidden_layer_sizes=(100, 100, 50, 20),
+mlp = MLPClassifier(hidden_layer_sizes=(100, 50, 20),
                     activation='relu',
                     batch_size=2000,
+                    rndom_state=1234,
+                    warm_start=True,
                     early_stopping=True)
 
 
@@ -1461,20 +1676,176 @@ pipeline = Pipeline(
 )
 
 
+#
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+
+# %% Random forests
+# TODO comment
+"""
+## <a name="rf"></a>Random forests
+
+We now turn to ensemble methods.
+"""
+
+from sklearn.ensemble import RandomForestClassifier
+
+
+# %%% RF : Simple model
+# TODO comment
+"""
+### Simple model
+"""
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
+
+# classifier
+rfc = RandomForestClassifier(criterion='gini',
+                             # max_depth=8,
+                             bootstrap=True,
+                             random_state=1234)
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('classifier', rfc)]
+)
+
 # optimize
-# best_ccp_alpha = gridsearch_cv(pipeline, X, y, param_name='ccp_alpha',
-#                                param_vals=np.logspace(-1, 3, 41))
-# pipeline['classifier'].ccp_alpha = best_ccp_alpha
-# best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
-#                                param_vals=[10, 20, 50, 100, 200, 500])
-# pipeline['classifier'].max_depth = best_max_depth
+best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
+                               param_vals=np.arange(2, 13, 1))
+pipeline['classifier'].max_depth = best_max_depth
 
 #
 _ = cv_eval(pipeline, X, y, verbose=True)
 
 
+# %%% RF : Split model
+# TODO
+# TODO comment
+"""
+### Split model
 
-# %%
+"""
+
+
+# %% Gradient boosting
+# TODO comment
+"""
+## <a name="gb"></a>Gradient boosting
+"""
+
+from sklearn.ensemble import HistGradientBoostingClassifier
+
+
+# %%% GB : Simple model
+# TODO comment
+"""
+### Simple model
+
+In order to have reasonable fitting times, we use the hisogram-based gradient boosting classifier
+"""
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
+
+# classifier
+hgbc = HistGradientBoostingClassifier(loss='log_loss',
+                                      max_iter=200,
+                                      # max_depth=6,
+                                      categorical_features=[0, 1, 2],
+                                      random_state=1234)
+
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('poly_features', FunctionTransformer(poly_features)),
+     ('classifier', hgbc)]
+)
+
+
+# optimize
+# best_ccp_alpha = gridsearch_cv(pipeline, X, y, param_name='ccp_alpha',
+#                                param_vals=np.logspace(-1, 3, 41))
+# pipeline['classifier'].ccp_alpha = best_ccp_alpha
+best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
+                               param_vals=np.arange(2, 13, 1))
+pipeline['classifier'].max_depth = best_max_depth
+
+#
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+
+# %%% GB : Split model
+# TODO
+# TODO comment
+"""
+### Split model
+
+"""
+
+
+
+# %% Composite
+"""
+## <a name="composite"></a>Composite models
+
+We have build many models so far, each having a F1 score of 0.75 - 0.77 after parameter tuning.
+However, we saw that there were significant differences between models in terms of precision/recall to yield the F1 score, as illustrated in the following table.
+"""
+
+models = {'lr_model_ta': lr_model_ta,
+          
+          'lda_model_ta': None,
+          'dtc_model': dtc_model,
+          'split_dtc_model': None,
+          }
+
+# prec | recall | F1 of the models
+
+
+"""
+Furthermore, when fitting models for each pair (new_user, country)it appeared that the F1 scores were rather low in some categories and high in others,
+as highlighted in the following table.
+"""
+
+# F1 for each idx of each model
+
+"""
+In this section, we will try to take advantage of each model by building composite models.
+"""
+
+from sklearn.ensemble import VotingClassifier
+
+# %%% Voting
+
+"""
+### Voting classifier
+
+We build a voting classifier out of all our models
+"""
+
+vc = VotingClassifier()
+
+
+# %%% Mixing models
+
+"""
+### Mixing models
+
+We take the best of each sub-model
+"""
+
+
+
+
+
 ##### testing pipeline #####
 
 # def preprocessor_baseline(dataframe: pd.DataFrame)-> np.ndarray:
