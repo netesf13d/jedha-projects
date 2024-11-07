@@ -610,6 +610,10 @@ warnings.simplefilter("ignore", ConvergenceWarning)
 
 
 def print_metrics(cm: np.ndarray)-> None:
+    """
+    Print metrics related to the confusion matrix: precision, recall, F1-score.
+    TODO handle ZeroDiv
+    """
     recall = cm[1, 1] / np.sum(cm, axis=1)[1]
     prec = cm[1, 1] / np.sum(cm, axis=0)[1]
     print("Confusion matrix\n", cm / np.sum(cm))
@@ -764,14 +768,6 @@ class MimicEstimator():
         for idx, X in Xs.items():
             y_pred[X.index] = self.model[idx].predict(X)
         return y_pred
-
-"""
-Model containers
-"""
-
-models = {}
-f1_scores = {}
-
 
 
 # %% LogReg
@@ -973,7 +969,6 @@ plt.show()
 """
 
 # %%% LR : polynomial features
-# TODO
 # TODO comment
 """
 ### Adding polynomial features
@@ -1016,12 +1011,6 @@ def poly_features_full(X: np.ndarray) -> np.ndarray:
     X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
     return X_
 
-# # scale quantitative data
-# poly_scaler = ColumnTransformer(
-#     [('id_1', FunctionTransformer(None), slice(0, 10)),
-#      ('poly_scaler', StandardScaler(), slice(10, 13)),
-#      ('id_2', FunctionTransformer(None), slice(13, None))])
-
 # classifier
 lr = LogisticRegression(
     penalty='elasticnet',
@@ -1032,20 +1021,16 @@ lr = LogisticRegression(
     random_state=1234,
     l1_ratio=0.8)
 
-
 # full pipeline
 pipeline = Pipeline([('column_preprocessing', col_preproc_full),
                      ('poly_features', FunctionTransformer(poly_features_full)),
-                     # ('poly_scaler', poly_scaler),
                      ('classifier', lr)])
 
 # evaluate by cross-validation
 _ = cv_eval(pipeline, X, y, verbose=True)
 
-
 # adjujst threshold
 lr_model_polyfeatures_ta = tune_threshold_cv(pipeline, X, y)
-
 
 
 # %%% LR : split
@@ -1078,9 +1063,6 @@ col_preproc_split = ColumnTransformer(
     [('cat_ohe', OneHotEncoder(drop=None), split_cat_vars),
      ('bool_id', FunctionTransformer(None), split_bool_vars),
      ('quant_scaler', StandardScaler(), split_quant_vars)])
-# col_preproc = ColumnTransformer(
-#     [('cat_ohe', OneHotEncoder(drop=None), split_cat_vars),
-#      ('id_', FunctionTransformer(None), split_bool_vars + split_quant_vars)])
 
 
 # custom feature engineering
@@ -1117,9 +1099,9 @@ lr_split = LogisticRegression(
 
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
+    [('column_preprocessing', col_preproc_split),
      ('poly_features', FunctionTransformer(poly_features_split)),
-     ('classifier', lr)]
+     ('classifier', lr_split)]
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
@@ -1142,17 +1124,10 @@ It would be difficult to recover a global F1-score estimate since the TunedThres
 return the confusion matrix at each CV round.
 """
 
-# # fit on the whole dataset
-# split_lr_model_polyfeatures = {idx: pipeline.fit(Xs[idx], ys[idx])
-#                          for idx, pipeline in pipelines.items()}
-
-# adjust threshold
-# split_lr_model_pf_ta = {idx: tune_threshold_cv(pipeline, Xs[idx], ys[idx])
-#                             for idx, pipeline in pipelines.items()}
-split_lr_model_pf_ta = {}
+split_lr_model_ta = {}
 for idx, p in pipelines.items():
     print(f'== {idx} ==')
-    split_lr_model_pf_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+    split_lr_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
 
 
 
@@ -1320,18 +1295,20 @@ _ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 ... comment
 """
 
-"""
-#### Evaluate the model
-"""
-
-# fit on the whole dataset
-# lda_model = {idx: pipeline.fit(Xs[idx], ys[idx]) for idx, pipeline in pipelines.items()}
 
 # Threshold adjust
-lda_model_ta = {}
+split_lda_model_ta = {}
 for idx, p in pipelines.items():
     print(f'== {idx} ==')
-    lda_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+    split_lda_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+
+
+# %%% LDA : eval
+
+"""
+
+"""
 
 # print('\n===== Linear discriminant analysis =====')
 # _, cm = evaluate_model(lda_model)
@@ -1366,7 +1343,7 @@ Trees are insensitive to variables scaling
 """
 
 # column preprocessing
-col_preproc = ColumnTransformer(
+tree_col_preproc_full = ColumnTransformer(
     [('cat_oe', OrdinalEncoder(), cat_vars),
      ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
 
@@ -1387,16 +1364,18 @@ pipeline['classifier'].max_depth = best_max_depth
 _ = cv_eval(pipeline, X, y, verbose=True)
 
 # fit
-dtc_model = pipeline
-t0 = time.time()
-dtc_model.fit(X, y)
-t1 = time.time()
-print(f'model fitting time: {t1-t0} s')
+dtc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
+# t0 = time.time()
+# dtc_model.fit(X, y)
+# t1 = time.time()
+# print(f'model fitting time: {t1-t0} s')
 
 
-# %%% Tree with polynomial features
+# %%% Tree : polynomial features
 
+"""
 
+"""
 # TODO comment
 # feature engineering
 def poly_features(X: np.ndarray) -> np.ndarray:
@@ -1428,7 +1407,7 @@ dtc = DecisionTreeClassifier(criterion='gini',
 
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
+    [('column_preprocessing', tree_col_preproc_full),
      ('poly_features', FunctionTransformer(poly_features)),
      ('classifier', dtc)]
 )
@@ -1440,15 +1419,51 @@ _ = cv_eval(pipeline, X, y, verbose=True)
 Adding polynomial features does not improve significantly the score, as expected since trees naturally capture the non-linear relationship between features.
 """
 
-# %%% Split trees
+# %%% Tree : split
 # TODO comment
-# TODO
 """
 Split 
 """
 
+# column preprocessing
+tree_col_preproc_split = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), split_cat_vars),
+     ('id_', FunctionTransformer(None), split_bool_vars + split_quant_vars)])
+
+# full pipeline
+pipeline = Pipeline([('column_preprocessing', tree_col_preproc_split),
+                     ('classifier', dtc)])
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+## CV-evaluation
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 
 
+"""
+... comment
+"""
+
+# Threshold adjust
+split_dtc_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    split_dtc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+
+# %%% Tree : test eval
+
+"""
+### Model evaluation on test data
+"""
+
+# print('===== Decision tree with adjusted decision threshold =====')
+# _, cm = evaluate_model(dtc_model_ta)
+# print_metrics(cm)
+
+
+# print('\n===== Split decision tree with adjusted threshold =====')
+# _, cm = evaluate_model(MimicEstimator(split_dtc_model_ta))
+# print_metrics(cm)
 
 
 # %% SVM
@@ -1462,7 +1477,8 @@ As an illustration of kernel methods for classification, we build a support vect
 
 from sklearn.svm import LinearSVC
 
-# %%% Simple SVM
+
+# %%% SVM : simple
 # TODO comment
 """
 ### Support Vector Machines
@@ -1472,88 +1488,37 @@ the logistic regression would include all observations in the error function com
 
 The support vector machine brings a solution to this issue, by considering only those observations that lie within a given margin of the decision plane.
 Let us implement this solution.
+
+No improvement from polynomial features, but convergence times x25
 """
-
-# column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
-
-# custom feature engineering
-def poly_features(X: np.ndarray) -> np.ndarray:
-    """
-    Custom polynomial features construction:
-        - Original features, Xi
-        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-        - Products of categorical and quantitative features, Xi_cat * Xj_quant
-    """
-    X_ = np.empty((len(X), 26), dtype=float)
-    X_[:, :9] = X  # original features
-    X_[:, 9:11] = X[:, 7:9]**2  # age**2, npages**2
-    X_[:, 11] = X[:, 7] * X[:, 8]  # age * npages
-    X_[:, 12:19] = X[:, :7] * X[:, [7]]  # cat * age
-    X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
-    return X_
-
 
 # classifier
-svc = LinearSVC(loss='hinge',
-                penalty='l2',
+svc = LinearSVC(penalty='l2',
+                loss='squared_hinge',
+                C=1,
                 fit_intercept=True,
-                # intercept_scaling=10
-                )
+                intercept_scaling=10,
+                random_state=1234)
 
-# full pipeline, including polynomial feature generation
+# full pipeline
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
-     # PolynomialFeatures(degree=2, interaction_only=True)),
-     ('poly_features', FunctionTransformer(poly_features)),
+    [('column_preprocessing', col_preproc_full),
      ('classifier', svc)]
 )
-pipelines = {idx: clone(pipeline) for idx in Xs}
+
+# optimize
+best_C = gridsearch_cv(pipeline, X, y, param_name='C',
+                       param_vals=np.logspace(-2, 1, 16))
+pipeline['classifier'].C = best_C
+
+# model assessment
+_ = cv_eval(pipeline, X, y, verbose=True)
+
+# fit
+svc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
 
 
-"""
-Now we optimize
-"""
-
-## optimize the regularization parameter
-best_alphas = multimodel_gridsearch_cv(
-    pipelines, Xs, ys, param_name='alpha', param_vals=np.logspace(-6, -2, 41))
-for idx, pipeline in pipelines.items():
-    pipeline['classifier'].alpha = best_alphas[idx]
-
-
-## CV-evaluation
-_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
-
-
-# fit on the whole dataset
-svc_model = {idx: p.fit(Xs[idx], ys[idx]) for idx, p in pipelines.items()}
-
-
-"""
-Similarly, we can adjust the classification threshold
-It would be difficult to recover a global F1-score estimate since the TunedThresholdClassifierCV won't
-return the confusion matrix at each CV round.
-"""
-
-# Threshold adjust
-svc_model_ta = {}
-for idx, p in pipelines.items():
-    print(f'== {idx} ==')
-    svc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
-
-
-"""
-#### Model evaluation on test data
-
-"""
-
-
-
-# %%% Split model
+# %%% SVM : split
 # TODO comment
 """
 ### Split SVM
@@ -1561,66 +1526,46 @@ for idx, p in pipelines.items():
 Let us make a composite model
 """
 
-# split the dataset
-groups = ['new_user', 'country']
-Xs, ys = split_data(groups)
-
-# column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
-     ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
-     ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
-
-
-# custom feature engineering
-def poly_features(X: np.ndarray) -> np.ndarray:
-    """
-    Custom polynomial features construction:
-        - Original features, Xi
-        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-        - Products of categorical and quantitative features, Xi_cat * Xj_quant
-    """
-    X_ = np.empty((len(X), 26), dtype=float)
-    X_[:, :9] = X  # original features
-    X_[:, 9:11] = X[:, 7:9]**2  # age**2, npages**2
-    X_[:, 11] = X[:, 7] * X[:, 8]  # age * npages
-    X_[:, 12:19] = X[:, :7] * X[:, [7]]  # cat * age
-    X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
-    return X_
-
-
 # classifier
-svc = LinearSVC(
-    loss='hinge',
-    penalty='l2',
-    fit_intercept=True,
-    # intercept_scaling=10,
-)
+svc = LinearSVC(penalty='l2',
+                loss='squared_hinge',
+                C=best_C,
+                fit_intercept=True,
+                intercept_scaling=10,
+                random_state=1234)
 
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
-     # PolynomialFeatures(degree=2, interaction_only=True)),
-     ('poly_features', FunctionTransformer(poly_features)),
+    [('column_preprocessing', col_preproc_split),
+     # ('poly_features', FunctionTransformer(poly_features_split)),
      ('classifier', svc)]
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
-
-"""
-Now we optimize
-"""
-
-## optimize the regularization parameter
-best_alphas = multimodel_gridsearch_cv(
-    pipelines, Xs, ys, param_name='alpha', param_vals=np.logspace(-6, -2, 41))
-for idx, pipeline in pipelines.items():
-    pipeline['classifier'].alpha = best_alphas[idx]
-
-
-## CV-evaluation
+# assessment
 _ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 
+# Threshold adjust
+split_svc_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    split_svc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+
+# %%% SVM : test eval
+
+"""
+### Model evaluation on test data
+"""
+
+# print('===== Support vector classifier with adjusted decision threshold =====')
+# _, cm = evaluate_model(svc_model_ta)
+# print_metrics(cm)
+
+
+# print('\n===== Split support vector classifier with adjusted threshold =====')
+# _, cm = evaluate_model(MimicEstimator(split_svc_model_ta))
+# print_metrics(cm)
 
 
 # %% NN
@@ -1632,38 +1577,39 @@ _ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
 from sklearn.neural_network import MLPClassifier
 
 
-# %%% Basic model
+# %%% NN : simple
 # TODO comment
+# TODO
 """
 ### Simple multi-layer perceptron
 """
-# column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
+# # column preprocessing
+# col_preproc = ColumnTransformer(
+#     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+#      ('bool_id', FunctionTransformer(None), bool_vars),
+#      ('quant_scaler', StandardScaler(), quant_vars)])
 
-# feature engineering
-def poly_features(X: np.ndarray) -> np.ndarray:
-    """
-    Custom polynomial features construction:
-        - Original features, Xi
-        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-        - Products of categorical and quantitative features, Xi_cat * Xj_quant
-    """
-    X_ = np.empty((len(X), 29), dtype=float)
-    X_[:, :10] = X  # original features
-    X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
-    X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
-    X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
-    X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
-    return X_
+# # feature engineering
+# def poly_features(X: np.ndarray) -> np.ndarray:
+#     """
+#     Custom polynomial features construction:
+#         - Original features, Xi
+#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
+#     """
+#     X_ = np.empty((len(X), 29), dtype=float)
+#     X_[:, :10] = X  # original features
+#     X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
+#     X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
+#     X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
+#     X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
+#     return X_
 
 # classifier
 mlp = MLPClassifier(hidden_layer_sizes=(100, 50, 20),
                     activation='relu',
                     batch_size=2000,
-                    rndom_state=1234,
+                    random_state=1234,
                     warm_start=True,
                     early_stopping=True)
 
@@ -1676,8 +1622,37 @@ pipeline = Pipeline(
 )
 
 
-#
-_ = cv_eval(pipeline, X, y, verbose=True)
+# TODO train test split for eval
+# _ = cv_eval(pipeline, X, y, verbose=True)
+
+mlp_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
+
+
+# %%% NN : split
+# TODO comment
+# TODO
+"""
+### Split model
+"""
+
+# full pipeline, including polynomial feature generation
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc_split),
+     # ('poly_features', FunctionTransformer(poly_features_split)),
+     ('classifier', mlp)]
+)
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+# assessment
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
+
+# Threshold adjust
+split_mlp_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    split_svc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+
 
 
 # %% Random forests
@@ -1697,11 +1672,6 @@ from sklearn.ensemble import RandomForestClassifier
 ### Simple model
 """
 
-# column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_oe', OrdinalEncoder(), cat_vars),
-     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
-
 # classifier
 rfc = RandomForestClassifier(criterion='gini',
                              # max_depth=8,
@@ -1710,7 +1680,7 @@ rfc = RandomForestClassifier(criterion='gini',
 
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
+    [('column_preprocessing', tree_col_preproc_full),
      ('classifier', rfc)]
 )
 
@@ -1719,8 +1689,11 @@ best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
                                param_vals=np.arange(2, 13, 1))
 pipeline['classifier'].max_depth = best_max_depth
 
-#
+# assessment
 _ = cv_eval(pipeline, X, y, verbose=True)
+
+# fit
+rfc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
 
 
 # %%% RF : Split model
@@ -1730,6 +1703,42 @@ _ = cv_eval(pipeline, X, y, verbose=True)
 ### Split model
 
 """
+
+# classifier
+rfc = RandomForestClassifier(criterion='gini',
+                             max_depth=best_max_depth,
+                             bootstrap=True,
+                             random_state=1234)
+
+# full pipeline
+pipeline = Pipeline([('column_preprocessing', tree_col_preproc_split),
+                     ('classifier', rfc)])
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+## CV-evaluation
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
+
+# Threshold adjust
+split_rfc_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    split_rfc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+
+# %%% Tree : test eval
+
+"""
+### Model evaluation on test data
+"""
+
+# print('===== Random forest with adjusted decision threshold =====')
+# _, cm = evaluate_model(rfc_model_ta)
+# print_metrics(cm)
+
+
+# print('\n===== Split random forests with adjusted threshold =====')
+# _, cm = evaluate_model(MimicEstimator(split_rfc_model_ta))
+# print_metrics(cm)
 
 
 # %% Gradient boosting
@@ -1749,11 +1758,6 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 In order to have reasonable fitting times, we use the hisogram-based gradient boosting classifier
 """
 
-# column preprocessing
-col_preproc = ColumnTransformer(
-    [('cat_oe', OrdinalEncoder(), cat_vars),
-     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
-
 # classifier
 hgbc = HistGradientBoostingClassifier(loss='log_loss',
                                       max_iter=200,
@@ -1761,35 +1765,67 @@ hgbc = HistGradientBoostingClassifier(loss='log_loss',
                                       categorical_features=[0, 1, 2],
                                       random_state=1234)
 
-
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
-     ('poly_features', FunctionTransformer(poly_features)),
+    [('column_preprocessing', tree_col_preproc_full),
      ('classifier', hgbc)]
 )
 
-
 # optimize
-# best_ccp_alpha = gridsearch_cv(pipeline, X, y, param_name='ccp_alpha',
-#                                param_vals=np.logspace(-1, 3, 41))
-# pipeline['classifier'].ccp_alpha = best_ccp_alpha
 best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
                                param_vals=np.arange(2, 13, 1))
 pipeline['classifier'].max_depth = best_max_depth
 
-#
+# assessment
 _ = cv_eval(pipeline, X, y, verbose=True)
+
+# fit
+hgbc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
 
 
 # %%% GB : Split model
-# TODO
 # TODO comment
 """
 ### Split model
 
 """
 
+# classifier
+hgbc = HistGradientBoostingClassifier(loss='log_loss',
+                                      max_iter=200,
+                                      max_depth=best_max_depth,
+                                      categorical_features=[0, 1, 2],
+                                      random_state=1234)
+
+# full pipeline
+pipeline = Pipeline([('column_preprocessing', tree_col_preproc_split),
+                     ('classifier', hgbc)])
+pipelines = {idx: clone(pipeline) for idx in Xs}
+
+## CV-evaluation
+_ = multimodel_cv_eval(pipelines, Xs, ys, print_partial_scores=True)
+
+# Threshold adjust
+split_hgbc_model_ta = {}
+for idx, p in pipelines.items():
+    print(f'== {idx} ==')
+    split_hgbc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
+
+
+# %%% Tree : test eval
+
+"""
+### Model evaluation on test data
+"""
+
+# print('===== Gradient boosting with adjusted decision threshold =====')
+# _, cm = evaluate_model(hgbc_model_ta)
+# print_metrics(cm)
+
+
+# print('\n===== Split gradient boosting with adjusted threshold =====')
+# _, cm = evaluate_model(MimicEstimator(split_hgbc_model_ta))
+# print_metrics(cm)
 
 
 # %% Composite
@@ -1800,12 +1836,30 @@ We have build many models so far, each having a F1 score of 0.75 - 0.77 after pa
 However, we saw that there were significant differences between models in terms of precision/recall to yield the F1 score, as illustrated in the following table.
 """
 
-models = {'lr_model_ta': lr_model_ta,
-          
-          'lda_model_ta': None,
-          'dtc_model': dtc_model,
-          'split_dtc_model': None,
-          }
+models = {
+    # logistic regressions
+    'lr_model_ta': lr_model_ta,
+    'lr_model_polyfeatures_ta': lr_model_polyfeatures_ta,
+    'split_lr_model_ta': split_lr_model_ta,
+    # linear discriminant analysis
+    'lda_model_ta': lda_model_ta,
+    'split_lda_model_ta': split_lda_model_ta,
+    # Decision trees
+    'dtc_model_ta': dtc_model_ta,
+    'split_dtc_model_ta': split_dtc_model_ta,
+    # support vector machines
+    'svc_model_ta': svc_model_ta,
+    'split_svc_model_ta': split_svc_model_ta,
+    # multi-layer perceptrons
+    'mlp_model_ta': mlp_model_ta,
+    'split_mlp_model_ta': split_mlp_model_ta,
+    # random forests
+    'rfc_model_ta': rfc_model_ta,
+    'split_rfc_model_ta': split_rfc_model_ta,
+    # gradient boosting
+    'hgbc_model_ta': hgbc_model_ta,
+    'split_hgbc_model_ta': split_hgbc_model_ta,
+    }
 
 # prec | recall | F1 of the models
 
