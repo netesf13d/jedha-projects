@@ -695,7 +695,7 @@ pipeline into a `model_selection.TunedThresholdClassifierCV`.
 """
 
 lr_model_ta = TunedThresholdClassifierCV(
-    pipeline, scoring='f1', cv=10, refit=False, random_state=1234)
+    pipeline, scoring='f1', cv=10, random_state=1234)
 
 t0 = time.time()
 lr_model_ta.fit(X, y)
@@ -938,7 +938,7 @@ class MimicEstimator():
             y_pred[X.index] = self.model[idx].predict(X)
         return y_pred
 
-
+sys.exit()
 #%%
 
 
