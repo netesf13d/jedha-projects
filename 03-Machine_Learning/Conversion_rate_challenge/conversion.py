@@ -577,38 +577,6 @@ warnings.simplefilter("ignore", ConvergenceWarning)
 #     return X_
 
 
-# def evaluate_model2(pipeline: Pipeline,
-#                    export_csv: bool = False,
-#                    name_suffix: str = 'EXAMPLE') -> np.ndarray:
-#     """
-#     Evaluate the model on the test set. The predictions are exported as
-#     'conversion_data_test_predictions_{name_suffix}.csv'
-
-#     Parameters
-#     ----------
-#     Pipeline : Callable: pd.DataFrame -> T
-#         The feature preprocessor.
-#     export_csv : bool, optional
-#         Export the test data as a csv file for challenge assessment.
-#         The default is False.
-#     name_suffix : str, optional
-#         Suffix appended to the output filename. The default is 'EXAMPLE'.
-
-#     Returns
-#     -------
-#     Y_pred : 1D np.ndarray
-#         The model's predictions on the test set.
-#     """
-#     df = pd.read_csv('./conversion_data_test.csv')
-#     Y_pred = pipeline.predict(df)
-
-#     if export_csv:
-#         fname = f'conversion_data_test_predictions_{name_suffix}.csv'
-#         np.savetxt(fname, Y_pred, fmt='%d', header='converted', comments='')
-
-#     return Y_pred
-
-
 def print_metrics(cm: np.ndarray)-> None:
     """
     Print metrics related to the confusion matrix: precision, recall, F1-score.
@@ -1181,41 +1149,11 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 ### Simple model
 """
 
-# column preprocessing
-# col_preproc = ColumnTransformer(
-#     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-#      ('bool_id', FunctionTransformer(None), bool_vars),
-#      ('quant_scaler', StandardScaler(), quant_vars)])
-
-# feature engineering
-# def poly_features(X: np.ndarray) -> np.ndarray:
-#     """
-#     Custom polynomial features construction:
-#         - Original features, Xi
-#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
-#     """
-#     X_ = np.empty((len(X), 29), dtype=float)
-#     X_[:, :10] = X  # original features
-#     X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
-#     X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
-#     X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
-#     X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
-#     return X_
-
 # classifier
 lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
-# lr1 = LogisticRegression(
-#     penalty='l2',
-#     C=0.1,
-#     fit_intercept=True,
-#     class_weight=None,
-#     solver='lbfgs',
-#     random_state=1234,
-#     # l1_ratio=0.8,
-# )
 
-# full pipeline, including polynomial feature generation
+
+# pipeline
 pipeline = Pipeline(
     [('column_preprocessing', col_preproc_full),
      ('poly_features', FunctionTransformer(poly_features_full)),
@@ -1226,30 +1164,13 @@ pipeline = Pipeline(
 best_shrinkage = gridsearch_cv(
     pipeline, X, y, param_name='shrinkage', param_vals=np.logspace(-3, -2, 41))
 pipeline['classifier'].shrinkage = best_shrinkage
-# best_C = gridsearch_cv(
-#     pipeline, X, y, param_name='C', param_vals=np.logspace(-3, 1, 41))
-# pipeline['classifier'].C = best_C
+
 
 # assessment
 _ = cv_eval(pipeline, X, y, verbose=True)
 
 # fit
 lda_model_ta = tune_threshold_cv(pipeline, X, y)
-
-# lda_model_ta = TunedThresholdClassifierCV(
-#     pipeline, scoring='f1', cv=10, refit=True, random_state=1234)
-# t0 = time.time()
-# lda_model_ta.fit(X, y)
-# t1 = time.time()
-# print(f'model fitting time: {t1-t0} s')
-
-# best_thr = lda_model_ta.best_threshold_
-# best_score = lda_model_ta.best_score_
-# print(f'best threshold = {best_thr:.8f}',
-#       f'\nbest F1-score = {best_score:.8f}')
-
-
-
 
 
 # %%% LDA : split
@@ -1630,7 +1551,6 @@ mlp_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
 
 # %%% NN : split
 # TODO comment
-# TODO
 """
 ### Split model
 """
@@ -1885,7 +1805,7 @@ from sklearn.ensemble import VotingClassifier
 We build a voting classifier out of all our models
 """
 
-vc = VotingClassifier()
+# vc = VotingClassifier()
 
 
 # %%% Mixing models
@@ -1896,34 +1816,3 @@ vc = VotingClassifier()
 We take the best of each sub-model
 """
 
-
-
-
-
-##### testing pipeline #####
-
-# def preprocessor_baseline(dataframe: pd.DataFrame)-> np.ndarray:
-#     df = pd.get_dummies(dataframe)
-#     df = df.drop(['country_US', 'source_Seo'], axis=1)
-#     return df
-
-# def predictor_baseline(X: np.ndarray)-> np.ndarray:
-#     return model.predict(X)
-
-
-# models = {
-#     # 'model1_ta': model1_ta,
-#     # 'model2': model2,
-#     # 'model2_ta': model2_ta,
-#     'model4': MimicEstimator(model3, groups),
-#     'model4_ta': MimicEstimator(model3_ta, groups),
-# }
-# # models = {m: shake_256(m).hexdigest(4) for m in models}
-
-# for m, model in models.items():
-#     evaluate_model(model, export_csv=True, name_suffix=m)
-
-# evaluate_model(preprocessor_baseline,
-#                predictor_baseline,
-#                export_csv=False,
-#                name_suffix=models[b'linreg_threhold_adjust'])
