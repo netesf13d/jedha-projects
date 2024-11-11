@@ -31,17 +31,22 @@ df = df.loc[df['age'] < 80]
 
 
 # %% EDA
-# TODO comment
 """
 ## <a name="eda"></a>Preliminary EDA
 
+We begin with a preliminary data analysis. Our problem is of low dimension, with only 5 predictive features and a binary categorical variable as the target.
+A good approach in this case is to plot the average of the target as a function of all features.
+Here this average can be interpreted naturally as the probability of subscription to the newsletter.
+As we'll see, the insights gathered in this first step will point us towards more advanced data analysis.
 """
 
 # %%% EDA utils
-# TODO comment
 """
-### 
+### Utilities 
 
+Before moving to the data exploration proper, we set-up a few utility functions to wrap around repetitive code:
+- `prob_distrib` computes the newsletter subscription probability as a function of the selected variables.
+- `prob_distrib_plot` produces a plot of the probability density of the selected variable and the corresponding subscription probability.
 """
 
 import matplotlib.pyplot as plt
@@ -127,7 +132,7 @@ def prob_distrib_plot(xvals: np.ndarray,
     """
     fig, axs = plt.subplots(
         nrows=1, ncols=2, figsize=(9, 4),
-        gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.86, 'bottom': 0.12})
+        gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.85, 'bottom': 0.12})
 
     axs[0].grid(visible=True)
     distribs = counts / np.sum(counts, axis=1, keepdims=True)
@@ -152,21 +157,35 @@ def prob_distrib_plot(xvals: np.ndarray,
 
 
 # %%% EDA tables
-# TODO comment
 """
 ### Some tables
+
+We begin by counting the conversion events vs the various categorical variables, `'country'`, `'new_user'`, `'source'`.
 """
 
 ##
 df.groupby(['country', 'converted']).count()['age'] # the name 'age' is irrelevant here
 ##
+df.groupby(['new_user', 'converted']).count()['age']
+##
 df.groupby(['source', 'converted']).count()['age']
 
 
+"""
+The conversion events are rather rare. About 1% for new website visitors and 8% for recurrent visitors, out of a global count of 300000.
+Although the subscription probability is rather homogeneous accross the various sources, this is not the case for the different countries.
+In particular, the conversion events are very rare among chinese visitors, with a count of only 89. We anticipate that this will cause a lot of variance in
+classifying new events corresponding to chinese visitors.
+"""
+
+
 # %%% EDA heatmap
-# TODO comment
 """
 ### Conversion probability heatmap
+
+We make the above observation more visual by showing heatmaps of the newsletter subscription probabilility for the
+categorical features `'source'` and `'country'`, for both recurring (left) and new (right) visitors. We also indicate the conversion probability (in %)
+the total counts corresponding to each condition.
 """
 
 sources = ['Ads', 'Direct', 'Seo']
@@ -175,11 +194,10 @@ new_user, counts, pconv, _ = prob_distrib(
     df, group_by='new_user', variables=['source', 'country'],
     xvals=[sources, countries])
 
-
 ##
 fig1, axs1 = plt.subplots(
-    nrows=1, ncols=2, figsize=(6, 3),
-    gridspec_kw={'left': 0.1, 'right': 0.9, 'top': 0.88, 'bottom': 0.14, 'wspace': 0.3})
+    nrows=1, ncols=2, figsize=(6.5, 3.2),
+    gridspec_kw={'left': 0.09, 'right': 0.94, 'top': 0.88, 'bottom': 0.11, 'wspace': 0.18})
 fig1.suptitle('Figure 1: Influence of categorical variables on conversion probability', x=0.02, ha='left')
 
 axs1_cb = np.empty_like(axs1, dtype=object)
@@ -190,13 +208,13 @@ for k, ax in enumerate(axs1):
     ax.set_yticks([0.5, 1.5, 2.5], sources)
     for (i, j), p in np.ndenumerate(pconv[k]):
         color = 'k' if p > np.max(pconv[k]) / 3 else 'w'
-        ax.text(j+0.5, i+0.5, f'{100*p:.2f}', color=color, ha='center', va='center')
+        ax.text(j+0.5, i+0.5, f'{100*p:.2f}\n({counts[k, i, j]})',
+                fontsize=9, color=color, ha='center', va='center')
     
     div = make_axes_locatable(ax)
     axs1_cb[k] = div.append_axes("right", size="7%", pad="5%")
     fig1.add_axes(axs1_cb[k])
     fig1.colorbar(heatmap, cax=axs1_cb[k], orientation="vertical", ticklocation="right")
-
 
 axs1[0].set_title(f"Recurring visitors (n={np.sum(counts[0])})\nconversion prob. (%)")
 axs1_cb[0].set_yticks([0, 5, 10, 15])
@@ -208,28 +226,29 @@ axs1_cb[1].set_yticks([0, 0.5, 1, 1.5, 2, 2.5])
 plt.show()
 
 """
-Here we show heatmaps of the newsletter subscription probabilility for the
-categorical features `'source'` and `'country'`, for both new user and recurring users.
-We can make the following remarks:
+We note the following trends, that could already been seen from the raw data in the tables above:
 - Recurring visitors are 2.5 - 8 times more likely to subscribe to the newsletter.
-- Chinese visitors are much less likely to subscribe than others, and US visitors tend to subscribe less than europeans.
+- Chinese visitors are much less likely to subscribe than others despite being the second population in terms of country.
 - The way by which visitors reached the website has little impact on their eventual subscription.
+
+We anticipate that the very low conversion probability among chinese users will cause a lot of variance in
+the classification of new visits from China.
 """
 
 
 # %%% EDA age
-# TODO comment
 """
-### Influence of age on the conversion probability
+### Influence of visitors' age on the conversion probability
+
+We turn to the study of the impact of quantitative variables on the conversion probability, begining with the variable `'age'`.
 """
 
-# Age data
-# prepare age data
+## Age data
 ages = np.arange(80)
 new_user, age_counts, age_pconv, age_std_pconv = prob_distrib(
     df, group_by='new_user', variables=['age'], xvals=[ages])
 
-
+##
 def decay_exp(x: np.ndarray,
               A: float,
               tau: float) -> np.ndarray:
@@ -237,7 +256,6 @@ def decay_exp(x: np.ndarray,
     Exponential decay: f(x) = A * exp(- x / tau)
     """
     return A * np.exp(- x / tau)
-
 
 idx = ~np.isnan(age_pconv)
 popt, pcov = [], []
@@ -247,8 +265,7 @@ for k, i in enumerate(idx):
     popt.append(popt_)
     pcov.append(pcov_)
 
-
-# ## plot
+## plot
 fig2, axs2 = prob_distrib_plot(
     ages, age_counts, age_pconv, age_std_pconv,
     group_labels=['recur.', 'new'])
@@ -278,24 +295,23 @@ axs2[1].legend()
 plt.show()
 
 """
-Here we show the distribution of ages (left panel) and the conversion probability (right panel)
+We show in figure 2 the distribution of ages (left panel) and the conversion probability (right panel)
 aggregated by `'source'` and `'country'`, but distinguishing new and recurrent visitors.
 - The distribution of ages is the same for the two categories: a truncated gaussian with a cutoff at 17 years old,
-  centered at around 28 years old. The probability of having a new visitor is roughly twice that of a recurrent visitor.
+  centered at around 28 years old. The probability of having a new visitor is thus roughly twice that of a recurrent visitor, independently of age.
 - The newsletter subscription probability decays with age. The observed decay fits well with an exponential
-  from which we recover very similar decay constants of about 14 years. The multiplicative factor is 5-6 times higher
-  for recurrent visitors than for new visitors, and so is the subscription probability both both categories, almost *independently of age*.
+  from which we get similar decay constants of about 14 years. We also recover the ratio of 5-6 of conversion probability between recurrent and new visitors.
 
-These patterns are extremely regular and again reveal the artificial nature of the data. They would certainly not be occur in a realistic context.
+Finally, we note that these patterns are extremely regular and again reveal the artificial nature of the data.
 """
 
 
 # %%% EDA npages
 # TODO comment
 """
-### Influence of the number of pages visited on the conversion probability
+### Influence of the number of pages visited
 
-We proceed in a similar fashion this time with the quantity `'total_pages_visited'`
+We proceed in a similar fashion this time with the quantity `'total_pages_visited'`.
 """
 npages = np.arange(30)
 new_user, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
@@ -354,15 +370,19 @@ plt.show()
 
 
 txt = """
-Here we show the distribution of number of pages visited (left panel) and the corresponding conversion probability (right panel)
-built the same way as in the previous figure.
+The number of pages visited is clearly the most relevant feature that determines the newsletter subscription, with a sigmoid dependence of the conversion probability.
+- The newsletter subscription probability looks like a sigmoid for both new and recurring visitors. The inflection points are shifted,
+  and looking at the 13 pages-visits threshold, we see that here the conversion probability is thrice for recurring users than for new users.
+
+
+- The distributions of number of pages visited are not proportional. They actually look like
+  [inverse-gamma distributions](https://en.wikipedia.org/wiki/Inverse-gamma_distribution).
+
 - Although we still have a factor ~2 between the total counts, we remark that website visits with more than 13 pages visited are
   mostly done by recurrent visitors. Accounting for the factor 2, this makes it more than twice likely that a > 13 pages visit
   is done by a recurrent visitor.
-- The two distributions are thus not proportional. They actually look like
-  [inverse-gamma distributions](https://en.wikipedia.org/wiki/Inverse-gamma_distribution).
-- The newsletter subscription probability looks like a sigmoid for both new and recurring visitors. The inflection points are shifted,
-  and looking at the 13 pages-visits threshold, we see that here the conversion probability is thrice for recurring users than for new users.
+
+
 - Sigmoid fits with the slope and inflection point as parameters is also shown on the right panel. The slopes are roughly the same,
   the difference being the inflection point: 12.5 pages for recurring visitors vs 15 pages for new visitors.
 - Finally, we note two outlier events on the right panel. ~30 pages visits with no subscription. We might consider removing these observations
@@ -580,10 +600,11 @@ warnings.simplefilter("ignore", ConvergenceWarning)
 def print_metrics(cm: np.ndarray)-> None:
     """
     Print metrics related to the confusion matrix: precision, recall, F1-score.
-    TODO handle ZeroDiv
     """
-    recall = cm[1, 1] / np.sum(cm, axis=1)[1]
-    prec = cm[1, 1] / np.sum(cm, axis=0)[1]
+    t = np.sum(cm, axis=1)[1]
+    recall = (cm[1, 1] / t) if t != 0 else 1
+    t = np.sum(cm, axis=0)[1]
+    prec = (cm[1, 1] / t) if t != 0 else 1
     print("Confusion matrix\n", cm / np.sum(cm))
     print(f'Precision: {prec:.8}; recall: {recall:.8}')
     print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
@@ -607,8 +628,7 @@ def evaluate_model(model,
 
 
 def cv_eval(model, X: np.ndarray, y: np.ndarray,
-            n_splits: int = 10,
-            verbose: bool = False)-> np.ndarray:
+            n_splits: int = 10)-> np.ndarray:
     """
     Evaluation of a multi-model by cross-validation.
     Returns the confusion matrix.
@@ -618,8 +638,6 @@ def cv_eval(model, X: np.ndarray, y: np.ndarray,
     for i, (itr, ival) in enumerate(cv.split(X, y)):
         model.fit(X.iloc[itr], y.iloc[itr])
         cm += confusion_matrix(y.iloc[ival], model.predict(X.iloc[ival]))
-    if verbose:
-        print_metrics(cm)
     return cm
 
 
@@ -995,7 +1013,8 @@ pipeline = Pipeline([('column_preprocessing', col_preproc_full),
                      ('classifier', lr)])
 
 # evaluate by cross-validation
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 # adjujst threshold
 lr_model_polyfeatures_ta = tune_threshold_cv(pipeline, X, y)
@@ -1055,8 +1074,17 @@ def poly_features_split(X: np.ndarray) -> np.ndarray:
 
 
 # classifier
+# lr_split = LogisticRegression(
+#     penalty='elasticnet',
+#     C=0.1,
+#     fit_intercept=True,
+#     class_weight=None,
+#     solver='saga',  # supports elasticnet penalty
+#     random_state=1234,
+#     l1_ratio=0.8,
+# )
 lr_split = LogisticRegression(
-    penalty='elasticnet',
+    penalty='l1',
     C=0.1,
     fit_intercept=True,
     class_weight=None,
@@ -1167,7 +1195,8 @@ pipeline['classifier'].shrinkage = best_shrinkage
 
 
 # assessment
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 # fit
 lda_model_ta = tune_threshold_cv(pipeline, X, y)
@@ -1178,19 +1207,6 @@ lda_model_ta = tune_threshold_cv(pipeline, X, y)
 """
 
 """
-
-# split the dataset
-# groups = ['new_user', 'country']
-# Xs, ys = split_data(groups)
-
-# preprocessing
-# cat_vars = ['country', 'source']
-# bool_vars = ['new_user']
-# quant_vars = ['age', 'total_pages_visited']
-# col_preproc = ColumnTransformer(
-#     [('cat_ohe', OneHotEncoder(drop=None), [v for v in cat_vars if v not in groups]),
-#      ('bool_id', FunctionTransformer(None), [v for v in bool_vars if v not in groups]),
-#      ('quant_scaler', StandardScaler(), [v for v in quant_vars if v not in groups])])
 
 # classifier
 lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
@@ -1282,7 +1298,8 @@ best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
 pipeline['classifier'].max_depth = best_max_depth
 
 # model ssessment
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 # fit
 dtc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
@@ -1334,7 +1351,8 @@ pipeline = Pipeline(
 )
 
 # 
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 """
 Adding polynomial features does not improve significantly the score, as expected since trees naturally capture the non-linear relationship between features.
@@ -1433,7 +1451,8 @@ best_C = gridsearch_cv(pipeline, X, y, param_name='C',
 pipeline['classifier'].C = best_C
 
 # model assessment
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 # fit
 svc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
@@ -1610,7 +1629,8 @@ best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
 pipeline['classifier'].max_depth = best_max_depth
 
 # assessment
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 # fit
 rfc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
@@ -1697,7 +1717,8 @@ best_max_depth = gridsearch_cv(pipeline, X, y, param_name='max_depth',
 pipeline['classifier'].max_depth = best_max_depth
 
 # assessment
-_ = cv_eval(pipeline, X, y, verbose=True)
+cm = cv_eval(pipeline, X, y)
+print_metrics(cm)
 
 # fit
 hgbc_model_ta = tune_threshold_cv(pipeline, X, y, verbose=True)
