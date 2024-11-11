@@ -43,6 +43,23 @@ from sklearn.svm import SVR
 # Utils
 # =============================================================================
 
+def evaluate_model(model,
+                   xtest_fname: str = 'conversion_data_test.csv',
+                   ytest_fname: str = 'conversion_data_test_labels.csv'
+                   )-> tuple[np.ndarray, np.ndarray]:
+    """
+    Evaluate the model on the test set. The predictions are exported as
+    'conversion_data_test_predictions_{name_suffix}.csv'
+    """
+    X_test = pd.read_csv(xtest_fname)
+    y_test = pd.read_csv(ytest_fname)
+    y_pred = model.predict(X_test)
+
+    cm = confusion_matrix(y_test, y_pred)
+    
+    return y_pred, cm
+
+
 def print_metrics(cm: np.ndarray)-> None:
     """
     Print metrics related to the confusion matrix: precision, recall, F1-score.
@@ -68,10 +85,9 @@ def tune_thr_cv(model, X: pd.DataFrame, y: pd.DataFrame,
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
     for i, (itr, ival) in enumerate(cv.split(X, y)):
         # fit
-        df = X.iloc[itr]
-        df.loc[:, 'pconv'] = y.iloc[itr]
+        df = pd.concat([X.iloc[itr], y.iloc[itr]], axis=1)
         df = df.groupby(list(df.columns[:-1])).mean()
-        model.fit(df.index.to_frame(), df['pconv'])
+        model.fit(df.index.to_frame(), df['converted'])
         # predict
         y_v = y.iloc[ival].to_numpy()
         p_pred = model.predict(X.iloc[ival])
@@ -106,70 +122,100 @@ class Classifier:
 df = pd.read_csv('./conversion_data_train.csv')
 df = df.loc[df['age'] < 80]
 
+# prepare classification data
 X_clf, y_clf = df.drop('converted', axis=1), df.loc[:, 'converted']
 
+# prepare conversion probability data
 features = list(df.columns[:-1])
 pconv = df.groupby(features).mean()
 data = pd.DataFrame.from_dict(
     ({c: v.to_numpy() for c, v in pconv.index.to_frame().items()}
      | {'pconv': pconv['converted'].to_numpy()})
 )
-
-# data preparation
 y = data.loc[:, 'pconv']
 X = data.drop('pconv', axis=1)
 
-# preprocessing
+# columns preprocessings
 cat_vars = ['country', 'source']
 bool_vars = ['new_user']
 quant_vars = ['age', 'total_pages_visited']
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
-tree_col_preproc = ColumnTransformer(
-    [('cat_oe', OrdinalEncoder(), cat_vars),
-     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
 
 
 # %% Gradient boosting regressor
 
+"""
+## <a name="gbr"></a>Gradient boosting
+
+
+
+### Model construction
+"""
+
+# column preprocessing
+tree_col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
+
 # regressor
 gbr = GradientBoostingRegressor(loss='squared_error',
                                 n_estimators=1000,
-                                max_depth=10)
+                                max_depth=10,
+                                random_state=1234)
 
 # pipeline
 pipeline = Pipeline([('column_preprocessing', tree_col_preproc),
                      ('regressor', gbr)])
 
+# parameter optimization : `max_depth`
+# gbr_model = GridSearchCV(
+#     pipeline,  param_grid={'regressor__max_depth': np.arange(2, 10, 1)},
+#     scoring='neg_mean_squared_error', n_jobs=4, refit=True, cv=5)
+# gbr_model.fit(X, y)
+# best_max_depth = gbr_model.best_params_['regressor__max_depth']
+# print(f'found best max_depth: {best_max_depth}')
 
-gbr_model = GridSearchCV(
-    pipeline,  param_grid={'regressor__max_depth': np.arange(2, 13, 1)},
-    scoring='neg_mean_squared_error', n_jobs=4, refit=True, cv=10)
-gbr_model.fit(X, y)
-best_max_depth = gbr_model.best_params_['regressor__max_depth']
-print(f'found best max_depth: {best_max_depth}')
-
-pipeline['regressor'].max_depth = best_max_depth
+pipeline['regressor'].max_depth = 2 # best_max_depth
 thr, cm = tune_thr_cv(clone(pipeline), X_clf, y_clf)
 print(f'best decision threshold: {thr}')
 print_metrics(cm)
 
-gbr_model = Classifier(gbr_model, thr)
+"""
 
 """
-### evaluation
+
+
+"""
+### Model evaluation on test data
+
+
 """
 
 # print('===== Gradient boosting regressor-baser classifier =====')
-# _, cm = evaluate_model(gbr_model)
+# _, cm = evaluate_model(Classifier(gbr_model, thr))
 # print_metrics(cm)
 
-sys.exit()
 
 
 # %% SVM
+
+"""
+## <a name="svr"></a>Support vector machines
+
+The reformulation of the classification problem into a regression task caused 20-times reduction in problem size.
+This makes it affordable to use SVMs with non-linear kernels. 
+
+In this section we fit a SVM with a radial-basis function kernel on the conversion probability. As above, we take advantage of the decreased
+fitting times to optimize the model parameters `gamma` and `C`, along with the decision threshold. 
+
+### Model construction
+"""
+
+
+# column preprocessing
+col_preproc = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
 
 # regressor
 svr = SVR(kernel='rbf',
@@ -181,19 +227,46 @@ svr = SVR(kernel='rbf',
 pipeline = Pipeline([('column_preprocessing', col_preproc),
                      ('regressor', svr)])
 
-# parameter optimization
-svr_model = GridSearchCV(
-    pipeline,  param_grid={'regressor__C': np.logspace(-2, 1, 16)},
-    scoring='neg_mean_squared_error', n_jobs=2, refit=True, cv=10)
-svr_model.fit(X, y)
-best_C = svr_model.best_params_['regressor__C']
-print(f'found best C: {best_C}')
+"""
+### Parameter optimization
+"""
 
+# parameter optimization
+gamma_vals = np.repeat(np.logspace(-2, 1, 16), 16)
+C_vals = np.tile(np.logspace(-2, 1, 16), 16)
+svr_model = GridSearchCV(
+    pipeline,
+    param_grid={'regressor__gamma': gamma_vals, 'regressor__C': C_vals},
+    scoring='neg_mean_squared_error', n_jobs=6, refit=True, cv=5)
+svr_model.fit(X, y)
+best_gamma = svr_model.best_params_['regressor__gamma']
+best_C = svr_model.best_params_['regressor__C']
+print(f'found best C: {best_C}; best gamma: {best_gamma}')
+
+# decision threshold tuning
+pipeline['regressor'].gamma = best_gamma
 pipeline['regressor'].C = best_C
 thr, cm = tune_thr_cv(clone(pipeline), X_clf, y_clf)
 print(f'best decision threshold: {thr}')
 print_metrics(cm)
 
-svr_model = Classifier(svr_model, thr)
+# TODO comment
+"""
+The cross-validation F1-score is 0.77, not better than what was obtained with a simple logistic regression with tuned decision threshold.
+We note that the decision threshold maximizing the F1 score is around 0.40, close to the corresponding value of the tuned logistic regression.
+This is a hint that the two models must behave very similarly.
+"""
 
+
+"""
+### Model evaluation on test data
+"""
+
+# print('===== Gradient boosting regressor-baser classifier =====')
+# _, cm = evaluate_model(Classifier(svr_model, thr))
+# print_metrics(cm)
+
+"""
+
+"""
 
