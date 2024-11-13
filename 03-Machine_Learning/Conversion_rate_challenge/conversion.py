@@ -602,9 +602,9 @@ def print_metrics(cm: np.ndarray)-> None:
     Print metrics related to the confusion matrix: precision, recall, F1-score.
     """
     t = np.sum(cm, axis=1)[1]
-    recall = (cm[1, 1] / t) if t != 0 else 1
+    recall = (cm[1, 1] / t) if t != 0 else 1.
     t = np.sum(cm, axis=0)[1]
-    prec = (cm[1, 1] / t) if t != 0 else 1
+    prec = (cm[1, 1] / t) if t != 0 else 1.
     print("Confusion matrix\n", cm / np.sum(cm))
     print(f'Precision: {prec:.8}; recall: {recall:.8}')
     print(f'F1-score: {2*prec*recall/(prec+recall):.8}')

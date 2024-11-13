@@ -65,9 +65,9 @@ def print_metrics(cm: np.ndarray)-> None:
     Print metrics related to the confusion matrix: precision, recall, F1-score.
     """
     t = np.sum(cm, axis=1)[1]
-    recall = (cm[1, 1] / t) if t != 0 else 1
+    recall = (cm[1, 1] / t) if t != 0 else 1.
     t = np.sum(cm, axis=0)[1]
-    prec = (cm[1, 1] / t) if t != 0 else 1
+    prec = (cm[1, 1] / t) if t != 0 else 1.
     print("Confusion matrix\n", cm / np.sum(cm))
     print(f'Precision: {prec:.8}; recall: {recall:.8}')
     print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
@@ -158,23 +158,30 @@ tree_col_preproc = ColumnTransformer(
 
 # regressor
 gbr = GradientBoostingRegressor(loss='squared_error',
-                                n_estimators=1000,
-                                max_depth=10,
-                                random_state=1234)
+                                learning_rate=0.1,
+                                n_estimators=10000,
+                                max_depth=2,
+                                random_state=1234,
+                                max_features=0.5)
 
 # pipeline
 pipeline = Pipeline([('column_preprocessing', tree_col_preproc),
                      ('regressor', gbr)])
 
 # parameter optimization : `max_depth`
-# gbr_model = GridSearchCV(
-#     pipeline,  param_grid={'regressor__max_depth': np.arange(2, 10, 1)},
-#     scoring='neg_mean_squared_error', n_jobs=4, refit=True, cv=5)
-# gbr_model.fit(X, y)
+gbr_model = GridSearchCV(
+    pipeline,
+    param_grid={#'regressor__max_depth': np.arange(1, 4, 1),
+                'regressor__learning_rate': np.logspace(-3, -1, 5)},
+    scoring='neg_mean_squared_error', n_jobs=4, refit=True, cv=5)
+gbr_model.fit(X, y)
+best_learning_rate = gbr_model.best_params_['regressor__learning_rate']
+print(f'found best learning_rate: {best_learning_rate}')
 # best_max_depth = gbr_model.best_params_['regressor__max_depth']
 # print(f'found best max_depth: {best_max_depth}')
 
-pipeline['regressor'].max_depth = 2 # best_max_depth
+pipeline['regressor'].learning_rate = best_learning_rate
+# pipeline['regressor'].max_depth = 2 # best_max_depth
 thr, cm = tune_thr_cv(clone(pipeline), X_clf, y_clf)
 print(f'best decision threshold: {thr}')
 print_metrics(cm)
@@ -193,6 +200,7 @@ print_metrics(cm)
 # print('===== Gradient boosting regressor-baser classifier =====')
 # _, cm = evaluate_model(Classifier(gbr_model, thr))
 # print_metrics(cm)
+# sys.exit()
 
 
 
@@ -232,20 +240,25 @@ pipeline = Pipeline([('column_preprocessing', col_preproc),
 """
 
 # parameter optimization
-gamma_vals = np.repeat(np.logspace(-2, 1, 16), 16)
-C_vals = np.tile(np.logspace(-2, 1, 16), 16)
+gamma_vals = np.repeat(np.logspace(-2, 1, 7), 7)
+C_vals = np.tile(np.logspace(-2, 1, 7), 7)
+epsilon_vals = np.logspace(-2, 1, 7)
 svr_model = GridSearchCV(
     pipeline,
-    param_grid={'regressor__gamma': gamma_vals, 'regressor__C': C_vals},
+    param_grid={#'regressor__gamma': gamma_vals, 'regressor__C': C_vals,
+                'regressor__epsilon': epsilon_vals},
     scoring='neg_mean_squared_error', n_jobs=6, refit=True, cv=5)
 svr_model.fit(X, y)
-best_gamma = svr_model.best_params_['regressor__gamma']
-best_C = svr_model.best_params_['regressor__C']
-print(f'found best C: {best_C}; best gamma: {best_gamma}')
+# best_gamma = svr_model.best_params_['regressor__gamma'] # 0.1
+# best_C = svr_model.best_params_['regressor__C'] # 1.
+best_epsilon = svr_model.best_params_['regressor__epsilon']
+# print(f'found best C: {best_C}; best gamma: {best_gamma}')
+print(f'found best epsilon: {best_epsilon}')
 
 # decision threshold tuning
-pipeline['regressor'].gamma = best_gamma
-pipeline['regressor'].C = best_C
+# pipeline['regressor'].gamma = best_gamma
+# pipeline['regressor'].C = best_C
+pipeline['regressor'].epsilon = best_epsilon # 0.0316
 thr, cm = tune_thr_cv(clone(pipeline), X_clf, y_clf)
 print(f'best decision threshold: {thr}')
 print_metrics(cm)
