@@ -203,7 +203,8 @@ fig1.suptitle('Figure 1: Influence of categorical variables on conversion probab
 axs1_cb = np.empty_like(axs1, dtype=object)
 for k, ax in enumerate(axs1):
     ax.set_aspect('equal')
-    heatmap = ax.pcolormesh(100*pconv[k], cmap='plasma', edgecolors='k', lw=0.5)
+    heatmap = ax.pcolormesh(100*pconv[k], cmap='plasma', vmin=0,
+                            edgecolors='k', lw=0.5)
     ax.set_xticks([0.5, 1.5, 2.5, 3.5], countries, rotation=60)
     ax.set_yticks([0.5, 1.5, 2.5], sources)
     for (i, j), p in np.ndenumerate(pconv[k]):
@@ -502,47 +503,39 @@ The plot shows...
 """
 
 new_user, npages = np.arange(80), np.arange(30)
-country, counts, pconv, std_pconv = prob_distrib(
+new_user, counts, pconv, std_pconv = prob_distrib(
     df, group_by='new_user', variables=['age', 'total_pages_visited'],
     xvals=[ages, npages])
 
 
 x, y = np.meshgrid(npages[:25], ages[17:46])
+xx, yy = np.meshgrid(npages[:26]-0.5, ages[17:47]-0.5)
 
 fig6, axs6 = plt.subplots(
-    nrows=1, ncols=2,
-    gridspec_kw={'left': 0.1, 'right': 0.95, 'top': 0.9, 'bottom': 0.1},
+    nrows=1, ncols=2, figsize=(6, 3.5),
+    gridspec_kw={'left': 0.1, 'right': 0.95, 'top': 0.9, 'bottom': 0.02},
     subplot_kw=dict(projection='3d'))
-fig6.suptitle("Figure 6: Cross-influence of 'age' and 'total_pages_visited' on the conversion probability",
+fig6.suptitle("Figure 6: Cross-influence of 'age' and 'total_pages_visited' on the\n               conversion probability",
               x=0.02, ha='left')
 
-# new visitors
-axs6[0].view_init(elev=20, azim=-110)
-surf = axs6[0].plot_surface(
-    x, y, pconv[1, 17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
-    linewidth=0, antialiased=True, shade=False)
+for k, label in enumerate(['Recur. visitors', 'New visitors']):
+    axs6[k].view_init(elev=20, azim=-110)
+    surf = axs6[k].plot_surface(
+        x, y, pconv[k, 17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
+        linewidth=0, antialiased=True, shade=False)
 
-axs6[0].set_xlim(0, 24)
-axs6[0].set_ylim(17, 45)
-axs6[0].tick_params(pad=0)
-axs6[0].set_title('New visitors')
-axs6[0].set_xlabel('# pages visited')
-axs6[0].set_ylabel('age')
-axs6[0].set_zlabel('conv. prob.')
-
-# recurring visitors
-axs6[1].view_init(elev=20, azim=-110)
-surf = axs6[1].plot_surface(
-    x, y, pconv[0, 17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
-    linewidth=0, antialiased=True, shade=False)
-
-axs6[1].set_xlim(0, 24)
-axs6[1].set_ylim(17, 45)
-axs6[1].tick_params(pad=0)
-axs6[1].set_title('Recurring visitors')
-axs6[1].set_xlabel('# pages visited')
-axs6[1].set_ylabel('age')
-axs6[1].set_zlabel('conv. prob.')
+    axs6[k].set_xlim(0, 24)
+    axs6[k].set_ylim(17, 45)
+    axs6[k].tick_params(pad=0)
+    axs6[k].set_title(label)
+    axs6[k].set_xlabel('# pages visited')
+    axs6[k].set_ylabel('age')
+    axs6[k].set_zlabel('conv. prob.')
+    
+    ax6_ins = axs6[k].inset_axes([0.15, 0.55, 0.26, 0.26])
+    ax6_ins.pcolormesh(xx, yy, pconv[k, 17:46, :25], cmap='coolwarm', vmin=0, vmax=1)
+    ax6_ins.set_xlim(0.5, 24.5)
+    ax6_ins.tick_params(left=False, labelleft=False, bottom=False, labelbottom=False)
 
 plt.show()
 
@@ -777,6 +770,8 @@ We do a simple train-test split using the train set, without relying on the test
 
 
 #### Model construction and training
+
+One hot encoding is done with `pandas.get_dummies`. We drop manually the categories with the largest counts: 'country_US' and 'source_Seo'.
 """
 
 # Data to fit
@@ -813,14 +808,27 @@ X_test = scaler.transform(X_test)  # no fit this time
 y_test_pred = lr_model.predict(X_test)
 print_metrics(confusion_matrix(y_test, y_test_pred))
 
-"""
 
 """
+#### Evaluation on test data
 
+We finally evaluate our model on the test data provided. Before doing so, we train on the full dataset.
+"""
+
+##
 t0 = time.time()
 lr_model.fit(X, y)
 t1 = time.time()
 print(f'model fitting time: {t1-t0} s')
+
+##
+print('===== Basic logistic regression =====')
+_, cm = evaluate_model(lr_model)
+print_metrics(cm)
+
+"""
+
+"""
 
 
 # %%% LR : threshold adjust
@@ -830,16 +838,15 @@ print(f'model fitting time: {t1-t0} s')
 
 Let us now make some improvements to the previous code, without changing the model (almost).
 
-#### Model construction and training
+#### Model construction
 
 A first improvement is to make it work in a more integrated fashion. We thus do the following:
 - The data preprocessing, encoding of categorical variables and scaling of quantitative variables, is wrapped in a `compose.ColumnTransformer`
 - The preprocessing and classification are wrapped in a `pipeline.Pipeline`, exposing a single interface for all steps
 
-Note that one-hot encoding can be done with pandas
-```python
-X = pd.get_dummies(X).drop(['country_US', 'source_Seo'], axis=1)
-```
+In the one-hot encoding of categorical variables, we do not set `drop='first'`. This is actually unecessary since the default `LogisticRegression`
+includes some L2 regularization which prevents the redundancy in the regression coefficients. However, in doing so we retain the symmetry of the model with respect
+to the various categories, and, in turn, its interpretability.
 """
 
 ##
@@ -847,17 +854,17 @@ X = pd.get_dummies(X).drop(['country_US', 'source_Seo'], axis=1)
 y = df.loc[:, 'converted']
 X = df.drop('converted', axis=1)
 
-# preprocessing
+# column preprocessing
 cat_vars = ['country', 'source']
 bool_vars = ['new_user']
 quant_vars = ['age', 'total_pages_visited']
-col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop='first'), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
+col_preproc_full = ColumnTransformer(
+    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
      ('quant_scaler', StandardScaler(), quant_vars)])
 
 # full pipeline
-pipeline = Pipeline([('column_preprocessing', col_preproc),
+pipeline = Pipeline([('column_preprocessing', col_preproc_full),
                      ('classifier', LogisticRegression())])
 
 """
@@ -866,6 +873,12 @@ This corresponds to the minimization of the logistic loss.
 However, we recall that the performance of our model is assessed not by the average logistic loss but through the F1-score.
 Our model can adjust by cross-validation this threshold probability so as to maximize the F1-score. This is done by wrapping the
 pipeline into a `model_selection.TunedThresholdClassifierCV`.
+"""
+
+"""
+#### Training
+
+
 """
 
 lr_model_ta = TunedThresholdClassifierCV(
@@ -880,6 +893,15 @@ best_thr = lr_model_ta.best_threshold_
 best_score = lr_model_ta.best_score_
 print(f'best threshold = {best_thr:.8f}',
       f'\nbest F1-score = {best_score:.8f}')
+
+"""
+#### Evaluation on test data
+
+"""
+
+# print('\n===== Logistic regression with adjusted decision threshold =====')
+# _, cm = evaluate_model(lr_model_ta)
+# print_metrics(cm)
 
 
 # %%% LR : ROC
@@ -897,9 +919,8 @@ we get 15% less false negatives, at the expense of 50% more false positives. How
 the overall result is an improved value.
 """
 n_splits = 10
-cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
-clf = Pipeline([('column_preprocessing', col_preproc),
-                ('classifier', LogisticRegression())])
+cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=1234)
+clf = clone(pipeline)
 
 mean_cm = np.zeros((2, 2), dtype=float)  # confusion matrix
 mean_fpr = np.linspace(0, 1, 401)  # false-positive rates
@@ -954,6 +975,65 @@ plt.show()
 ... comment
 """
 
+# %%% LR : interpretation
+"""
+### Model interpretation
+
+The interpretation of a (scaled) linear model is simple: large coefficients correspond to more relevant features.
+However, since we did not drop the redundancy, only the relative difference is relevant for the categorical features coefficients.
+"""
+
+# recover feature names
+col_preproc = lr_model_ta.estimator_['column_preprocessing']
+features = [feature_name.split('__')[1]
+            for feature_name in col_preproc.get_feature_names_out()]
+
+# get coefficients
+intercept = lr_model_ta.estimator_['classifier'].intercept_[0]
+coefs = lr_model_ta.estimator_['classifier'].coef_[0]
+
+
+# print(f'{"intercept":<20} : {intercept: }')
+# for feature, coef in zip(features, coefs):
+#     print(f'{feature:<20} : {coef: }')
+
+
+"""
+The results follow closely what we saw in the EDA section:
+- The most relevant variable is the total number of pages visited, with a positive correlation with the conversion probability;
+- The age is negatively correlated with the conversion probability, yet with a 4 times lower influence than the number of pages visited;
+- Being a new visitor penalizes the conversion probability;
+- Similarly, coming from China causes a large penalty, while users from other countries have a rather uniform behavior;
+- The visitors source has a limited effect (the coefficients are roughly the same).
+"""
+
+
+"""
+#### Plotting decision boundaries
+
+We will now plot decision boundaries for the different features. In doing so, we face two main difficulties:
+- The coefficients must be brought back to the original scale
+- The original feature space is more than 2-dimensional, hence we must aggregate the values in order for
+  our decision boundaries to relate adequately to the plots of the EDA section.
+"""
+
+# standard scaler coefs
+qsc_means = col_preproc.transformers_[-1][1].mean_
+qsc_scales = col_preproc.transformers_[-1][1].scale_
+
+# un-scaled coefficients
+unscaled_coefs = np.copy(coefs)
+unscaled_coefs[-2:] /= qsc_scales
+unscaled_intercept = intercept - np.sum(coefs[-2:] * qsc_means / qsc_scales)
+
+
+"""
+With the unscaled coefficients $c_i$ ... 
+"""
+
+
+
+
 # %%% LR : polynomial features
 # TODO comment
 """
@@ -972,11 +1052,11 @@ multiple datasets, corresponding to a (country, new_user) pair, and fit a differ
 
 """
 
-# preprocessing
-col_preproc_full = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
+# # preprocessing
+# col_preproc_full = ColumnTransformer(
+#     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+#      ('bool_id', FunctionTransformer(None), bool_vars),
+#      ('quant_scaler', StandardScaler(), quant_vars)])
 
 # custom feature engineering
 def poly_features_full(X: np.ndarray) -> np.ndarray:
@@ -999,18 +1079,26 @@ def poly_features_full(X: np.ndarray) -> np.ndarray:
 
 # classifier
 lr = LogisticRegression(
-    penalty='elasticnet',
+    penalty='l1',
     C=0.1,
     fit_intercept=True,
     class_weight=None,
     solver='saga',  # supports elasticnet penalty
     random_state=1234,
-    l1_ratio=0.8)
+    max_iter=400,
+    # l1_ratio=0.8
+    )
 
 # full pipeline
 pipeline = Pipeline([('column_preprocessing', col_preproc_full),
                      ('poly_features', FunctionTransformer(poly_features_full)),
                      ('classifier', lr)])
+
+# optimize the regularization
+best_C = gridsearch_cv(pipeline, X, y, 
+                       param_name='C', param_vals=np.logspace(-3, 0, 7),
+                       n_splits=10)
+pipeline['classifier'].C = best_C
 
 # evaluate by cross-validation
 cm = cv_eval(pipeline, X, y)
@@ -1018,6 +1106,17 @@ print_metrics(cm)
 
 # adjujst threshold
 lr_model_polyfeatures_ta = tune_threshold_cv(pipeline, X, y)
+
+"""
+#### Evaluation on test data
+
+Our two models are `dict`s and as such do not have the `Estimator` interface (and most notably the `predict` method).
+To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
+"""
+
+# print('===== Logistic regression polynoial features and adjusted decision threshold =====')
+# _, cm = evaluate_model(lr_model_polyfeatures_ta)
+# print_metrics(cm)
 
 
 # %%% LR : split
@@ -1048,7 +1147,7 @@ split_bool_vars = [v for v in bool_vars if v not in groups]
 split_quant_vars = [v for v in quant_vars if v not in groups]
 col_preproc_split = ColumnTransformer(
     [('cat_ohe', OneHotEncoder(drop=None), split_cat_vars),
-     ('bool_id', FunctionTransformer(None), split_bool_vars),
+     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), split_bool_vars),
      ('quant_scaler', StandardScaler(), split_quant_vars)])
 
 
@@ -1090,7 +1189,7 @@ lr_split = LogisticRegression(
     class_weight=None,
     solver='saga',  # supports elasticnet penalty
     random_state=1234,
-    l1_ratio=0.8,
+    # l1_ratio=0.8,
 )
 
 # full pipeline, including polynomial feature generation
@@ -1101,9 +1200,11 @@ pipeline = Pipeline(
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
-# multimodel_gridsearch_cv(pipelines, Xs, ys,
-#                          param_name: str, param_vals: np.ndarray)
-
+# optimize the regularization
+best_Cs = multimodel_gridsearch_cv(
+    pipelines, Xs, ys, param_name='shrinkage', param_vals=np.logspace(-3, 0, 7))
+for idx, pipeline in pipelines.items():
+    pipeline['classifier'].C = best_Cs[idx]
 
 """
 #### Model evaluation by cross-validation
@@ -1126,37 +1227,16 @@ for idx, p in pipelines.items():
     split_lr_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
 
 
-
-# %%% LR : test eval
-
 """
-### Model evaluation on test data
+#### Evaluation on test data
 
 Our two models are `dict`s and as such do not have the `Estimator` interface (and most notably the `predict` method).
 To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
 """
 
-##
-# print('===== Basic logistic regression =====')
-# _, cm = evaluate_model(lr_model)
-# print_metrics(cm)
-
-##
-# print('\n===== Logistic regression with adjusted decision threshold =====')
+# print('===== Logistic regression : split model =====')
 # _, cm = evaluate_model(lr_model_ta)
 # print_metrics(cm)
-
-
-##
-# print('===== Improved logistic regression =====')
-# _, cm = evaluate_model(MimicEstimator(lr_model))
-# print_metrics(cm)
-
-##
-# print('\n===== Improved logistic regression with adjusted classification threshold =====')
-# _, cm = evaluate_model(MimicEstimator(lr_model_ta))
-# print_metrics(cm)
-
 
 
 # %% LDA
@@ -1190,7 +1270,7 @@ pipeline = Pipeline(
 
 # optimization
 best_shrinkage = gridsearch_cv(
-    pipeline, X, y, param_name='shrinkage', param_vals=np.logspace(-3, -2, 41))
+    pipeline, X, y, param_name='shrinkage', param_vals=np.logspace(-4, -0, 41))
 pipeline['classifier'].shrinkage = best_shrinkage
 
 
@@ -1218,7 +1298,7 @@ pipeline = Pipeline(
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
-# optimize regularization
+# optimize the regularization
 best_shrinkages = multimodel_gridsearch_cv(
     pipelines, Xs, ys, param_name='shrinkage', param_vals=np.logspace(-3, 0, 31))
 for idx, pipeline in pipelines.items():
@@ -1240,7 +1320,7 @@ for idx, p in pipelines.items():
     split_lda_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
 
 
-
+sys.exit()
 # %%% LDA : eval
 
 """
@@ -1258,7 +1338,7 @@ for idx, p in pipelines.items():
 """
 ... comment...
 """
-
+sys.exit()
 
 # %% Trees
 # TODO comment
@@ -1523,30 +1603,10 @@ from sklearn.neural_network import MLPClassifier
 """
 ### Simple multi-layer perceptron
 """
-# # column preprocessing
-# col_preproc = ColumnTransformer(
-#     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-#      ('bool_id', FunctionTransformer(None), bool_vars),
-#      ('quant_scaler', StandardScaler(), quant_vars)])
 
-# # feature engineering
-# def poly_features(X: np.ndarray) -> np.ndarray:
-#     """
-#     Custom polynomial features construction:
-#         - Original features, Xi
-#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
-#     """
-#     X_ = np.empty((len(X), 29), dtype=float)
-#     X_[:, :10] = X  # original features
-#     X_[:, 10:12] = X[:, 8:10]**2  # age**2, npages**2
-#     X_[:, 12] = X[:, -2] * X[:, -1]  # age * npages
-#     X_[:, 13:21] = X[:, :8] * X[:, [8]]  # cat * age
-#     X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
-#     return X_
 
 # classifier
-mlp = MLPClassifier(hidden_layer_sizes=(100, 50, 20),
+mlp = MLPClassifier(hidden_layer_sizes=(50, 20, 10),
                     activation='relu',
                     batch_size=2000,
                     random_state=1234,
@@ -1554,10 +1614,9 @@ mlp = MLPClassifier(hidden_layer_sizes=(100, 50, 20),
                     early_stopping=True)
 
 
-# full pipeline, including polynomial feature generation
+# pipeline
 pipeline = Pipeline(
-    [('column_preprocessing', col_preproc),
-     # ('poly_features', FunctionTransformer(poly_features)),
+    [('column_preprocessing', col_preproc_full),
      ('classifier', mlp)]
 )
 
@@ -1592,6 +1651,20 @@ for idx, p in pipelines.items():
     split_svc_model_ta[idx] = tune_threshold_cv(p, Xs[idx], ys[idx], verbose=True)
 
 
+# %%% NN : test eval
+
+"""
+### Model evaluation on test data
+"""
+
+# print('===== Multi-layer perceptron with adjusted decision threshold =====')
+# _, cm = evaluate_model(mlp_model_ta)
+# print_metrics(cm)
+
+
+# print('\n===== Split multi-layer perceptron with adjusted threshold =====')
+# _, cm = evaluate_model(MimicEstimator(split_mlp_model_ta))
+# print_metrics(cm)
 
 
 # %% Random forests
