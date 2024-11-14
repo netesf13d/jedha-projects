@@ -512,13 +512,13 @@ x, y = np.meshgrid(npages[:25], ages[17:46])
 xx, yy = np.meshgrid(npages[:26]-0.5, ages[17:47]-0.5)
 
 fig6, axs6 = plt.subplots(
-    nrows=1, ncols=2, figsize=(6, 3.5),
-    gridspec_kw={'left': 0.1, 'right': 0.95, 'top': 0.9, 'bottom': 0.02},
+    nrows=1, ncols=2, figsize=(7, 3.8),
+    gridspec_kw={'left': 0.04, 'right': 1., 'top': 0.9, 'bottom': 0.02},
     subplot_kw=dict(projection='3d'))
 fig6.suptitle("Figure 6: Cross-influence of 'age' and 'total_pages_visited' on the\n               conversion probability",
               x=0.02, ha='left')
 
-for k, label in enumerate(['Recur. visitors', 'New visitors']):
+for k, label in enumerate(['Recurrent visitors', 'New visitors']):
     axs6[k].view_init(elev=20, azim=-110)
     surf = axs6[k].plot_surface(
         x, y, pconv[k, 17:46, :25], rstride=1, cstride=1, cmap='coolwarm',
@@ -527,7 +527,7 @@ for k, label in enumerate(['Recur. visitors', 'New visitors']):
     axs6[k].set_xlim(0, 24)
     axs6[k].set_ylim(17, 45)
     axs6[k].tick_params(pad=0)
-    axs6[k].set_title(label)
+    axs6[k].set_title(label, y=0.94)
     axs6[k].set_xlabel('# pages visited')
     axs6[k].set_ylabel('age')
     axs6[k].set_zlabel('conv. prob.')
@@ -552,7 +552,7 @@ for both new (left panel) and recurring (right panel) visitors.
 ## <a name="utils"></a>Utilities
 """
 
-from scipy.special import expit
+from scipy.special import expit, logit
 
 from sklearn.base import clone
 from sklearn.exceptions import ConvergenceWarning
@@ -822,9 +822,16 @@ t1 = time.time()
 print(f'model fitting time: {t1-t0} s')
 
 ##
-print('===== Basic logistic regression =====')
-_, cm = evaluate_model(lr_model)
-print_metrics(cm)
+# X_test = pd.read_csv('conversion_data_test.csv')
+# X_test = pd.get_dummies(X_test)
+# X_test = X_test.drop(['country_US', 'source_Seo'], axis=1)
+# y_test = pd.read_csv('conversion_data_test_labels.csv')
+# y_pred = lr_model.predict(X_test)
+# cm = confusion_matrix(y_test, y_pred)
+
+# print('===== Basic logistic regression =====')
+# print_metrics(cm)
+
 
 """
 
@@ -1028,10 +1035,79 @@ unscaled_intercept = intercept - np.sum(coefs[-2:] * qsc_means / qsc_scales)
 
 
 """
-With the unscaled coefficients $c_i$ ... 
+The logit of the fitted conversion probability $p$ is:
+$$\mathrm{logit}(p) = c_0 + \sum_{i} c_i X_i$$,
+where the $c_i$ represent the unscaled coefficients.
+The decision threshold at probability $p_0$ for a given (quantitative) variable $X_k$ given the values $X_i, i \neq k $ of the other features, is thus
+$$X_k^{\mathrm{thr}} = \frac{\mathrm{logit}(p) - c_0 + \sum_{i \neq k} c_i X_i}{c_k}$$.
+
+In order to display consistently the decision threshold on the plots made by aggregating different values $X_i$ of the features, we replace the value
+by the average over the dataset.
 """
 
+intercept = unscaled_intercept
+coefs_dict = {f: c for f, c in zip(features, unscaled_coefs)}
 
+
+npages = np.arange(30)
+country, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
+    df, group_by='country', variables=['total_pages_visited'], xvals=[npages])
+
+
+p_thr = 0.5 # best_thr
+
+variable = 'total_pages_visited'
+countries = []
+for k, (group, gdf) in enumerate(df.groupby('country')):
+    # print(gdf)
+    countries.append(group)
+    
+    dec_var = logit(p_thr) - intercept
+    print(dec_var)
+    for feature, avg in pd.get_dummies(gdf).mean().drop('converted').items():
+        dec_var -= coefs_dict[feature] * avg
+    dec_var /= coefs_dict[variable]
+    print(dec_var)
+    # for idx, c in gdf.loc[:, variables].value_counts().items():
+    #     idx = tuple(indice[i] for indice, i in zip(indices, idx))
+    # pconv_df = gdf.loc[:, variables + ['converted']] \
+    #               .groupby(variables) \
+    #               .mean()['converted']
+    # print(pconv_df)
+    # for idx, p in pconv_df.items():
+    #     idx = idx if isinstance(idx, tuple) else (idx,)  # cast to tuple if no multiindex
+    #     idx = tuple(indice[i] for indice, i in zip(indices, idx))
+    #     pconv[k, *idx] = p
+
+# df_ = pd.get_dummies(df)
+
+
+
+# fig8, axs8 = plt.subplots(
+#     nrows=1, ncols=2, figsize=(9, 4),
+#     gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.85, 'bottom': 0.12})
+
+# axs8[0].grid(visible=True)
+# distribs = counts / np.sum(counts, axis=1, keepdims=True)
+# for k, label in enumerate(group_labels):
+#     axs8[0].plot(xvals, distribs[k], color=f'C{k}',
+#                 linewidth=1, label=f'{label} ({int(np.sum(counts[k]))})')
+# axs8[0].set_xlim(0, np.max(xvals)+1)
+# axs8[0].set_ylim(-0.0005, (int(np.max(distribs)*100)+1)/100)
+# axs8[0].set_ylabel('Prob. density')
+
+# axs8[1].grid(visible=True)
+# for k, label in enumerate(group_labels):
+#     axs8[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
+#                     color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
+#                     label=label)
+# axs8[1].set_xlim(0, np.max(xvals)+1)
+# axs8[1].set_ylim(-0.005, int(np.max(pconv[~np.isnan(pconv)])*120)/100)
+# axs8[1].set_title("Conversion probability")
+# axs8[1].set_ylabel('Conversion probability')
+
+
+sys.exit()
 
 
 # %%% LR : polynomial features
