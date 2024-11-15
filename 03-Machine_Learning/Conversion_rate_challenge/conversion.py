@@ -957,7 +957,9 @@ print_metrics(mean_cm)
 We plot the ROC curve in figure 7. The location of our selected threshold is indicated on the curve as an orange cross.
 """
 
-fig7, ax7 = plt.subplots(figsize=(5, 5))
+fig7 = plt.figure(figsize=(4, 4))
+ax7 = fig7.add_axes((0.14, 0.11, 0.76, 0.76))
+
 fig7.suptitle('Figure 7: ROC curve', x=0.02, ha='left')
 
 ax7.plot(mean_fpr, mean_tpr, label=f'Mean ROC (AUC = {mean_auc:.4f})')
@@ -973,7 +975,7 @@ ax7.grid(visible=True, alpha=0.3)
 
 thr_txt = (f'threshold = {best_thr:.4f}\nF1-score = {best_score:.4f}\n'
            f'TPR = {thr_tpr:.4}\nFPR = {thr_fpr:.4}')
-ax7.text(0.23, 0.74, thr_txt, ha='center', va='center')
+ax7.text(0.26, 0.74, thr_txt, ha='center', va='center')
 
 plt.show()
 
@@ -1049,62 +1051,96 @@ intercept = unscaled_intercept
 coefs_dict = {f: c for f, c in zip(features, unscaled_coefs)}
 
 
+# npages = np.arange(30)
+# country, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
+#     df, group_by='country', variables=['total_pages_visited'], xvals=[npages])
+
+
+df_ = df.drop('converted', axis=1)
+
+p_thr = best_thr
+
+ctry_decision_thrs = {}
+for group, gdf in df_.groupby('country'):
+    gdf = gdf.drop('total_pages_visited', axis=1)
+    decision_thr = logit(p_thr) - intercept
+    for feature, mean in pd.get_dummies(gdf).mean().items():
+        decision_thr -= coefs_dict[feature] * mean
+    decision_thr /= coefs_dict['total_pages_visited']
+    ctry_decision_thrs[group] = decision_thr
+
+
+usr_decision_thrs = {}
+for group, gdf in df_.groupby('new_user'):
+    gdf = gdf.drop('total_pages_visited', axis=1)
+    decision_thr = logit(p_thr) - intercept
+    for feature, mean in pd.get_dummies(gdf).mean().items():
+        decision_thr -= coefs_dict[feature] * mean
+    decision_thr /= coefs_dict['total_pages_visited']
+    usr_decision_thrs[group] = decision_thr
+
+
 npages = np.arange(30)
-country, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
+
+country, ctry_counts, ctry_npage_pconv, ctry_npage_std_pconv = prob_distrib(
     df, group_by='country', variables=['total_pages_visited'], xvals=[npages])
+idx = ~np.isnan(ctry_npage_pconv)
+ctry_popt = []
+for k, i in enumerate(idx):
+    popt_, _ = curve_fit(sigmoid, npages[i], ctry_npage_pconv[k, i], p0=(15, 1))
+    ctry_popt.append(popt_)
+
+usr, usr_counts, usr_npage_pconv, usr_npage_std_pconv = prob_distrib(
+    df, group_by='new_user', variables=['total_pages_visited'], xvals=[npages])
+idx = ~np.isnan(usr_npage_pconv)
+usr_popt = []
+for k, i in enumerate(idx):
+    popt_, _ = curve_fit(sigmoid, npages[i], usr_npage_pconv[k, i], p0=(15, 1))
+    usr_popt.append(popt_)
 
 
-p_thr = 0.5 # best_thr
+## plot
+fig8, axs8 = plt.subplots(
+    nrows=1, ncols=2, figsize=(9, 4),
+    gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.85, 'bottom': 0.12})
 
-variable = 'total_pages_visited'
-countries = []
-for k, (group, gdf) in enumerate(df.groupby('country')):
-    # print(gdf)
-    countries.append(group)
-    
-    dec_var = logit(p_thr) - intercept
-    print(dec_var)
-    for feature, avg in pd.get_dummies(gdf).mean().drop('converted').items():
-        dec_var -= coefs_dict[feature] * avg
-    dec_var /= coefs_dict[variable]
-    print(dec_var)
-    # for idx, c in gdf.loc[:, variables].value_counts().items():
-    #     idx = tuple(indice[i] for indice, i in zip(indices, idx))
-    # pconv_df = gdf.loc[:, variables + ['converted']] \
-    #               .groupby(variables) \
-    #               .mean()['converted']
-    # print(pconv_df)
-    # for idx, p in pconv_df.items():
-    #     idx = idx if isinstance(idx, tuple) else (idx,)  # cast to tuple if no multiindex
-    #     idx = tuple(indice[i] for indice, i in zip(indices, idx))
-    #     pconv[k, *idx] = p
+fig8.suptitle("Figure 8: Decision thresholds",
+              x=0.02, ha='left')
 
-# df_ = pd.get_dummies(df)
+for ax in axs8:
+    ax.grid(visible=True)
+    ax.set_xlim(0, 30)
+    ax.set_ylim(-0.01, 1.01)
+    ax.set_xlabel('# pages visited')
+
+axs8[0].set_ylabel('conversion probabililty')
+for k, (key, val) in enumerate(usr_decision_thrs.items()):
+    axs8[0].errorbar(
+        npages, usr_npage_pconv[k], yerr=usr_npage_std_pconv[k],
+        fmt='o', color=f'C{k}', markersize=3, markeredgewidth=0.3,
+        label=f'{key}')
+    axs8[0].plot(npages, sigmoid(npages, *usr_popt[k]),
+                 linewidth=1, color=f'C{k}')
+    axs8[0].axvline(val, color=f'C{k}', linestyle='--', linewidth=1)
+axs8[0].legend(loc=2)
+
+for k, (key, val) in enumerate(ctry_decision_thrs.items()):
+    axs8[1].errorbar(
+        npages, ctry_npage_pconv[k], yerr=ctry_npage_std_pconv[k],
+        fmt='o', color=f'C{k}', markersize=3, markeredgewidth=0.3,
+        label=f'{key}')
+    axs8[1].plot(npages, sigmoid(npages, *ctry_popt[k]),
+                 linewidth=1, color=f'C{k}')
+    axs8[1].axvline(val, color=f'C{k}', linestyle='--', linewidth=1)
+axs8[1].legend(loc=2)
 
 
+plt.show()
 
-# fig8, axs8 = plt.subplots(
-#     nrows=1, ncols=2, figsize=(9, 4),
-#     gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.85, 'bottom': 0.12})
+"""
+Now to the heatmaps
+"""
 
-# axs8[0].grid(visible=True)
-# distribs = counts / np.sum(counts, axis=1, keepdims=True)
-# for k, label in enumerate(group_labels):
-#     axs8[0].plot(xvals, distribs[k], color=f'C{k}',
-#                 linewidth=1, label=f'{label} ({int(np.sum(counts[k]))})')
-# axs8[0].set_xlim(0, np.max(xvals)+1)
-# axs8[0].set_ylim(-0.0005, (int(np.max(distribs)*100)+1)/100)
-# axs8[0].set_ylabel('Prob. density')
-
-# axs8[1].grid(visible=True)
-# for k, label in enumerate(group_labels):
-#     axs8[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
-#                     color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
-#                     label=label)
-# axs8[1].set_xlim(0, np.max(xvals)+1)
-# axs8[1].set_ylim(-0.005, int(np.max(pconv[~np.isnan(pconv)])*120)/100)
-# axs8[1].set_title("Conversion probability")
-# axs8[1].set_ylabel('Conversion probability')
 
 
 sys.exit()
