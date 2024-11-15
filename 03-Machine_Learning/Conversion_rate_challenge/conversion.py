@@ -134,7 +134,7 @@ def prob_distrib_plot(xvals: np.ndarray,
         nrows=1, ncols=2, figsize=(9, 4),
         gridspec_kw={'left': 0.08, 'right': 0.96, 'top': 0.85, 'bottom': 0.12})
 
-    axs[0].grid(visible=True)
+    axs[0].grid(visible=True, linewidth=0.3)
     distribs = counts / np.sum(counts, axis=1, keepdims=True)
     for k, label in enumerate(group_labels):
         axs[0].plot(xvals, distribs[k], color=f'C{k}',
@@ -143,7 +143,7 @@ def prob_distrib_plot(xvals: np.ndarray,
     axs[0].set_ylim(-0.0005, (int(np.max(distribs)*100)+1)/100)
     axs[0].set_ylabel('Prob. density')
 
-    axs[1].grid(visible=True)
+    axs[1].grid(visible=True, linewidth=0.3)
     for k, label in enumerate(group_labels):
         axs[1].errorbar(xvals, pconv[k], yerr=std_pconv[k],
                         color=f'C{k}', fmt='o', markersize=3, markeredgewidth=0.3,
@@ -242,6 +242,7 @@ the classification of new visits from China.
 ### Influence of visitors' age on the conversion probability
 
 We turn to the study of the impact of quantitative variables on the conversion probability, begining with the variable `'age'`.
+We have seen before that there is a strong dependence in user status (new or recurring), we consider the two types of users separately.
 """
 
 ## Age data
@@ -272,7 +273,6 @@ fig2, axs2 = prob_distrib_plot(
     group_labels=['recur.', 'new'])
 fig2.suptitle("Figure 2: Influence of 'age' on the conversion probability", x=0.02, ha='left')
 
-axs2[0].text(45, 0.0375, f'total counts: {int(np.sum(age_counts))}')
 axs2[0].axvline(17, color='k', linewidth=1, linestyle='--')
 axs2[0].text(11, 0.04, '17 yo\ncutoff', ha='center', va='center')
 axs2[0].set_title("Age distribution of visitors")
@@ -308,7 +308,6 @@ Finally, we note that these patterns are extremely regular and again reveal the 
 
 
 # %%% EDA npages
-# TODO comment
 """
 ### Influence of the number of pages visited
 
@@ -344,7 +343,6 @@ fig3, axs3 = prob_distrib_plot(
 fig3.suptitle("Figure 3: Influence of 'total_pages_visited' on the conversion probability",
               x=0.02, ha='left')
 
-axs3[0].text(13, 0.123, f'total counts: {int(np.sum(npage_counts))}')
 axs3[0].set_ylim(-0.002, 0.16)
 axs3[0].set_title("# pages visited distribution")
 axs3[0].set_xlabel('# pages visited')
@@ -370,24 +368,12 @@ axs3[1].legend()
 plt.show()
 
 
-txt = """
+"""
 The number of pages visited is clearly the most relevant feature that determines the newsletter subscription, with a sigmoid dependence of the conversion probability.
-- The newsletter subscription probability looks like a sigmoid for both new and recurring visitors. The inflection points are shifted,
-  and looking at the 13 pages-visits threshold, we see that here the conversion probability is thrice for recurring users than for new users.
-
-
-- The distributions of number of pages visited are not proportional. They actually look like
-  [inverse-gamma distributions](https://en.wikipedia.org/wiki/Inverse-gamma_distribution).
-
-- Although we still have a factor ~2 between the total counts, we remark that website visits with more than 13 pages visited are
-  mostly done by recurrent visitors. Accounting for the factor 2, this makes it more than twice likely that a > 13 pages visit
-  is done by a recurrent visitor.
-
-
-- Sigmoid fits with the slope and inflection point as parameters is also shown on the right panel. The slopes are roughly the same,
-  the difference being the inflection point: 12.5 pages for recurring visitors vs 15 pages for new visitors.
-- Finally, we note two outlier events on the right panel. ~30 pages visits with no subscription. We might consider removing these observations
-  for training later on.
+- The effect of the number of pages visited takes the form of an "activation threshold" dependent on the visitor status.
+Fitting with a sigmoid function gives an inflection point of about 12.4 for recurring users and 14.7 for new users, with a similar slope for both.
+- The distributions of number of pages visited are not proportional. In particular, those visits which contribute the most to the newsletter subscription
+  are less likely among new visitors. Together with the higher conversion threshold, this explains the significantly lower conversion rate of new visitors.
 
 We again stress that such regularity is unlikely in any realistic context.
 """
@@ -397,12 +383,7 @@ We again stress that such regularity is unlikely in any realistic context.
 ### Effect of the number of pages visited for each country
 
 We noted above that the country of origin has a significant impact on the conversion probability.
-We consider the two following hypotheses to explain this trend:
-- The country of orgin has an impact on the distribution of number of pages visited, but not on the subscription threshold (the inflection point of the sigmoid).
-  In this case, the country is expected to not be a good a predictor: the relevant information would be already contained in the number of pages visited.
-- The pages visits distribution does not depend on the country, but the conversion threshold does. In this case, the country (more precisely, its correlation with the number of pages visted)
-  would be a highly relevant predictor.
-For comparison, the new/recurring character of visitors effect is a mixture of these two: it affects both the pages visits distribution and conversion threshold.
+We explore here the dependence of the conversion probability in the number of pages visited for each country instead of user status.
 """
 
 ##
@@ -425,7 +406,6 @@ fig4, axs4 = prob_distrib_plot(
     group_labels=country)
 fig4.suptitle("Figure 4: Cross-influence of 'country' and 'total_pages_visited'", x=0.02, ha='left')
 
-axs4[0].text(14, 0.103, f'total counts: {int(np.sum(npage_counts))}')
 axs4[0].set_ylim(-0.001, 0.16)
 axs4[0].set_title("# pages visited distribution")
 axs4[0].set_xlabel('# pages visited')
@@ -440,19 +420,19 @@ axs4[1].set_xlabel('# pages visited')
 plt.show()
 
 """
-Here we show, for each country, the distribution of pages visited (left panel) and the conversion probability as a function of the number of pages visited (right panel).
+Figure 4 shows, for each country of origin, the distribution of pages visited (left panel) and the conversion probability as a function of the number of pages visited (right panel).
 - The behavior of users from `'Germany'`, `'UK'` and `'US'` is quite similar both in terms of page visits and conversion probability thresholding with a tendency Germany < UK < US
-which matches the differences observed in figure 1.
+matching the differences observed in figure 1.
 - The behavior difference of users from `'China'` is striking. First, the distibution of pages visits is different, with much less visits of more than 13 pages, those which are associated to newsletter subscription.
-Second, the threshold seems to be set at a significantly higher level than other countries. These two factors explain the much lower conversion rates observed in figure 1.
+Second, the threshold seems to be set at a significantly higher level than other countries. These two factors contribute to the much lower conversion rates observed in figure 1.
 """
 
 # %%% source x npages
-# TODO comment
 """
 ### Effect of the number of pages visited for each source
 
-We now consider 
+For the sake of completeness, we produce the same plot as before, this time with the variable `'source'`.
+We did not observe a significant impact of this feature in figure 1, and we do not expect any significant differences between the various curves. 
 """
 
 ##
@@ -476,7 +456,6 @@ fig5, axs5 = prob_distrib_plot(
 fig5.suptitle("Figure 5: Cross-influence of 'source' and 'total_pages_visited' on the conversion probability",
               x=0.02, ha='left')
 
-axs5[0].text(17, 0.11, f'total counts: {int(np.sum(npage_counts))}')
 axs5[0].set_ylim(0, 0.16)
 axs5[0].set_title("# pages visited distribution")
 axs5[0].set_xlabel('# pages visited')
@@ -492,7 +471,7 @@ axs5[1].legend(loc=2)
 plt.show()
 
 """
-The plot shows...
+The distribution of pages visits is the same for each source. The only difference being in the conversion threshold, with a trend following that of figure 1.
 """
 
 
@@ -500,9 +479,11 @@ The plot shows...
 # TODO comment
 """
 ### Combined effect of age and number of pages visited
+
+We will finally explore 
 """
 
-new_user, npages = np.arange(80), np.arange(30)
+ages, npages = np.arange(80), np.arange(30)
 new_user, counts, pconv, std_pconv = prob_distrib(
     df, group_by='new_user', variables=['age', 'total_pages_visited'],
     xvals=[ages, npages])
@@ -540,22 +521,26 @@ for k, label in enumerate(['Recurrent visitors', 'New visitors']):
 plt.show()
 
 """
-The figure shows the conversion probability as a function of age and number of pages visited
-for both new (left panel) and recurring (right panel) visitors.
-- the sigmoid dependence of the conversion probability vs. number of pages visited is valid over the whole age range.
-- In both conditions, there is a small linear dependence of the inflection point with age, with a lower inflection point for younger visitors.
+The figure shows the conversion probability as a function of age and number of pages visited for both recurring (left panel) and new (right panel) visitors.
+The insets show the same data as a heatmap, on which the conversion threshold is easily visualized.
+- The sigmoid dependence of the conversion probability vs. number of pages visited seems valid over the whole age range.
+- In both conditions, the inflection point seems to be *linearly* dependent with the age. The dependence is positive: older visitors subscribe with more page visits.
+
+The boundary separating the conversion outcomes is clearly linear, and we thus expect a linear model to perform very well.
 """
 
+
 # %% General Utils
-# TODO comment
 """
 ## <a name="utils"></a>Utilities
+
+Before moving on to machine learning proper, we introduce here some utilities and helper functions for the subsequent sections.
 """
 
 from scipy.special import expit, logit
 
 from sklearn.base import clone
-from sklearn.exceptions import ConvergenceWarning
+# from sklearn.exceptions import ConvergenceWarning
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (confusion_matrix,
                              roc_curve,
@@ -571,7 +556,7 @@ from sklearn.preprocessing import (OneHotEncoder,
                                    FunctionTransformer)
 
 
-warnings.simplefilter("ignore", ConvergenceWarning)
+# warnings.simplefilter("ignore", ConvergenceWarning)
 
 
 # def poly_features(X: np.ndarray) -> np.ndarray:
@@ -589,6 +574,10 @@ warnings.simplefilter("ignore", ConvergenceWarning)
 #     X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
 #     return X_
 
+
+"""
+The following are convenience functions for displaying metrics, parameter optimization and model evaluation.
+"""
 
 def print_metrics(cm: np.ndarray)-> None:
     """
@@ -672,9 +661,10 @@ def tune_threshold_cv(model, X: np.ndarray, y: np.ndarray,
     
     return model_ta
 
-"""
-Some utilities
 
+"""
+In the upcomming sections, we will split our models into a collection of models adjusted to each categorical variable.
+The following are utilities designed to work with those composite models.
 """
 
 
@@ -797,6 +787,8 @@ lr_model.fit(X_tr, y_tr)
 
 """
 #### Performance assessment
+
+The retained metrics is the F1-score
 """
 
 print('===== Train set metrics =====')
@@ -985,6 +977,7 @@ plt.show()
 """
 
 # %%% LR : interpretation
+# TODO clean
 """
 ### Model interpretation
 
@@ -1002,14 +995,14 @@ intercept = lr_model_ta.estimator_['classifier'].intercept_[0]
 coefs = lr_model_ta.estimator_['classifier'].coef_[0]
 
 
-# print(f'{"intercept":<20} : {intercept: }')
-# for feature, coef in zip(features, coefs):
-#     print(f'{feature:<20} : {coef: }')
+print(f'{"intercept":<20} : {intercept: }')
+for feature, coef in zip(features, coefs):
+    print(f'{feature:<20} : {coef: }')
 
 
 """
 The results follow closely what we saw in the EDA section:
-- The most relevant variable is the total number of pages visited, with a positive correlation with the conversion probability;
+- The most relevant variable is the total number of pages visited, having a positive correlation with the conversion probability;
 - The age is negatively correlated with the conversion probability, yet with a 4 times lower influence than the number of pages visited;
 - Being a new visitor penalizes the conversion probability;
 - Similarly, coming from China causes a large penalty, while users from other countries have a rather uniform behavior;
@@ -1020,10 +1013,12 @@ The results follow closely what we saw in the EDA section:
 """
 #### Plotting decision boundaries
 
-We will now plot decision boundaries for the different features. In doing so, we face two main difficulties:
+We will now plot decision boundaries for the various features. In doing so, we face two main difficulties:
 - The coefficients must be brought back to the original scale
 - The original feature space is more than 2-dimensional, hence we must aggregate the values in order for
   our decision boundaries to relate adequately to the plots of the EDA section.
+
+We first un-scale the coefficients of quantitative variables.
 """
 
 # standard scaler coefs
@@ -1035,26 +1030,21 @@ unscaled_coefs = np.copy(coefs)
 unscaled_coefs[-2:] /= qsc_scales
 unscaled_intercept = intercept - np.sum(coefs[-2:] * qsc_means / qsc_scales)
 
-
-"""
-The logit of the fitted conversion probability $p$ is:
-$$\mathrm{logit}(p) = c_0 + \sum_{i} c_i X_i$$,
-where the $c_i$ represent the unscaled coefficients.
-The decision threshold at probability $p_0$ for a given (quantitative) variable $X_k$ given the values $X_i, i \neq k $ of the other features, is thus
-$$X_k^{\mathrm{thr}} = \frac{\mathrm{logit}(p) - c_0 + \sum_{i \neq k} c_i X_i}{c_k}$$.
-
-In order to display consistently the decision threshold on the plots made by aggregating different values $X_i$ of the features, we replace the value
-by the average over the dataset.
-"""
-
+# coefficients to be used for decision boundary computation
 intercept = unscaled_intercept
 coefs_dict = {f: c for f, c in zip(features, unscaled_coefs)}
 
 
-# npages = np.arange(30)
-# country, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
-#     df, group_by='country', variables=['total_pages_visited'], xvals=[npages])
+r"""
+The logit of the fitted conversion probability $p$ is:
+$$\mathrm{logit}(p) = c_0 + \sum_{k} c_k X_k$$,
+where the $c_k$ represent the unscaled coefficients.
+The decision threshold at probability $p_0$ for a given (quantitative) variable $X_i$ given the values $X_k, k \neq i $ of the other features, is thus
+$$X_i^{\mathrm{thr}} = \frac{\mathrm{logit}(p) - c_0 + \sum_{k \neq i} c_k X_k}{c_i}$$.
 
+In order to display consistently the decision threshold on the plots made by aggregating different values $X_k$ of the features, we replace the value
+by the average over the dataset.
+"""
 
 df_ = df.drop('converted', axis=1)
 
@@ -1108,11 +1098,12 @@ fig8.suptitle("Figure 8: Decision thresholds",
               x=0.02, ha='left')
 
 for ax in axs8:
-    ax.grid(visible=True)
+    ax.grid(visible=True, linewidth=0.3)
     ax.set_xlim(0, 30)
     ax.set_ylim(-0.01, 1.01)
     ax.set_xlabel('# pages visited')
 
+axs8[0].set_title('Data aggregated by user status')
 axs8[0].set_ylabel('conversion probabililty')
 for k, (key, val) in enumerate(usr_decision_thrs.items()):
     axs8[0].errorbar(
@@ -1124,6 +1115,7 @@ for k, (key, val) in enumerate(usr_decision_thrs.items()):
     axs8[0].axvline(val, color=f'C{k}', linestyle='--', linewidth=1)
 axs8[0].legend(loc=2)
 
+axs8[1].set_title('Data aggregated by country')
 for k, (key, val) in enumerate(ctry_decision_thrs.items()):
     axs8[1].errorbar(
         npages, ctry_npage_pconv[k], yerr=ctry_npage_std_pconv[k],
@@ -1134,17 +1126,85 @@ for k, (key, val) in enumerate(ctry_decision_thrs.items()):
     axs8[1].axvline(val, color=f'C{k}', linestyle='--', linewidth=1)
 axs8[1].legend(loc=2)
 
+plt.show()
+
+"""
+Figure 8 shows the conversion probability vs the number of pages visited for the various group of `'new_user'` (left panel) and `'country'` (right panel).
+The corresponding decision thresholds are shown as dashed vertical lines, and as in the EDA section, sigmoid fits are represented as solid lines.
+The thresholds are well postionned near the bayesian boundary at $p_{\mathrm{conv}} = 0.5$, except maybe for the data pertaining to chinese users.
+We thus expect that only minimal improvements of the F1 score can be obtained by fine tuning or with other models.
+"""
+
+
+# %%%% LR decision boundary heatmaps
+# TODO clean
+r"""
+We proceed by computing the decision boundary in the plane of the quantitative variables `'age'` and `'total_pages_visited'`.
+In this case, the boundary for variables $X_i, X_j$ can be expressed as:
+$$X_i^{\mathrm{thr}} = \frac{c_j}{c_i}X_j + \frac{\mathrm{logit}(p) - c_0 + \sum_{k \neq i, j} c_k X_k}{c_i}$$,
+where, again, we replace the other feature $X_k, k \neq i, j$ by their average over the dataset.
+"""
+
+##
+dt_slope = - coefs_dict['age'] / coefs_dict['total_pages_visited']
+dt_intercepts = {}
+for group, gdf in df_.groupby('new_user'):
+    gdf = gdf.drop(['age', 'total_pages_visited'], axis=1)
+    dt_intercept = logit(p_thr) - intercept
+    for feature, mean in pd.get_dummies(gdf).mean().items():
+        dt_intercept -= coefs_dict[feature] * mean
+    dt_intercept /= coefs_dict['total_pages_visited']
+    dt_intercepts[group] = dt_intercept
+print(f'decision boundary slope: {dt_slope}')
+print(f'decision boundary intercepts: {dt_intercepts}')
+
+##
+ages, npages = np.arange(81), np.arange(31)
+new_user, counts, pconv, std_pconv = prob_distrib(
+    df, group_by='new_user', variables=['total_pages_visited', 'age'],
+    xvals=[npages, ages])
+xx, yy = np.meshgrid(ages[17:]-0.5, npages-0.5)
+x_dt = np.array([0, 80], dtype=float)
+
+##
+fig9, axs9 = plt.subplots(
+    nrows=2, ncols=1, figsize=(5.5, 5.2),
+    gridspec_kw={'left': 0.105, 'right': 0.82, 'top': 0.9, 'bottom': 0.11, 'hspace': 0.06})
+cax9 = fig9.add_axes((0.905, 0.11, 0.036, 0.77))
+fig9.suptitle('Figure 9: Decision boundaries', x=0.02, ha='left')
+
+for k, ax in enumerate(axs9):
+    ax.set_aspect('equal')
+    heatmap = ax.pcolormesh(
+        xx, yy, pconv[k, :-1, 17:-1], cmap='coolwarm', vmin=0, vmax=1)
+    ax.plot(x_dt, dt_intercepts[new_user[k]] + x_dt * dt_slope,
+            color='k')
+    ax.set_xlim(16, 80)
+    ax.set_ylim(0, 30)
+
+axs9[0].set_title("Recurring visitors", x=0.98, y=0.85, ha='right')
+axs9[0].tick_params(bottom=True, labelbottom=False)
+axs9[0].set_ylabel('# pages visited', y=-0.1, labelpad=6, fontsize=11)
+
+axs9[1].set_title("New visitors", x=0.98, y=0.85, ha='right')
+axs9[1].set_xlabel('Age', fontsize=11)
+
+fig9.colorbar(heatmap, cax=cax9, orientation="vertical", ticklocation="left")
+cax9.yaxis.set_label_position('right')
+cax9.set_yticks([0.1, 0.3, 0.5, 0.7, 0.9], minor=True)
+cax9.set_ylabel('Conversion probability', labelpad=16, rotation=-90, fontsize=11)
+cax9.tick_params(which='major', direction='in', length=6, width=1)
+cax9.tick_params(which='minor', direction='in', length=3, width=0.8)
 
 plt.show()
 
 """
-Now to the heatmaps
+Figure 9 shows heatmaps of the conversion probability for recurring visitors (top panel) and new visitors (bottom panel), with the corresponding decision boundaries shown as solid black lines.
+Again, they go through the bayesian boundary $p_{\mathrm{conv}} = 0.5$ in both cases.
 """
 
 
-
 sys.exit()
-
 
 # %%% LR : polynomial features
 # TODO comment
@@ -1764,7 +1824,7 @@ for idx, p in pipelines.items():
 
 
 # %%% NN : test eval
-
+# TODO
 """
 ### Model evaluation on test data
 """
@@ -1939,7 +1999,7 @@ for idx, p in pipelines.items():
 
 
 # %%% Tree : test eval
-
+# TODO
 """
 ### Model evaluation on test data
 """
@@ -1955,6 +2015,7 @@ for idx, p in pipelines.items():
 
 
 # %% Composite
+# TODO
 """
 ## <a name="composite"></a>Composite models
 
@@ -1987,7 +2048,7 @@ models = {
     'split_hgbc_model_ta': split_hgbc_model_ta,
     }
 
-# prec | recall | F1 of the models
+# TODO prec | recall | F1 of the models
 
 
 """
@@ -1995,7 +2056,7 @@ Furthermore, when fitting models for each pair (new_user, country)it appeared th
 as highlighted in the following table.
 """
 
-# F1 for each idx of each model
+# TODO F1 for each idx of each model
 
 """
 In this section, we will try to take advantage of each model by building composite models.
@@ -2004,7 +2065,8 @@ In this section, we will try to take advantage of each model by building composi
 from sklearn.ensemble import VotingClassifier
 
 # %%% Voting
-
+# TODO
+# TODO comment
 """
 ### Voting classifier
 
@@ -2015,6 +2077,8 @@ We build a voting classifier out of all our models
 
 
 # %%% Mixing models
+# TODO
+# TODO comment
 
 """
 ### Mixing models
