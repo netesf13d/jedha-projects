@@ -1,34 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-!!!
-# Lu matin
-# 3 choses positives
-# agressions dans le metro
-# Celia et pierre baisent pas assez
-Created on Fri Nov  8 10:49:22 2024
+# A regression approach to the classification problem
 
-@author: netes
+This script presents a different approach to the classification problem. Since we have many observations in a very low
+dimension problem (only two quantitative features!), we can directly estimate the conversion probability density by regression.
+The classification then amounts to determine if the estimated probability is above a certain threshold.
 """
 
 import sys
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.special import logit
 
 from sklearn.base import clone
-from sklearn.exceptions import ConvergenceWarning
 from sklearn.compose import ColumnTransformer
-from sklearn.metrics import (confusion_matrix,
-                             roc_curve,
-                             auc)
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import (GridSearchCV,
-                                     train_test_split,
-                                     StratifiedKFold,
-                                     TunedThresholdClassifierCV)
+                                     StratifiedKFold)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder,
                                    OrdinalEncoder,
@@ -39,9 +29,12 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.svm import SVR
 
 
-# =============================================================================
-# Utils
-# =============================================================================
+#%% Utils
+"""
+## <a name="utils"></a>Utilities
+
+We introduce here relevant utilities that will make the code cleaner later on.
+"""
 
 def evaluate_model(model,
                    xtest_fname: str = 'conversion_data_test.csv',
@@ -114,9 +107,13 @@ class Classifier:
         return (self.model.predict(X) > self.thr).astype(int)
 
 
-# =============================================================================
 #%% Data loading and initial preprocessing
-# =============================================================================
+
+"""
+## <a name="loading"></a>Data loading and initial preprocessing
+
+We prepare two datasets, one for plain classification, and one for conversion probability regression.
+"""
 
 # Load data
 df = pd.read_csv('./conversion_data_train.csv')

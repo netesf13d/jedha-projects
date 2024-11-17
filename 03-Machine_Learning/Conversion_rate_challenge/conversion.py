@@ -6,7 +6,6 @@
 
 import sys
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -172,7 +171,7 @@ df.groupby(['source', 'converted']).count()['age']
 
 
 """
-The conversion events are rather rare. About 1% for new website visitors and 8% for recurrent visitors, out of a global count of 300000.
+The conversion events are rather rare, with a global rate of 3.2%, 1% for new website visitors and 8% for recurrent visitors.
 Although the subscription probability is rather homogeneous accross the various sources, this is not the case for the different countries.
 In particular, the conversion events are very rare among chinese visitors, with a count of only 89. We anticipate that this will cause a lot of variance in
 classifying new events corresponding to chinese visitors.
@@ -314,7 +313,7 @@ Finally, we note that these patterns are extremely regular and again reveal the 
 We proceed in a similar fashion this time with the quantity `'total_pages_visited'`.
 """
 npages = np.arange(30)
-new_user, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
+new_user, usr_npage_counts, usr_npage_pconv, usr_npage_std_pconv = prob_distrib(
     df, group_by='new_user', variables=['total_pages_visited'], xvals=[npages])
 
 
@@ -328,17 +327,17 @@ def sigmoid(x: np.ndarray,
     return 1 / (1 + np.exp(- a * (x - x0)))
 
 
-idx = ~np.isnan(npage_pconv)
-popt, pcov = [], []
+idx = ~np.isnan(usr_npage_pconv)
+usr_popt, usr_pcov = [], []
 for k, i in enumerate(idx):
-    popt_, pcov_ = curve_fit(sigmoid, npages[i], npage_pconv[k, i], p0=(15, 1))
-    popt.append(popt_)
-    pcov.append(pcov_)
+    popt_, pcov_ = curve_fit(sigmoid, npages[i], usr_npage_pconv[k, i], p0=(15, 1))
+    usr_popt.append(popt_)
+    usr_pcov.append(pcov_)
 
 
 # plot
 fig3, axs3 = prob_distrib_plot(
-    npages, npage_counts, npage_pconv, npage_std_pconv,
+    npages, usr_npage_counts, usr_npage_pconv, usr_npage_std_pconv,
     group_labels=['recur. visitors', 'new visitors'])
 fig3.suptitle("Figure 3: Influence of 'total_pages_visited' on the conversion probability",
               x=0.02, ha='left')
@@ -349,12 +348,12 @@ axs3[0].set_xlabel('# pages visited')
 axs3[0].legend()
 
 
-for k, popt_ in enumerate(popt):
+for k, popt_ in enumerate(usr_popt):
     axs3[1].plot(npages, sigmoid(npages, *popt_),
                  linewidth=1, color=f'C{k}', label='sigmoid fit')
 
 popt_txt = [f'x0 = {popt_[0]:.3} +- {pcov_[0, 0]:.2}\na = {popt_[1]:.3} +- {pcov_[1, 1]:.2}'
-            for popt_, pcov_ in zip(popt, pcov)]
+            for popt_, pcov_ in zip(usr_popt, usr_pcov)]
 axs3[1].text(7, 0.7, popt_txt[0], ha='center', va='center', fontsize=7)
 axs3[1].text(21, 0.6, popt_txt[1], ha='center', va='center', fontsize=7)
 
@@ -388,21 +387,21 @@ We explore here the dependence of the conversion probability in the number of pa
 
 ##
 npages = np.arange(30)
-country, npage_counts, npage_pconv, npage_std_pconv = prob_distrib(
+country, ctry_npage_counts, ctry_npage_pconv, ctry_npage_std_pconv = prob_distrib(
     df, group_by='country', variables=['total_pages_visited'], xvals=[npages])
 
 ##
-idx = ~np.isnan(npage_pconv)
-popt, pcov = [], []
+idx = ~np.isnan(ctry_npage_pconv)
+ctry_popt, ctry_pcov = [], []
 for k, i in enumerate(idx):
-    popt_, pcov_ = curve_fit(sigmoid, npages[i], npage_pconv[k, i], p0=(15, 1))
-    popt.append(popt_)
-    pcov.append(pcov_)
+    popt_, pcov_ = curve_fit(sigmoid, npages[i], ctry_npage_pconv[k, i], p0=(15, 1))
+    ctry_popt.append(popt_)
+    ctry_pcov.append(pcov_)
 
 
 ### plot
 fig4, axs4 = prob_distrib_plot(
-    npages, npage_counts, npage_pconv, npage_std_pconv,
+    npages, ctry_npage_counts, ctry_npage_pconv, ctry_npage_std_pconv,
     group_labels=country)
 fig4.suptitle("Figure 4: Cross-influence of 'country' and 'total_pages_visited'", x=0.02, ha='left')
 
@@ -411,7 +410,7 @@ axs4[0].set_title("# pages visited distribution")
 axs4[0].set_xlabel('# pages visited')
 axs4[0].legend(loc=1)
 
-for k, popt_ in enumerate(popt):
+for k, popt_ in enumerate(ctry_popt):
     axs4[1].plot(npages, sigmoid(npages, *popt_),
                  linewidth=1, color=f'C{k}', label='sigmoid fit')
 axs4[1].set_ylim(-0.005, 1.005)
@@ -480,7 +479,8 @@ The distribution of pages visits is the same for each source. The only differenc
 """
 ### Combined effect of age and number of pages visited
 
-We will finally explore 
+We conclude the EDA by studying the combined effect of the quantitative variables `'age'` and `'total_pages_visited'`
+on the conversion probability.
 """
 
 ages, npages = np.arange(80), np.arange(30)
@@ -540,7 +540,6 @@ Before moving on to machine learning proper, we introduce here some utilities an
 from scipy.special import expit, logit
 
 from sklearn.base import clone
-# from sklearn.exceptions import ConvergenceWarning
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (confusion_matrix,
                              roc_curve,
@@ -554,25 +553,6 @@ from sklearn.preprocessing import (OneHotEncoder,
                                    OrdinalEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
-
-
-# warnings.simplefilter("ignore", ConvergenceWarning)
-
-
-# def poly_features(X: np.ndarray) -> np.ndarray:
-#     """
-#     Custom polynomial features construction:
-#         - Original features, Xi
-#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
-#     """
-#     X_ = np.empty((len(X), 26), dtype=float)
-#     X_[:, :9] = X  # original features
-#     X_[:, 9:11] = X[:, 7:9]**2  # age**2, npages**2
-#     X_[:, 11] = X[:, 7] * X[:, 8]  # age * npages
-#     X_[:, 12:19] = X[:, :7] * X[:, [7]]  # cat * age
-#     X_[:, 19:26] = X[:, :7] * X[:, [8]]  # cat * npages
-#     return X_
 
 
 """
@@ -740,28 +720,28 @@ class MimicEstimator():
 
 
 # %% LogReg
-# TODO comment
 """
 ## <a name="linear"></a>Logistic regression
 
-
+We begin with the simplest classification model, logistic regression.
+As shown in the EDA section, setting a linear decision boundary will already provide a very good solution to our problem.
 """
 
 from sklearn.linear_model import LogisticRegression
 
 
 # %%% LR : basic
-# TODO comment
 """
 ### A first model
 
 We reproduce here the basic linear regression from the template, this time including all the features in the fit.
-We do a simple train-test split using the train set, without relying on the test set provided due to limited access at the time of writing.
+For this first model, we keep things simple and perform all the steps explicitely.
 
 
 #### Model construction and training
 
 One hot encoding is done with `pandas.get_dummies`. We drop manually the categories with the largest counts: 'country_US' and 'source_Seo'.
+For model evaluation, we do a simple train-test split using the train set.
 """
 
 # Data to fit
@@ -788,7 +768,15 @@ lr_model.fit(X_tr, y_tr)
 """
 #### Performance assessment
 
-The retained metrics is the F1-score
+The retained evaluation metrics for this problem is the F1-score, computed from the confusion matrix.
+
+We get F1-scores of 0.762 for the train set and 0.774 for the test set. These values are produced by
+about 70% recall and 85% precision. Our model has a tendency to miss conversion events, and in counterpart reduces
+its false positives rate.
+
+This can be interpreted as an effect of the strong imbalance between outcomes. Non-conversion events occur 30 times more frequently.
+This causes an imbalance in the loss function penalties from both sides,
+which in turn tends to repell the decision boundary towards the conversion zone.
 """
 
 print('===== Train set metrics =====')
@@ -814,19 +802,20 @@ t1 = time.time()
 print(f'model fitting time: {t1-t0} s')
 
 ##
-# X_test = pd.read_csv('conversion_data_test.csv')
-# X_test = pd.get_dummies(X_test)
-# X_test = X_test.drop(['country_US', 'source_Seo'], axis=1)
-# y_test = pd.read_csv('conversion_data_test_labels.csv')
-# y_pred = lr_model.predict(X_test)
-# cm = confusion_matrix(y_test, y_pred)
+X_test = pd.read_csv('conversion_data_test.csv')
+X_test = pd.get_dummies(X_test)
+X_test = X_test.drop(['country_US', 'source_Seo'], axis=1)
+y_test = pd.read_csv('conversion_data_test_labels.csv')
+y_pred = lr_model.predict(X_test)
+cm = confusion_matrix(y_test, y_pred)
 
-# print('===== Basic logistic regression =====')
-# print_metrics(cm)
+print('===== Basic logistic regression =====')
+print_metrics(cm)
 
 
 """
-
+The real test set F1-score is 0.754, slightly lower than that of the train set,
+which indicates a (minor) overfitting.
 """
 
 
@@ -867,17 +856,13 @@ pipeline = Pipeline([('column_preprocessing', col_preproc_full),
                      ('classifier', LogisticRegression())])
 
 """
-The default logistic regression classifier uses a threshold probability of 0.5 to classify an observation.
-This corresponds to the minimization of the logistic loss.
-However, we recall that the performance of our model is assessed not by the average logistic loss but through the F1-score.
-Our model can adjust by cross-validation this threshold probability so as to maximize the F1-score. This is done by wrapping the
-pipeline into a `model_selection.TunedThresholdClassifierCV`.
-"""
-
-"""
 #### Training
 
-
+The default logistic regression classifier uses a threshold probability of 0.5 to classify an observation.
+This corresponds to the minimization of the logistic loss.
+However, we recall that the performance of our model is assessed not by the average logistic loss but by the F1-score.
+We can gain further by tuning this decision threshold so as to maximize the F1-score. This is done by wrapping the
+pipeline into a `model_selection.TunedThresholdClassifierCV`.
 """
 
 lr_model_ta = TunedThresholdClassifierCV(
@@ -895,27 +880,26 @@ print(f'best threshold = {best_thr:.8f}',
 
 """
 #### Evaluation on test data
-
 """
 
 # print('\n===== Logistic regression with adjusted decision threshold =====')
 # _, cm = evaluate_model(lr_model_ta)
 # print_metrics(cm)
 
+"""
+
+Compared to that of the non-adjusted linear regression, we get 15% less false negatives, at the expense of 50% more false positives.
+
+"""
+
 
 # %%% LR : ROC
-# TODO comment
 """
 ### Receiver operating charcteristic (ROC) curve
 
 The receiver operating characteristic curve is the natural metric associated to the classification threshold variation.
 We produce the mean curve through 10-times cross validation building a ROC curve from each validation set and averaging the results.
 
-We also use the data to compute the mean confusion matrix at the threshold selected above. Compared to that of the non-adjusted linear regression,
-we get 15% less false negatives, at the expense of 50% more false positives. However,
-
- since the latter are not involved in the computation of the F1 score,
-the overall result is an improved value.
 """
 n_splits = 10
 cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=1234)
@@ -944,11 +928,7 @@ mean_auc = auc(mean_fpr, mean_tpr)
 print('===== CV-estimated metrics =====')
 print_metrics(mean_cm)
 
-
-"""
-We plot the ROC curve in figure 7. The location of our selected threshold is indicated on the curve as an orange cross.
-"""
-
+##
 fig7 = plt.figure(figsize=(4, 4))
 ax7 = fig7.add_axes((0.14, 0.11, 0.76, 0.76))
 
@@ -973,11 +953,11 @@ plt.show()
 
 
 """
-... comment
+We plot the ROC curve in figure 7. The location of our selected threshold is indicated on the curve as an orange cross.
+The AUC is 0.985, which indicates that the simple linear model is quite good.
 """
 
 # %%% LR : interpretation
-# TODO clean
 """
 ### Model interpretation
 
@@ -1046,48 +1026,24 @@ In order to display consistently the decision threshold on the plots made by agg
 by the average over the dataset.
 """
 
-df_ = df.drop('converted', axis=1)
-
+df_ = df.drop(['converted', 'total_pages_visited'], axis=1)
 p_thr = best_thr
 
 ctry_decision_thrs = {}
 for group, gdf in df_.groupby('country'):
-    gdf = gdf.drop('total_pages_visited', axis=1)
     decision_thr = logit(p_thr) - intercept
     for feature, mean in pd.get_dummies(gdf).mean().items():
         decision_thr -= coefs_dict[feature] * mean
     decision_thr /= coefs_dict['total_pages_visited']
     ctry_decision_thrs[group] = decision_thr
 
-
 usr_decision_thrs = {}
 for group, gdf in df_.groupby('new_user'):
-    gdf = gdf.drop('total_pages_visited', axis=1)
     decision_thr = logit(p_thr) - intercept
     for feature, mean in pd.get_dummies(gdf).mean().items():
         decision_thr -= coefs_dict[feature] * mean
     decision_thr /= coefs_dict['total_pages_visited']
     usr_decision_thrs[group] = decision_thr
-
-
-npages = np.arange(30)
-
-country, ctry_counts, ctry_npage_pconv, ctry_npage_std_pconv = prob_distrib(
-    df, group_by='country', variables=['total_pages_visited'], xvals=[npages])
-idx = ~np.isnan(ctry_npage_pconv)
-ctry_popt = []
-for k, i in enumerate(idx):
-    popt_, _ = curve_fit(sigmoid, npages[i], ctry_npage_pconv[k, i], p0=(15, 1))
-    ctry_popt.append(popt_)
-
-usr, usr_counts, usr_npage_pconv, usr_npage_std_pconv = prob_distrib(
-    df, group_by='new_user', variables=['total_pages_visited'], xvals=[npages])
-idx = ~np.isnan(usr_npage_pconv)
-usr_popt = []
-for k, i in enumerate(idx):
-    popt_, _ = curve_fit(sigmoid, npages[i], usr_npage_pconv[k, i], p0=(15, 1))
-    usr_popt.append(popt_)
-
 
 ## plot
 fig8, axs8 = plt.subplots(
@@ -1105,14 +1061,15 @@ for ax in axs8:
 
 axs8[0].set_title('Data aggregated by user status')
 axs8[0].set_ylabel('conversion probabililty')
-for k, (key, val) in enumerate(usr_decision_thrs.items()):
+for k, usr in enumerate(['recur. visitors', 'new visitors']):
     axs8[0].errorbar(
         npages, usr_npage_pconv[k], yerr=usr_npage_std_pconv[k],
         fmt='o', color=f'C{k}', markersize=3, markeredgewidth=0.3,
-        label=f'{key}')
+        label=f'{usr}')
     axs8[0].plot(npages, sigmoid(npages, *usr_popt[k]),
                  linewidth=1, color=f'C{k}')
-    axs8[0].axvline(val, color=f'C{k}', linestyle='--', linewidth=1)
+    axs8[0].axvline(usr_decision_thrs[new_user[k]],
+                    color=f'C{k}', linestyle='--', linewidth=1)
 axs8[0].legend(loc=2)
 
 axs8[1].set_title('Data aggregated by country')
@@ -1137,7 +1094,6 @@ We thus expect that only minimal improvements of the F1 score can be obtained by
 
 
 # %%%% LR decision boundary heatmaps
-# TODO clean
 r"""
 We proceed by computing the decision boundary in the plane of the quantitative variables `'age'` and `'total_pages_visited'`.
 In this case, the boundary for variables $X_i, X_j$ can be expressed as:
@@ -1145,11 +1101,11 @@ $$X_i^{\mathrm{thr}} = \frac{c_j}{c_i}X_j + \frac{\mathrm{logit}(p) - c_0 + \sum
 where, again, we replace the other feature $X_k, k \neq i, j$ by their average over the dataset.
 """
 
+df_ = df_.drop('age', axis=1)
 ##
 dt_slope = - coefs_dict['age'] / coefs_dict['total_pages_visited']
 dt_intercepts = {}
 for group, gdf in df_.groupby('new_user'):
-    gdf = gdf.drop(['age', 'total_pages_visited'], axis=1)
     dt_intercept = logit(p_thr) - intercept
     for feature, mean in pd.get_dummies(gdf).mean().items():
         dt_intercept -= coefs_dict[feature] * mean
@@ -1198,27 +1154,27 @@ cax9.tick_params(which='minor', direction='in', length=3, width=0.8)
 
 plt.show()
 
-"""
+r"""
 Figure 9 shows heatmaps of the conversion probability for recurring visitors (top panel) and new visitors (bottom panel), with the corresponding decision boundaries shown as solid black lines.
 Again, they go through the bayesian boundary $p_{\mathrm{conv}} = 0.5$ in both cases.
 """
-
-
-sys.exit()
 
 # %%% LR : polynomial features
 # TODO comment
 """
 ### Adding polynomial features
 
+Although we saw that we can reasonably expect the decision boundary to be linear, we will now see if considering
+features correlations improves the model further.
 
-The application of the `PolynomialFeatures` preprocessor caused the apparition of many useless features 
-The many (and mostly useless) features added through application of the `PolynomialFeatures` preprocessor were the cause of a significant slowdown
-of the various optimization procedures. 
+Scikit-learn provides a `preprocessing.PolynomialFeatures` to add polynomial features to the dataset. However,
+this class is not well adapted to our situation. We would like to include only a restricted set of polynomials features.
+Indeed, some of them are irrelevant, for instance the product of two one-hot encoded categorical variables is always zero.
+We therefore setup our custom `preprocessing.FunctionTransformer` to include the relevant polynomial features.
 
-A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
-multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
-
+We choose to retain the L2 penalty rather than use the L1 penalty. The main reason of this choice is that the fitting times
+increases with solvers compatible with L1 penalty. Moreover, the polynomial feature engineering changes the feature counts from 10 to 29,
+which is still rather low in regard to the 300k observations.
 
 #### Model construction
 
@@ -1249,28 +1205,46 @@ def poly_features_full(X: np.ndarray) -> np.ndarray:
     X_[:, 21:29] = X[:, :8] * X[:, [9]]  # cat * npages
     return X_
 
+
+
+# print(poly_features_names(0, col_preproc.get_feature_names_out()))
+# sys.exit()
+
 # classifier
+# lr = LogisticRegression(
+#     penalty='l1',
+#     C=0.1,
+#     fit_intercept=True,
+#     class_weight=None,
+#     solver='saga',  # supports elasticnet penalty
+#     random_state=1234,
+#     max_iter=400,
+#     # l1_ratio=0.8
+#     )
 lr = LogisticRegression(
-    penalty='l1',
+    penalty='l2',
     C=0.1,
     fit_intercept=True,
     class_weight=None,
-    solver='saga',  # supports elasticnet penalty
+    solver='lbfgs',
     random_state=1234,
     max_iter=400,
     # l1_ratio=0.8
     )
 
 # full pipeline
-pipeline = Pipeline([('column_preprocessing', col_preproc_full),
-                     ('poly_features', FunctionTransformer(poly_features_full)),
-                     ('classifier', lr)])
+pipeline = Pipeline(
+    [('column_preprocessing', col_preproc_full),
+     ('poly_features', FunctionTransformer(poly_features_full)),
+     ('classifier', lr)])
+
 
 # optimize the regularization
 best_C = gridsearch_cv(pipeline, X, y, 
-                       param_name='C', param_vals=np.logspace(-3, 0, 7),
+                       param_name='C', param_vals=np.logspace(-1, -1, 1),
                        n_splits=10)
 pipeline['classifier'].C = best_C
+
 
 # evaluate by cross-validation
 cm = cv_eval(pipeline, X, y)
@@ -1280,15 +1254,51 @@ print_metrics(cm)
 lr_model_polyfeatures_ta = tune_threshold_cv(pipeline, X, y)
 
 """
-#### Evaluation on test data
+#### Model interpretation
+"""
 
-Our two models are `dict`s and as such do not have the `Estimator` interface (and most notably the `predict` method).
-To perform evaluation, we wrap our model in a class mimicking the sufficient `Estimator` interface for model evaluation on the test data.
+# feature names
+def poly_features_names(input_features)-> list[str]:
+    """
+    Names of the features produced by `poly_features_full`.
+    """
+    feature_names = [fn.split('__')[1] for fn in input_features]
+    fns = feature_names + [f'{fn}^2' for fn in feature_names[-2:]] # age**2, npages**2
+    fns += [f'{feature_names[-2]}_x_{feature_names[-1]}'] # age * npages
+    fns += [f'{fn}_x_{feature_names[-2]}' for fn in feature_names[:-2]] # cat * age
+    fns += [f'{fn}_x_{feature_names[-1]}' for fn in feature_names[:-2]] # cat * npages
+    return fns
+
+##
+features = poly_features_names(col_preproc_full.get_feature_names_out())
+intercept = lr_model_polyfeatures_ta.estimator_['classifier'].intercept_[0]
+coefs = lr_model_polyfeatures_ta.estimator_['classifier'].coef_[0]
+
+print(f'{"intercept":<38} : {intercept: }')
+for feature, coef in zip(features, coefs):
+    print(f'{feature:<38} : {coef: }')
+
+"""
+The model has not changed significantly. The polynomial features 'age'^2, 'total_pages_visited'^2, 'age' x 'total_pages visited'
+have a very low coefficient. The products $\mathrm{quantitative} \times \mathrm{categorical } have similar coefficients and therefore reveal no
+particular correlation either.
+
+This model is thus essentially equivalent to the simple linear model.
+"""
+
+
+"""
+#### Evaluation on test data
 """
 
 # print('===== Logistic regression polynoial features and adjusted decision threshold =====')
 # _, cm = evaluate_model(lr_model_polyfeatures_ta)
 # print_metrics(cm)
+
+"""
+With a F1 score of ***, we conclude that this model expanded with polynomial features is not better
+than the simple linear model.
+"""
 
 
 # %%% LR : split
@@ -1296,16 +1306,12 @@ To perform evaluation, we wrap our model in a class mimicking the sufficient `Es
 """
 ### Splitting the model
 
-
-The application of the `PolynomialFeatures` preprocessor caused the apparition of many useless features 
-The many (and mostly useless) features added through application of the `PolynomialFeatures` preprocessor were the cause of a significant slowdown
-of the various optimization procedures. 
-
 A final approach, backed by intuition, is to consider each `'country'` and `'new_user'` value as leading to a different behavior. We can thus split the dataset into
 multiple datasets, corresponding to a (country, new_user) pair, and fit a different model on each one. The predictions will then be made by dispatching to the appropriate model.
 
 
 #### Model construction
+
 
 """
 
@@ -1323,25 +1329,25 @@ col_preproc_split = ColumnTransformer(
      ('quant_scaler', StandardScaler(), split_quant_vars)])
 
 
-# custom feature engineering
-def poly_features_split(X: np.ndarray) -> np.ndarray:
-    """
-    Custom polynomial features construction:
-        - Original features, Xi
-        - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
-        - Products of categorical and quantitative features, Xi_cat * Xj_quant
+# # custom feature engineering
+# def poly_features_split(X: np.ndarray) -> np.ndarray:
+#     """
+#     Custom polynomial features construction:
+#         - Original features, Xi
+#         - 2nd order polynomials of quantitative features, Xi^2, Xi*Xj
+#         - Products of categorical and quantitative features, Xi_cat * Xj_quant
         
-    This function is adapted to datasets *split* according to 'new_user' and
-    'country', preprocessed with one-hot encoding of the remaining categorical
-    variable 'source'.
-    """
-    X_ = np.empty((len(X), 13), dtype=float)
-    X_[:, :5] = X  # original features
-    X_[:, 5:7] = X[:, 3:5]**2  # age**2, npages**2
-    X_[:, 7] = X[:, 3] * X[:, 4]  # age * npages
-    X_[:, 7:10] = X[:, :3] * X[:, [3]]  # cat * age
-    X_[:, 10:13] = X[:, :3] * X[:, [4]]  # cat * npages
-    return X_
+#     This function is adapted to datasets *split* according to 'new_user' and
+#     'country', preprocessed with one-hot encoding of the remaining categorical
+#     variable 'source'.
+#     """
+#     X_ = np.empty((len(X), 13), dtype=float)
+#     X_[:, :5] = X  # original features
+#     X_[:, 5:7] = X[:, 3:5]**2  # age**2, npages**2
+#     X_[:, 7] = X[:, 3] * X[:, 4]  # age * npages
+#     X_[:, 7:10] = X[:, :3] * X[:, [3]]  # cat * age
+#     X_[:, 10:13] = X[:, :3] * X[:, [4]]  # cat * npages
+#     return X_
 
 
 # classifier
@@ -1355,11 +1361,11 @@ def poly_features_split(X: np.ndarray) -> np.ndarray:
 #     l1_ratio=0.8,
 # )
 lr_split = LogisticRegression(
-    penalty='l1',
+    penalty='l2',
     C=0.1,
     fit_intercept=True,
     class_weight=None,
-    solver='saga',  # supports elasticnet penalty
+    solver='lbfgs',  # supports elasticnet penalty
     random_state=1234,
     # l1_ratio=0.8,
 )
@@ -1367,14 +1373,14 @@ lr_split = LogisticRegression(
 # full pipeline, including polynomial feature generation
 pipeline = Pipeline(
     [('column_preprocessing', col_preproc_split),
-     ('poly_features', FunctionTransformer(poly_features_split)),
+     # ('poly_features', FunctionTransformer(poly_features_split)),
      ('classifier', lr_split)]
 )
 pipelines = {idx: clone(pipeline) for idx in Xs}
 
 # optimize the regularization
 best_Cs = multimodel_gridsearch_cv(
-    pipelines, Xs, ys, param_name='shrinkage', param_vals=np.logspace(-3, 0, 7))
+    pipelines, Xs, ys, param_name='C', param_vals=np.logspace(-3, 0, 7))
 for idx, pipeline in pipelines.items():
     pipeline['classifier'].C = best_Cs[idx]
 
@@ -1431,7 +1437,6 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 # classifier
 lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
-
 
 # pipeline
 pipeline = Pipeline(
