@@ -288,6 +288,7 @@ Follow up
 7_3 : attributes importance ; 100 pts total
 """
 
+# these represent intrinsic attributes, ie exclude interest sharing
 attributes = ['Attractive', 'Sincere', 'Intelligent', 'Fun', 'Ambitious']
 attr_kw = ['attr', 'sinc', 'intel', 'fun', 'amb']
 
@@ -311,17 +312,41 @@ Focus on the self assessment: same scale, 4 evals.
 """
 ##
 cols = [kw + f'3_{j}' for j in [1, 's', 2, 3] for kw in attr_kw]
-# data = {'Before dating': subject_df.loc[:, cols[0]].count().to_numpy(),
-#         'During dating': ,
-#         'After dating': subject_df.loc[:, cols[1]].count().to_numpy(),
-#         'Follow-up': subject_df.loc[:, cols[2]].count().to_numpy()}
-df_ = subject_df.loc[:, cols]
-df_.count()
+self_eval_df = subject_df.loc[:, cols]
+self_eval_df.count()
 
+# 4 sets of self assessed attributes
+self_attrs = np.array(np.split(self_eval_df.to_numpy(), 4, axis=1))
+diffs = [self_attrs[i+1] - self_attrs[i] for i in range(3)]
+diffs = [d[~np.any(np.isnan(d), axis=1)] for d in diffs]
+
+diffs = [self_attrs[2] - self_attrs[0]]
+diffs = [d[~np.any(np.isnan(d), axis=1)] for d in diffs]
+# diffs = [(df_.iloc[:, 5*(i+1):5*(i+2)] - df_.iloc[:, 5*i:5*(i+1)]).to_numpy()
+#          for i in range(3)]
 
 # fig: check that acceptable
 
+fig4, axs4 = plt.subplots(
+    nrows=1, ncols=5, figsize=(7.5, 4.2),
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11, 'hspace': 0.08})
+fig4.suptitle("Figure 3: Violin plots",
+              x=0.02, ha='left')
 
+for i, ax in enumerate(axs4):
+    vplot = ax.boxplot(
+        [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
+# for i, m in enumerate(mean_interests.T[1]):
+#     axs4[0].plot([i-0.2, i+0.2], [m, m])
+
+# axs4[0].set_xlim(0.5, 17.5)
+# axs4[0].tick_params(bottom=False, labelbottom=False)
+# axs4[0].set_ylim(0, 14)
+# axs4[0].set_ylabel('Score', y=-0.05, labelpad=10)
+# axs4[0].grid(visible=True, axis='y', linewidth=0.3)
+# axs4[0].legend(handles=[vplot['bod~es'][0]], labels=['Female'], ncols=2)
+
+plt.show()
 
 
 #%%
@@ -340,6 +365,38 @@ Define scope
   -> what I look for (!!! add 'shar' attr)
 """
 
+# self-evauated attributes
+se_iids = self_eval_df.index.to_numpy()[~np.all(np.isnan(self_attrs), axis=(0, 2))]
+se_attrs = self_attrs[:, ~np.all(np.isnan(self_attrs), axis=(0, 2))]
+se_attrs = np.mean(se_attrs, axis=0, where=~np.isnan(se_attrs))
+
+# partner-evaluated attributes
+pe_iids, pe_attrs = [], []
+partner_eval_df = df.loc[:, ['iid'] + attr_kw]
+for iid, df_ in partner_eval_df.groupby('iid'):
+    attr_eval = df_.loc[:, attr_kw].to_numpy()
+    mask = ~np.isnan(attr_eval)
+    if np.all(np.any(mask, axis=0)):
+        pe_iids.append(iid)
+        pe_attrs.append(np.mean(attr_eval, axis=0, where=mask))
+pe_iids, pe_attrs = np.array(pe_iids), np.array(pe_attrs)
+
+# evaluation differences
+se_idx = np.isin(se_iids, pe_iids, assume_unique=True)
+pe_idx = np.isin(pe_iids, se_iids, assume_unique=True)
+eval_diff = se_attrs[se_idx] - pe_attrs[pe_idx]
+
+
+## plot
+fig4, axs4 = plt.subplots(
+    nrows=1, ncols=5, figsize=(7.5, 4.2),
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11, 'hspace': 0.08})
+fig4.suptitle("Figure 3: Violin plots",
+              x=0.02, ha='left')
+
+for i, ax in enumerate(axs4):
+    vplot = ax.boxplot(
+        [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
 
 
 
@@ -349,6 +406,7 @@ Construct pair evaluation: attr eval by dating partners
 -> diff with self assessment
 -> diff with 
 """
+
 
 
 
