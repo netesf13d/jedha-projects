@@ -12,7 +12,6 @@ import time
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
@@ -53,7 +52,9 @@ def evaluate_model(model,
     return y_pred, cm
 
 
-def print_metrics(cm: np.ndarray)-> None:
+def print_metrics(cm: np.ndarray,
+                  print_cm: bool = True,
+                  print_precrec: bool = True)-> None:
     """
     Print metrics related to the confusion matrix: precision, recall, F1-score.
     """
@@ -61,8 +62,10 @@ def print_metrics(cm: np.ndarray)-> None:
     recall = (cm[1, 1] / t) if t != 0 else 1.
     t = np.sum(cm, axis=0)[1]
     prec = (cm[1, 1] / t) if t != 0 else 1.
-    print("Confusion matrix\n", cm / np.sum(cm))
-    print(f'Precision: {prec:.8}; recall: {recall:.8}')
+    if print_cm:
+        print("Confusion matrix\n", cm / np.sum(cm))
+    if print_precrec:
+        print(f'Precision: {prec:.8}; recall: {recall:.8}')
     print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
 
 
@@ -71,7 +74,7 @@ def tune_thr_cv(model, X: pd.DataFrame, y: pd.DataFrame,
                 n_splits: int = 10)-> float:
     """
     Tune the classification threshold according to the F1-score.
-    X and y correspond to raw data, to be classified,
+    X and y correspond to raw data, to be classified.
     """
     cms = np.zeros((2, 2, len(thrs)))
     thrs = np.reshape(thrs, (-1, 1))
@@ -137,25 +140,29 @@ cat_vars = ['country', 'source']
 bool_vars = ['new_user']
 quant_vars = ['age', 'total_pages_visited']
 
-
+sys.exit()
 # %% Gradient boosting regressor
 
 """
 ## <a name="gbr"></a>Gradient boosting
 
-
+Gradient boosting is a performant method in general, although usually slow to train.
+However, with our reduced dataset, the training times are now affordable.
 
 ### Model construction
+
+Owing to the greatly reduced training times, we set the number of estimators to 10000
+in the regressor.
 """
 
 # column preprocessing
 tree_col_preproc = ColumnTransformer(
     [('cat_oe', OrdinalEncoder(), cat_vars),
-     ('id_', FunctionTransformer(None), bool_vars + quant_vars)])
+     ('id_', FunctionTransformer(feature_names_out='one-to-one'), bool_vars + quant_vars)])
 
 # regressor
 gbr = GradientBoostingRegressor(loss='squared_error',
-                                learning_rate=0.1,
+                                learning_rate=0.01,
                                 n_estimators=10000,
                                 max_depth=2,
                                 random_state=1234,
@@ -164,6 +171,10 @@ gbr = GradientBoostingRegressor(loss='squared_error',
 # pipeline
 pipeline = Pipeline([('column_preprocessing', tree_col_preproc),
                      ('regressor', gbr)])
+
+"""
+### Model optimization, training and evaluation
+"""
 
 # parameter optimization : `max_depth`
 gbr_model = GridSearchCV(
@@ -177,29 +188,30 @@ print(f'found best learning_rate: {best_learning_rate}')
 # best_max_depth = gbr_model.best_params_['regressor__max_depth']
 # print(f'found best max_depth: {best_max_depth}')
 
+##
 pipeline['regressor'].learning_rate = best_learning_rate
 # pipeline['regressor'].max_depth = 2 # best_max_depth
+
 thr, cm = tune_thr_cv(clone(pipeline), X_clf, y_clf)
 print(f'best decision threshold: {thr}')
 print_metrics(cm)
 
 """
+The F1-score is quite good, with a value of 0.7676 that matches what was obtained with the logistic regression.
 
+
+### Evaluation on test data
 """
 
+print('===== Gradient boosting regressor-baser classifier =====')
+_, cm = evaluate_model(Classifier(gbr_model, thr))
+print_metrics(cm)
 
 """
-### Model evaluation on test data
-
-
+The obtained F1-score, 0.757, is lower than that of the `HistGradientBoostingClassifier` built above.
+It is also significantly lower than the value obtained by cross-validation. There is a possible overfitting
+that was mitigated by the histogram aggregation.
 """
-
-# print('===== Gradient boosting regressor-baser classifier =====')
-# _, cm = evaluate_model(Classifier(gbr_model, thr))
-# print_metrics(cm)
-# sys.exit()
-
-
 
 # %% SVM
 
@@ -213,13 +225,15 @@ In this section we fit a SVM with a radial-basis function kernel on the conversi
 fitting times to optimize the model parameters `gamma` and `C`, along with the decision threshold. 
 
 ### Model construction
-"""
 
+Rather than to optimize the parameters, we rely on the default values provided,
+which are actually very close to values found by optimization.
+"""
 
 # column preprocessing
 col_preproc = ColumnTransformer(
     [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
-     ('bool_id', FunctionTransformer(None), bool_vars),
+     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
      ('quant_scaler', StandardScaler(), quant_vars)])
 
 # regressor
@@ -233,29 +247,31 @@ pipeline = Pipeline([('column_preprocessing', col_preproc),
                      ('regressor', svr)])
 
 """
-### Parameter optimization
+### Model optimization, training and evaluation
 """
 
 # parameter optimization
-gamma_vals = np.repeat(np.logspace(-2, 1, 7), 7)
-C_vals = np.tile(np.logspace(-2, 1, 7), 7)
-epsilon_vals = np.logspace(-2, 1, 7)
-svr_model = GridSearchCV(
-    pipeline,
-    param_grid={#'regressor__gamma': gamma_vals, 'regressor__C': C_vals,
-                'regressor__epsilon': epsilon_vals},
-    scoring='neg_mean_squared_error', n_jobs=6, refit=True, cv=5)
-svr_model.fit(X, y)
-# best_gamma = svr_model.best_params_['regressor__gamma'] # 0.1
-# best_C = svr_model.best_params_['regressor__C'] # 1.
-best_epsilon = svr_model.best_params_['regressor__epsilon']
-# print(f'found best C: {best_C}; best gamma: {best_gamma}')
-print(f'found best epsilon: {best_epsilon}')
+# gamma_vals = np.repeat(np.logspace(-2, 1, 7), 7)
+# C_vals = np.tile(np.logspace(-2, 1, 7), 7)
+# epsilon_vals = np.logspace(-2, 1, 7)
+# svr_model = GridSearchCV(
+#     pipeline,
+#     param_grid={#'regressor__gamma': gamma_vals, 'regressor__C': C_vals,
+#                 'regressor__epsilon': epsilon_vals},
+#     scoring='neg_mean_squared_error', n_jobs=6, refit=True, cv=5)
+# svr_model.fit(X, y)
+# # best_gamma = svr_model.best_params_['regressor__gamma'] # 0.1
+# # best_C = svr_model.best_params_['regressor__C'] # 1.
+# best_epsilon = svr_model.best_params_['regressor__epsilon']
+# # print(f'found best C: {best_C}; best gamma: {best_gamma}')
+# print(f'found best epsilon: {best_epsilon}')
+
+svr_model = pipeline.fit(X, y)
 
 # decision threshold tuning
 # pipeline['regressor'].gamma = best_gamma
 # pipeline['regressor'].C = best_C
-pipeline['regressor'].epsilon = best_epsilon # 0.0316
+# pipeline['regressor'].epsilon = best_epsilon # 0.0316
 thr, cm = tune_thr_cv(clone(pipeline), X_clf, y_clf)
 print(f'best decision threshold: {thr}')
 print_metrics(cm)
@@ -272,9 +288,10 @@ This is a hint that the two models must behave very similarly.
 ### Model evaluation on test data
 """
 
-# print('===== Gradient boosting regressor-baser classifier =====')
-# _, cm = evaluate_model(Classifier(svr_model, thr))
-# print_metrics(cm)
+
+print('===== Gradient boosting regressor-based classifier =====')
+_, cm = evaluate_model(Classifier(svr_model, thr))
+print_metrics(cm)
 
 """
 
