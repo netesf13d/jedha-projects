@@ -55,6 +55,8 @@ for c in cols:
 
 # %% age and income histograms
 
+# TODO split by gender
+
 def textstr(df: pd.DataFrame)-> str:
     text = (f'Mean   : {df.mean():.2f}\n'
             f'Std dev : {df.std():.2f}'
@@ -564,6 +566,12 @@ Expected nb of likes / matches vs reality. for women and men
 """
 
 iids = []
+female_idx = [i for i, iid in enumerate(iids)
+            if subject_df.loc[iid, 'gender'] == 0]
+male_idx = [i for i, iid in enumerate(iids)
+            if subject_df.loc[iid, 'gender'] == 1]
+
+
 nmatch, nlike = [], []
 for iid, df_ in df.loc[:, ['iid', 'match', 'dec']].groupby('iid'):
     iids.append(iid)
@@ -571,10 +579,10 @@ for iid, df_ in df.loc[:, ['iid', 'match', 'dec']].groupby('iid'):
     nlike.append(df_['dec'].sum())
 # idx = np.argsort(iids)
 nmatch = np.array(nmatch)
-exp_nmatch = subject_df.loc[iids, 'expnum'].to_numpy()
+exp_nmatch = subject_df.loc[iids, 'match_es'].to_numpy()
 exp_nlike = subject_df.loc[iids, 'expnum'].to_numpy()
     
-
+## plot 
 
 
 
