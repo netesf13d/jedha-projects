@@ -16,7 +16,8 @@ import matplotlib.pyplot as plt
 # def to_float(series: pd.Series)-> np.ndarray:
 #     """
 #     Convert a series of floats loaded as objects into an array of floats.
-#     The floats in the raw dataset have format 'xxx,xxx.xx'The floats in the raw dataset have format 'xxx,xxx.xx', the comma prevents
+#     The floats in the raw dataset have format 'xxx,xxx.xx'The floats in the raw
+# dataset have format 'xxx,xxx.xx', the comma prevents
 #     automatic casting to float.
 #     """
 #     arr = [x if isinstance(x, float) else float(x.replace(',', ''))
@@ -107,7 +108,8 @@ plt.show()
 
 """
 Subjects are students at Columbia university hence realtively young
-The median household income is rather low, as expected for students which have generally not started their professional life.
+The median household income is rather low, as expected for students which have generally
+not started their professional life.
 The SAT scores are higher than average, as expected for people who follow graduate studies.
 """
 
@@ -308,45 +310,67 @@ Less responses over time
 
 #%%
 """
-Focus on the self assessment: same scale, 4 evals.
+Focus on the self assessment and what I look for: same scale, 4 evals.
+
 """
 ##
-cols = [kw + f'3_{j}' for j in [1, 's', 2, 3] for kw in attr_kw]
-self_eval_df = subject_df.loc[:, cols]
-self_eval_df.count()
+ev_cols = [kw + f'3_{j}' for j in [1, 's', 2, 3] for kw in attr_kw]
+self_ev_df = subject_df.loc[:, ev_cols] # self evaluation dataframe
+self_ev_df.count()
 
+"""
+We only consider the difference between after and before, since
+there are less counts for the other situations, during and followup.
+"""
+##
 # 4 sets of self assessed attributes
-self_attrs = np.array(np.split(self_eval_df.to_numpy(), 4, axis=1))
-diffs = [self_attrs[i+1] - self_attrs[i] for i in range(3)]
-diffs = [d[~np.any(np.isnan(d), axis=1)] for d in diffs]
+self_ev = np.array(np.split(self_ev_df.to_numpy(), 4, axis=1))
+ev_diff = self_ev[2] - self_ev[0]
+ev_diff = ev_diff[~np.any(np.isnan(ev_diff), axis=1)]
 
-diffs = [self_attrs[2] - self_attrs[0]]
-diffs = [d[~np.any(np.isnan(d), axis=1)] for d in diffs]
-# diffs = [(df_.iloc[:, 5*(i+1):5*(i+2)] - df_.iloc[:, 5*i:5*(i+1)]).to_numpy()
-#          for i in range(3)]
 
-# fig: check that acceptable
+## do the same with what I look for
+lf_cols = [kw + f'1_{j}' for j in [1, 's', 2, 3] for kw in attr_kw]
+self_lf_df = subject_df.loc[:, lf_cols] # self lookfor dataframe
+self_lf_df.count()
 
+self_lf = np.array(np.split(self_lf_df.to_numpy(), 4, axis=1))
+self_lf = 100 * self_lf / np.sum(self_lf, axis=-1, keepdims=True)
+lf_diff = self_lf[2] - self_lf[0]
+lf_diff = lf_diff[~np.any(np.isnan(lf_diff), axis=1)]
+
+
+##
 fig4, axs4 = plt.subplots(
-    nrows=1, ncols=5, figsize=(7.5, 4.2),
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11, 'hspace': 0.08})
-fig4.suptitle("Figure 3: Violin plots",
+    nrows=2, ncols=5, figsize=(7.5, 6.2), 
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11,
+                 'wspace': 0, 'hspace': 0.2})
+fig4.suptitle("Figure 4: Violin plots",
               x=0.02, ha='left')
 
-for i, ax in enumerate(axs4):
-    vplot = ax.boxplot(
-        [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
-# for i, m in enumerate(mean_interests.T[1]):
-#     axs4[0].plot([i-0.2, i+0.2], [m, m])
+# vplot = ax.boxplot( for d in diffs], widths=0.6, bootstrap=10)
+for i, ax in enumerate(axs4[0]):
+    ax.hist(ev_diff[:, i], bins=np.linspace(-5.5, 5.5, 10),
+            orientation='horizontal')
+    ax.set_xlim(0, 300)
+    ax.set_ylim(-5, 5)
+    ax.grid(visible=True, axis='x', linewidth=0.3)
+    
 
-# axs4[0].set_xlim(0.5, 17.5)
-# axs4[0].tick_params(bottom=False, labelbottom=False)
-# axs4[0].set_ylim(0, 14)
-# axs4[0].set_ylabel('Score', y=-0.05, labelpad=10)
-# axs4[0].grid(visible=True, axis='y', linewidth=0.3)
-# axs4[0].legend(handles=[vplot['bod~es'][0]], labels=['Female'], ncols=2)
+for i, ax in enumerate(axs4[1]):
+    ax.hist(lf_diff[:, i], bins=np.linspace(-14.5, 14.5, 30),
+            orientation='horizontal')
+    ax.set_xlim(0, 120)
+    ax.set_ylim(-15, 15)
+    ax.grid(visible=True, axis='x', linewidth=0.3)
+
 
 plt.show()
+
+"""
+No major change over time, maybe a slight decrease, indicating that people tend to
+overestimate themselves.
+"""
 
 
 #%%
@@ -363,54 +387,124 @@ Define scope
 - Differences of look for between M/F
   -> how I perceive myself
   -> what I look for (!!! add 'shar' attr)
+
+
+Here : how I perceive myself vs how ppl perceive me.
 """
 
 # self-evauated attributes
-se_iids = self_eval_df.index.to_numpy()[~np.all(np.isnan(self_attrs), axis=(0, 2))]
-se_attrs = self_attrs[:, ~np.all(np.isnan(self_attrs), axis=(0, 2))]
-se_attrs = np.mean(se_attrs, axis=0, where=~np.isnan(se_attrs))
+sev_iids = self_ev_df.index.to_numpy()[~np.all(np.isnan(self_ev), axis=(0, 2))]
+sev_genders = subject_df.loc[sev_iids]['gender'].to_numpy()
+sev_attrs = self_ev[:, ~np.all(np.isnan(self_ev), axis=(0, 2))]
+sev_attrs = np.mean(sev_attrs, axis=0, where=~np.isnan(sev_attrs))
 
 # partner-evaluated attributes
-pe_iids, pe_attrs = [], []
-partner_eval_df = df.loc[:, ['iid'] + attr_kw]
-for iid, df_ in partner_eval_df.groupby('iid'):
+pev_iids, pev_attrs = [], []
+partner_ev_df = df.loc[:, ['pid'] + attr_kw] # self evaluates partned
+for iid, df_ in partner_ev_df.groupby('pid'):
     attr_eval = df_.loc[:, attr_kw].to_numpy()
     mask = ~np.isnan(attr_eval)
     if np.all(np.any(mask, axis=0)):
-        pe_iids.append(iid)
-        pe_attrs.append(np.mean(attr_eval, axis=0, where=mask))
-pe_iids, pe_attrs = np.array(pe_iids), np.array(pe_attrs)
+        pev_iids.append(iid)
+        pev_attrs.append(np.mean(attr_eval, axis=0, where=mask))
+pev_iids, pev_attrs = np.array(pev_iids), np.array(pev_attrs)
+pev_genders = subject_df.loc[pev_iids]['gender'].to_numpy()
 
 # evaluation differences
-se_idx = np.isin(se_iids, pe_iids, assume_unique=True)
-pe_idx = np.isin(pe_iids, se_iids, assume_unique=True)
-eval_diff = se_attrs[se_idx] - pe_attrs[pe_idx]
+sev_idx = np.isin(sev_iids, pev_iids, assume_unique=True)
+pev_idx = np.isin(pev_iids, sev_iids, assume_unique=True)
+ev_diff = sev_attrs[sev_idx] - pev_attrs[pev_idx]
+ev_genders = sev_genders[sev_idx]
 
 
 ## plot
-fig4, axs4 = plt.subplots(
-    nrows=1, ncols=5, figsize=(7.5, 4.2),
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11, 'hspace': 0.08})
-fig4.suptitle("Figure 3: Violin plots",
+fig5, axs5 = plt.subplots(
+    nrows=3, ncols=5, figsize=(7.5, 8.2),
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11,
+                 'wspace': 0, 'hspace': 0.08})
+fig5.suptitle("Figure 5: Differences between self evaluated and partner evaluated attributes",
               x=0.02, ha='left')
 
-for i, ax in enumerate(axs4):
-    vplot = ax.boxplot(
-        [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
 
 
+for i, ax in enumerate(axs5[2]):
+    evd_f = ev_diff[ev_genders==0, i]
+    evd_m = ev_diff[ev_genders==1, i]
+    ax.hist(evd_f, bins=np.linspace(-14.5, 14.5, 30),
+            orientation='horizontal')
+    ax.hist(evd_m, bins=np.linspace(-14.5, 14.5, 30),
+            orientation='horizontal')
+    ax.axhline(np.mean(ev_diff[:, i]), color='k', linestyle='--')
+    ax.set_xlim(0, 200)
+    ax.set_ylim(-10, 10)
+    ax.grid(visible=True, axis='x', linewidth=0.3)
+    # vplot = ax.boxplot(
+    #     [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
+
+plt.show()
 
 #%%
 """
-Construct pair evaluation: attr eval by dating partners
--> diff with self assessment
--> diff with 
+What I think I look for vs what I actually look for
+
+The data is in some cases on a 1-10 scale, in other cases on a 100 pts total
+scale. In this latter case, 
+
+
+We compute the self-evaluated lookfor in the same way as the self evaluation of one'own attributes,
+that is by averaging (after scaling) all the data available : before, during after, and at followup
+For the real lookfor, we average the attributes of the people that the subject 'liked'.
 """
 
+# self-evauated attributes
+slf_iids = self_lf_df.index.to_numpy()[~np.all(np.isnan(self_lf), axis=(0, 2))]
+slf_genders = subject_df.loc[slf_iids]['gender'].to_numpy()
+slf_attrs = self_lf[:, ~np.all(np.isnan(self_ev), axis=(0, 2))]
+slf_attrs = np.mean(slf_attrs, axis=0, where=~np.isnan(slf_attrs))
+
+# partner-evaluated attributes
+plf_iids, plf_attrs = [], []
+partner_lf_df = df.loc[:, ['iid', 'dec'] + attr_kw] # like partner <-> look for in partner
+for (iid, dec), df_ in partner_lf_df.groupby(['iid', 'dec']):
+    if dec == 1: # consider only people 'liked'
+        attr_eval = df_.loc[:, attr_kw].to_numpy()
+        mask = ~np.isnan(attr_eval)
+        if np.all(np.any(mask, axis=0)):
+            plf_iids.append(iid)
+            plf_attrs.append(np.mean(attr_eval, axis=0, where=mask))
+plf_iids, plf_attrs = np.array(plf_iids), np.array(plf_attrs)
+plf_genders = subject_df.loc[plf_iids]['gender'].to_numpy()
+
+# evaluation differences
+slf_idx = np.isin(slf_iids, plf_iids, assume_unique=True)
+plf_idx = np.isin(plf_iids, slf_iids, assume_unique=True)
+eval_diff = slf_attrs[slf_idx] - plf_attrs[plf_idx]
 
 
 
+## plot
+fig6, axs6 = plt.subplots(
+    nrows=3, ncols=5, figsize=(7.5, 8.2),
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11,
+                 'wspace': 0, 'hspace': 0.08})
+fig6.suptitle("Figure 6: Differences between self",
+              x=0.02, ha='left')
 
+
+# for i, ax in enumerate(axs4):
+#     vplot = ax.boxplot(
+#         [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
+# for i, m in enumerate(mean_interests.T[1]):
+#     axs4[0].plot([i-0.2, i+0.2], [m, m])
+
+# axs4[0].set_xlim(0.5, 17.5)
+# axs4[0].tick_params(bottom=False, labelbottom=False)
+# axs4[0].set_ylim(0, 14)
+# axs4[0].set_ylabel('Score', y=-0.05, labelpad=10)
+# axs4[0].grid(visible=True, axis='y', linewidth=0.3)
+# axs4[0].legend(handles=[vplot['bod~es'][0]], labels=['Female'], ncols=2)
+
+plt.show()
 
 
 # %%
@@ -427,16 +521,71 @@ pair_cols = [c for c in df.columns if c not in subject_df.columns]
 - Race match matrix
 - nb likes vs each attr
 - nb likes vs income
-- primality effect: nb likes vs 'order'
+OK - primality effect: nb likes vs 'order'
 - matches vs 'int_corr'
+- 'match_es' vs real number of matches
+NO - integral of like 'prob' vs number of likes
+- 'expnum' vs actual nb of likes
 """
 
+"""
+Let us now explore the dating results proper.
+"""
+
+race_match_df = df.loc[:, ['match', 'race', 'race_o']]
+norm = race_match_df.groupby(['race', 'race_o']).count()
+matches = race_match_df.loc[df['match']==1].groupby(['race', 'race_o']).count()
+
+match_idx = {k: i for i, k in enumerate(list(races.keys()))}
+race_matches = np.zeros((len(races), len(races)), dtype=float)
+for (i, j), v in (matches/norm).iterrows():
+    race_matches[match_idx[i], match_idx[j]] = v['match']
+
+
+## Plot heatmap
+fig7, axs7 = plt.subplots(
+    nrows=2, ncols=1, figsize=(5.5, 5.2),
+    gridspec_kw={'left': 0.105, 'right': 0.82, 'top': 0.9, 'bottom': 0.11, 'hspace': 0.06})
+cax7 = fig7.add_axes((0.905, 0.11, 0.036, 0.77))
+fig7.suptitle('Figure 9: Decision boundaries in the (age, total_pages_visited) plane', x=0.02, ha='left')
+
+# for k, ax in enumerate(axs9):
+#     ax.set_aspect('equal')
+#     heatmap = ax.pcolormesh(
+#         xx, yy, pconv[k, :-1, 17:-1], cmap='coolwarm', vmin=0, vmax=1)
+#     ax.plot(x_dt, dt_intercepts[new_user[k]] + x_dt * dt_slope,
+#             color='k')
+#     ax.set_xlim(16, 80)
+#     ax.set_ylim(0, 30)
+
+# %%
+"""
+Expected nb of likes / matches vs reality. for women and men
+"""
+
+iids = []
+nmatch, nlike = [], []
+for iid, df_ in df.loc[:, ['iid', 'match', 'dec']].groupby('iid'):
+    iids.append(iid)
+    nmatch.append(df_['match'].sum())
+    nlike.append(df_['dec'].sum())
+# idx = np.argsort(iids)
+nmatch = np.array(nmatch)
+exp_nmatch = subject_df.loc[iids, 'expnum'].to_numpy()
+exp_nlike = subject_df.loc[iids, 'expnum'].to_numpy()
+    
 
 
 
 
+# %%
+"""
+number of likes vs dating order
+"""
 
-
-
+order_counts = df['order'].value_counts().to_numpy()
+likes_vs_order = df['order'].loc[df['dec'] == 1].value_counts()
+like_prob = df.loc[:, ['order', 'dec']].groupby('order').mean()['dec'].to_numpy()
+like_std = like_prob * (1 - like_prob) / np.sqrt(order_counts)
 
 
