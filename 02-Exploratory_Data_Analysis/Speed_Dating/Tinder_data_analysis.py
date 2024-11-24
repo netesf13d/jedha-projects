@@ -520,7 +520,7 @@ pair_cols = [c for c in df.columns if c not in subject_df.columns]
 # %%
 """
 - Age diff in matches distrib
-- Race match matrix
+OK - Race match matrix
 - nb likes vs each attr
 - nb likes vs income
 OK - primality effect: nb likes vs 'order'
