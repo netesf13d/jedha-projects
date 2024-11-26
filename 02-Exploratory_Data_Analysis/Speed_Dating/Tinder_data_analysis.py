@@ -34,7 +34,6 @@ fname = "./Speed+Dating+Data.csv"
 df = pd.read_csv(fname, encoding='mac_roman', thousands=',', decimal='.')
 
 
-
 subject_entries = pd.concat([pd.Series([True], index=['iid']),
                              df.groupby('iid').nunique().max() <= 1])
 partner_entries = ~subject_entries
@@ -44,13 +43,14 @@ subject_cols = df.columns[subject_entries]
 subject_df = df[subject_cols].groupby('iid').aggregate(lambda x: x.iloc[0])
 # subject_df.loc[:, 'race'] = subject_df['race'].astype(int)
 
+pair_cols = [c for c in df.columns if c not in subject_df.columns]
 
-# %%
 
-cols = ['age', 'income', 'mn_sat']
-for c in cols:
-    if sum(~np.isnan(subject_df[c])) > 276:
-        print(c)
+
+# cols = ['age', 'income', 'mn_sat']
+# for c in cols:
+#     if sum(~np.isnan(subject_df[c])) > 276:
+#         print(c)
 
 
 # %% age and income histograms
@@ -204,58 +204,58 @@ mean_interests = interests_df.groupby('gender').mean()
 interests_df.describe()
 
 ##
-interests_df = interests_df.astype({'gender': object})
-interests_df.loc[:, 'gender'] = interests_df['gender'].replace(genders)
-interests_data = {}
-for gender, df_ in interests_df.groupby('gender'):
-    cols = [inter.to_numpy() for _, inter in df_.iloc[:, 1:].items()]
-    interests_data[gender] = [col[~np.isnan(col)] for col in cols]
-# ages, incomes = {}, {}
-# for (race,), df_ in racial_df.groupby(['race']):
-    
-#     vals_f = df_.loc[df_['gender'] == 'Female', 'age']
-#     vals_m = df_.loc[df_['gender'] == 'Male', 'age']
-#     ages[race] = [vals_f[~np.isnan(vals_f)], vals_m[~np.isnan(vals_m)]]
-    
-#     vals_f = df_.loc[df_['gender'] == 'Female', 'income']
-#     vals_m = df_.loc[df_['gender'] == 'Male', 'income']
-#     incomes[race] = [vals_f[~np.isnan(vals_f)], vals_m[~np.isnan(vals_m)]]
+interests_data = interests_df.iloc[:, 1:].to_numpy().T
+interests_data = [col[~np.isnan(col)] for col in interests_data]
+
+# interests_df = interests_df.astype({'gender': object})
+# interests_df.loc[:, 'gender'] = interests_df['gender'].replace(genders)
+# gdf = interests_df.groupby('gender').mean()
+
+# m_interests = gdf.get_group('Male').iloc[:, 1:].to_numpy().T
+# m_interests = [col[~np.isnan(col)] for col in m_interests]
+# f_interests = gdf.get_group('Female').iloc[:, 1:].to_numpy().T
+# f_interests = [col[~np.isnan(col)] for col in f_interests]
+
+# interests_data = {}
+# for gender, df_ in interests_df.groupby('gender'):
+#     cols = [inter.to_numpy() for _, inter in df_.iloc[:, 1:].items()]
+#     interests_data[gender] = [col[~np.isnan(col)] for col in cols]
+# interests = [np.concat((c1, c2)) for c1, c2 in zip()]
 
 
-fig3, axs3 = plt.subplots(
-    nrows=2, ncols=1, figsize=(7.5, 5.2),
+fig3, ax3 = plt.subplots(
+    nrows=1, ncols=1, figsize=(7.5, 5.2),
     gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11, 'hspace': 0.08})
 fig3.suptitle("Figure 3: Violin plots",
               x=0.02, ha='left')
 
 
-vplot = axs3[0].violinplot(
-    interests_data['Female'][:17], widths=0.6, showmeans=True)
-for i, m in enumerate(mean_interests.T[1]):
-    axs3[0].plot([i-0.2, i+0.2], [m, m])
+vplot = ax3.violinplot(
+    interests_data, positions=np.arange(1, 18), widths=0.6, showmeans=True)
+for i, (m0, m1) in enumerate(mean_interests.T.to_numpy()[1:], start=1):
+    ax3.plot([i-0.2, i+0.2], [m0, m0], color='tab:blue')
+    ax3.plot([i-0.2, i+0.2], [m1, m1], color='tab:orange')
 
-axs3[0].set_xlim(0.5, 17.5)
-axs3[0].tick_params(bottom=False, labelbottom=False)
-axs3[0].set_ylim(0, 14)
-axs3[0].set_ylabel('Score', y=-0.05, labelpad=10)
-axs3[0].grid(visible=True, axis='y', linewidth=0.3)
-axs3[0].legend(handles=[vplot['bodies'][0]], labels=['Female'], ncols=2)
+ax3.set_xlim(0, 18)
+ax3.tick_params(bottom=False, labelbottom=False)
+ax3.set_ylim(0, 14)
+ax3.set_ylabel('Score', y=-0.05, labelpad=10)
+ax3.grid(visible=True, axis='y', linewidth=0.3)
+ax3.legend(handles=[vplot['bodies'][0]], labels=['Female'], ncols=2)
 
 
-vplot = axs3[1].violinplot(
-    interests_data['Male'], widths=0.6, showmeans=True)
 for elt in vplot['bodies']:
     elt.set_facecolor('#FF7F0E')
 for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
     vplot[elt].set_edgecolor('#FF7F0E')
 
-axs3[1].set_xlim(0.5, 17.5)
-axs3[1].set_xticks(np.arange(1, 18), interests, rotation=30)
-axs3[1].set_ylim(0, 14)
-# axs3[1].set_yticks(np.arange(0, 16, 2))
-# axs3[1].set_ylabel('Median household income\n(k$/year)', labelpad=2)
-axs3[1].grid(visible=True, axis='y', linewidth=0.3)
-axs3[1].legend(handles=[vplot['bodies'][0]], labels=['Male'], ncols=2)
+# axs3[1].set_xlim(0.5, 17.5)
+# axs3[1].set_xticks(np.arange(1, 18), interests, rotation=30)
+# axs3[1].set_ylim(0, 14)
+# # axs3[1].set_yticks(np.arange(0, 16, 2))
+# # axs3[1].set_ylabel('Median household income\n(k$/year)', labelpad=2)
+# axs3[1].grid(visible=True, axis='y', linewidth=0.3)
+# axs3[1].legend(handles=[vplot['bodies'][0]], labels=['Male'], ncols=2)
 
 plt.show()
 
@@ -427,6 +427,30 @@ fig5, axs5 = plt.subplots(
 fig5.suptitle("Figure 5: Differences between self evaluated and partner evaluated attributes",
               x=0.02, ha='left')
 
+for i, ax in enumerate(axs5[0]):
+    sev_f = sev_attrs[sev_genders==0, i]
+    sev_m = sev_attrs[sev_genders==1, i]
+    ax.violinplot(sev_f, positions=[-0.5], widths=0.8, showmeans=True)
+    ax.violinplot(sev_m, positions=[0.5], widths=0.8, showmeans=True)
+    
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(0, 12)
+    ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+    ax.grid(visible=True, axis='y', linewidth=0.3)
+
+ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+
+
+for i, ax in enumerate(axs5[1]):
+    pev_f = pev_attrs[pev_genders==0, i]
+    pev_m = pev_attrs[pev_genders==1, i]
+    ax.violinplot(pev_f, positions=[-0.5], widths=0.8, showmeans=True)
+    ax.violinplot(pev_m, positions=[0.5], widths=0.8, showmeans=True)
+    
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(0, 12)
+    ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+    ax.grid(visible=True, axis='y', linewidth=0.3)
 
 
 for i, ax in enumerate(axs5[2]):
@@ -510,29 +534,21 @@ plt.show()
 
 
 # %%
-
-pair_cols = [c for c in df.columns if c not in subject_df.columns]
-
-
-
-
-
-# %%
 """
-- Age diff in matches distrib
+OK- Age diff in matches distrib
 OK - Race match matrix
-- nb likes vs each attr
-- nb likes vs income
+OK - nb likes vs each attr
 OK - primality effect: nb likes vs 'order'
-- matches vs 'int_corr'
-- 'match_es' vs real number of matches
-NO - integral of like 'prob' vs number of likes
-- 'expnum' vs actual nb of likes
+OK - matches vs 'int_corr'
+OK - 'match_es' vs real number of matches
+OK - 'expnum' vs actual nb of likes
 """
 
 """
 Let us now explore the dating results proper.
 """
+
+# TODO re-normalize ?
 
 race_match_df = df.loc[:, ['match', 'race', 'race_o']]
 norm = race_match_df.groupby(['race', 'race_o']).count()
@@ -545,44 +561,236 @@ for (i, j), v in (matches/norm).iterrows():
 
 
 ## Plot heatmap
-fig7, axs7 = plt.subplots(
-    nrows=2, ncols=1, figsize=(5.5, 5.2),
-    gridspec_kw={'left': 0.105, 'right': 0.82, 'top': 0.9, 'bottom': 0.11, 'hspace': 0.06})
-cax7 = fig7.add_axes((0.905, 0.11, 0.036, 0.77))
-fig7.suptitle('Figure 9: Decision boundaries in the (age, total_pages_visited) plane', x=0.02, ha='left')
+fig7, ax7 = plt.subplots(
+    nrows=1, ncols=1, figsize=(4.5, 5),
+    gridspec_kw={'left': 0.25, 'right': 0.9, 'top': 0.8, 'bottom': 0.14, 'hspace': 0.06})
+cax7 = fig7.add_axes((0.2, 0.11, 0.6, 0.03))
+fig7.suptitle('Figure 7: Match probability vs race', x=0.02, ha='left')
 
 # for k, ax in enumerate(axs9):
-#     ax.set_aspect('equal')
-#     heatmap = ax.pcolormesh(
-#         xx, yy, pconv[k, :-1, 17:-1], cmap='coolwarm', vmin=0, vmax=1)
-#     ax.plot(x_dt, dt_intercepts[new_user[k]] + x_dt * dt_slope,
-#             color='k')
-#     ax.set_xlim(16, 80)
-#     ax.set_ylim(0, 30)
+ax7.set_aspect('equal')
+heatmap = ax7.pcolormesh(race_matches, cmap='plasma', vmin=0, vmax=0.5)
+ax7.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+ax7.set_xticks(np.linspace(0.5, 5.5, 6), list(races.values()), rotation=50)
+ax7.set_yticks(np.linspace(0.5, 5.5, 6), list(races.values()))
+
+fig7.colorbar(heatmap, cax=cax7, orientation="horizontal", ticklocation="bottom")
+cax7.set_title('Match probability', y=-3.5)
+
+plt.show()
+
+
+# %% 
+"""
+number of matches vs interests correlations
+"""
+
+int_corr = df['int_corr'].to_numpy()
+match_int_corr = df.loc[df['match'] == 1, 'int_corr'].to_numpy()
+bins = np.linspace(-1, 1, 41)
+
+hist_ic = np.histogram(int_corr, bins=bins)[0]
+hist_match_ic = np.histogram(match_int_corr, bins=bins)[0]
+
+ic_vals = np.linspace(-0.975, 0.975, 40)
+p_match = hist_match_ic / np.where(hist_ic, hist_ic, 1)
+std_p_match = p_match * (1-p_match) / np.sqrt(np.where(hist_ic, hist_ic, 1))
+
+
+## plot
+fig8, axs8 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 3.5),
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.88, 'bottom': 0.14, 'wspace':0.24})
+fig8.suptitle('Figure 8: Effect of shared interests on matching', x=0.02, ha='left')
+
+
+axs8[0].bar(ic_vals, hist_ic, width=0.05, label='all data')
+axs8[0].bar(ic_vals, hist_match_ic, width=0.05, label='with match')
+axs8[0].set_xlim(-1, 1)
+axs8[0].set_ylim(0, 600)
+axs8[0].grid(visible=True, linewidth=0.3)
+axs8[0].set_xlabel('Interests correlation')
+axs8[0].set_ylabel('Counts')
+axs8[0].legend()
+
+axs8[1].errorbar(ic_vals, p_match, yerr=std_p_match,
+             fmt='o-', markersize=5)
+
+axs8[1].set_xlim(-1, 1)
+axs8[1].set_ylim(-0.005, 0.35)
+axs8[1].set_yticks([0, 0.1, 0.2, 0.3])
+axs8[1].set_yticks([0.05, 0.15, 0.25, 0.35], minor=True)
+axs8[1].grid(visible=True, which='both', linewidth=0.3)
+axs8[1].set_xlabel('Interests correlation')
+axs8[1].set_ylabel('Match probability')
+
+plt.show()
+
+"""
+There is a tendency for the match probability to increase with interests correlations.
+However, the effect is very weak
+"""
+
 
 # %%
 """
 Expected nb of likes / matches vs reality. for women and men
+
+We do not study the number of likes: not enough values.
 """
 
-iids = []
-female_idx = [i for i, iid in enumerate(iids)
-            if subject_df.loc[iid, 'gender'] == 0]
-male_idx = [i for i, iid in enumerate(iids)
-            if subject_df.loc[iid, 'gender'] == 1]
+# TODO virer exp_nlike
+iids = subject_df.index.to_numpy()
+female_idx = np.array([i for i, iid in enumerate(iids)
+                       if subject_df.loc[iid, 'gender'] == 0])
+male_idx = np.array([i for i, iid in enumerate(iids)
+                     if subject_df.loc[iid, 'gender'] == 1])
 
-
-nmatch, nlike = [], []
-for iid, df_ in df.loc[:, ['iid', 'match', 'dec']].groupby('iid'):
-    iids.append(iid)
-    nmatch.append(df_['match'].sum())
-    nlike.append(df_['dec'].sum())
-# idx = np.argsort(iids)
-nmatch = np.array(nmatch)
+gdf = df.loc[:, ['iid', 'match', 'dec']].groupby('iid')
+nmatch = np.array([gdf.get_group(i)['match'].sum() for i in iids])
+nlike = np.array([gdf.get_group(i)['dec'].sum() for i in iids])
 exp_nmatch = subject_df.loc[iids, 'match_es'].to_numpy()
 exp_nlike = subject_df.loc[iids, 'expnum'].to_numpy()
+
+
+f_dmatch = (exp_nmatch - nmatch)[female_idx] # female match difference
+m_dmatch = (exp_nmatch - nmatch)[male_idx]
+f_dlike = (exp_nlike - nlike)[female_idx]
+m_dlike = (exp_nlike - nlike)[male_idx]
+
+
+## plot
+fig9, axs9 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 3.5),
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.88, 'bottom': 0.14, 'wspace':0.24})
+fig9.suptitle('Figure 9', x=0.02, ha='left')
+
+bins = np.linspace(-9.5, 9.5, 20)
+axs9[0].hist(f_dmatch, bins=bins, label='Females')
+axs9[0].plot([np.mean(f_dmatch, where=~np.isnan(f_dmatch))]*2, [0, 80],
+             color='k', linewidth=0.8)
+axs9[0].hist(m_dmatch, bins=bins, weights=np.full_like(m_dmatch, -1), label='Males')
+axs9[0].plot([np.mean(m_dmatch, where=~np.isnan(m_dmatch))]*2, [0, -80],
+             color='k', linewidth=0.8)
+
+axs9[0].set_xlim(-8, 8)
+axs9[0].set_ylim(-80, 80)
+axs9[0].grid(visible=True, linewidth=0.3)
+axs9[0].set_xlabel('Match difference')
+axs9[0].set_ylabel('Counts')
+axs9[0].legend()
+
+
+axs9[1].hist(f_dlike, bins=bins, label='Females')
+axs9[1].plot([np.mean(f_dlike, where=~np.isnan(f_dlike))]*2, [0, 80],
+             color='k', linewidth=0.8)
+axs9[1].hist(m_dlike, bins=bins, weights=np.full_like(m_dmatch, -1), label='Males')
+axs9[1].plot([np.mean(m_dlike, where=~np.isnan(m_dlike))]*2, [0, -80],
+             color='k', linewidth=0.8)
+
+axs9[1].set_xlim(-10, 10)
+axs9[1].set_ylim(-20, 20)
+axs9[1].grid(visible=True, linewidth=0.3)
+axs9[1].set_xlabel('Match difference')
+axs9[1].set_ylabel('Counts')
+axs9[1].legend()
+
+plt.show()
+
+
+# %%
+"""
+Age and income difference distribution when match
+"""
+
+gd_df = df.loc[df['match']==1, ['pid', 'gender', 'age', 'income']]
+gd_df['age_o'] = [subject_df.loc[int(pid), 'age'] for pid in gd_df['pid']]
+gd_df['income_o'] = [subject_df.loc[int(pid), 'income'] for pid in gd_df['pid']]
+
+gd_df = gd_df.loc[gd_df['gender']==0]
+age_diff = (gd_df['age'] - gd_df['age_o']).to_numpy() # female - male
+income_diff = (gd_df['income'] - gd_df['income_o']).to_numpy() 
+
+
+## plot
+fig10, axs10 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 3.5),
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.88, 'bottom': 0.14, 'wspace':0.24})
+fig10.suptitle('Figure 10: Age and income difference in matches (females - males)',
+               x=0.02, ha='left')
+
+
+axs10[0].hist(age_diff, bins=np.linspace(-14.5, 14.5, 30))
+axs10[0].plot([np.mean(age_diff, where=~np.isnan(age_diff))]*2, [0, 80], color='k')
+
+axs10[0].set_xlim(-15, 15)
+axs10[0].set_ylim(0, 80)
+axs10[0].grid(visible=True, linewidth=0.3)
+axs10[0].set_xlabel('Age difference')
+axs10[0].set_ylabel('Counts')
+# axs10[0].legend()
+
+
+axs10[1].hist(income_diff, bins=np.linspace(-65e3, 65e3, 27))
+
+axs10[1].set_xlim(-80e3, 80e3)
+axs10[1].set_ylim(0, 30)
+# axs10[1].set_yticks([0, 0.1, 0.2, 0.3])
+# axs10[1].set_yticks([0.05, 0.15, 0.25, 0.35], minor=True)
+axs10[1].grid(visible=True, which='both', linewidth=0.3)
+axs10[1].set_xlabel('Income difference (k$)')
+axs10[1].set_ylabel('Counts')
+
+plt.show()
+
+
+# %%
+
+"""
+Attribute difference when like
+
+!!! use ppl self perception attr1_3
+"""
+
+attr_data = df.loc[df['dec']==1, ['gender'] + [kw + '3_1' for kw in attr_kw] + attr_kw]
+attr_data = attr_data.astype(float).to_numpy()
+
+bins = np.linspace(-10.5, 10.5, 22)
+x = np.linspace(-10, 10, 21)
+
+f_attr = attr_data[attr_data[:, 0]==0, 1:]
+f_attr_diff = f_attr[:, 5:] - f_attr[:, :5] # self eval - other eval
+f_attr_hist = [np.histogram(d, bins=bins)[0] for d in f_attr_diff.T]
+f_attr_mean = np.mean(f_attr_diff, axis=0, where=~np.isnan(f_attr_diff))
+
+m_attr = attr_data[attr_data[:, 0]==1, 1:]
+m_attr_diff = m_attr[:, 5:] - m_attr[:, :5]
+m_attr_hist = [np.histogram(d, bins=bins)[0] for d in m_attr_diff.T]
+m_attr_mean = np.mean(m_attr_diff, axis=0, where=~np.isnan(m_attr_diff))
+
+
+## plot
+fig11, axs11 = plt.subplots(
+    nrows=1, ncols=5, figsize=(9, 3.5), sharex=True, sharey=True,
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.88, 'bottom': 0.14, 'wspace': 0})
+fig11.suptitle('Figure 11: ', x=0.02, ha='left')
+
+for i, ax in enumerate(axs11):
+    ax.bar(x, f_attr_hist[i]/np.sum(f_attr_hist[i]), width=1)
+    ax.plot([f_attr_mean[i]]*2, [0, 0.3], color='k', linewidth=0.6)
+    ax.bar(x, -m_attr_hist[i]/np.sum(m_attr_hist[i]), width=1)
+    ax.plot([m_attr_mean[i]]*2, [0, -0.3], color='k', linewidth=0.6)
     
-## plot 
+    ax.set_xlim(-10, 10)
+    ax.set_xticks(np.arange(-8, 10, 2))
+    ax.set_ylim(-0.3, 0.3)
+    ax.set_yticks(np.linspace(-.25, 0.25, 6), minor=True)
+    ax.grid(visible=True, which='both', linewidth=0.3)
+    ax.set_xlabel(attributes[i])
+
+
+
+plt.show()
 
 
 
@@ -593,7 +801,29 @@ number of likes vs dating order
 
 order_counts = df['order'].value_counts().to_numpy()
 likes_vs_order = df['order'].loc[df['dec'] == 1].value_counts()
-like_prob = df.loc[:, ['order', 'dec']].groupby('order').mean()['dec'].to_numpy()
+
+like_prob_df = df.loc[:, ['order', 'dec']].groupby('order').mean()
+order = like_prob_df.index.to_numpy()
+like_prob = like_prob_df['dec'].to_numpy() / 2
 like_std = like_prob * (1 - like_prob) / np.sqrt(order_counts)
 
 
+## plot
+fig12, ax12 = plt.subplots(
+    nrows=1, ncols=1, figsize=(6, 4),
+    gridspec_kw={'left': 0.12, 'right': 0.97, 'top': 0.88, 'bottom': 0.14})
+fig12.suptitle('Figure 12: Primality effect', x=0.02, ha='left')
+
+ax12.errorbar(order, like_prob, like_std, fmt='o-')
+
+ax12.set_xlim(0, 23)
+ax12.set_ylim(0.14, 0.28)
+ax12.grid(visible=True, linewidth=0.3)
+ax12.set_xlabel('Date order')
+ax12.set_ylabel('Like probability')
+
+plt.show()
+
+"""
+
+"""
