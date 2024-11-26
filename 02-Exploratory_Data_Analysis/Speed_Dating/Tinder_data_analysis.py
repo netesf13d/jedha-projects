@@ -207,55 +207,34 @@ interests_df.describe()
 interests_data = interests_df.iloc[:, 1:].to_numpy().T
 interests_data = [col[~np.isnan(col)] for col in interests_data]
 
-# interests_df = interests_df.astype({'gender': object})
-# interests_df.loc[:, 'gender'] = interests_df['gender'].replace(genders)
-# gdf = interests_df.groupby('gender').mean()
-
-# m_interests = gdf.get_group('Male').iloc[:, 1:].to_numpy().T
-# m_interests = [col[~np.isnan(col)] for col in m_interests]
-# f_interests = gdf.get_group('Female').iloc[:, 1:].to_numpy().T
-# f_interests = [col[~np.isnan(col)] for col in f_interests]
-
-# interests_data = {}
-# for gender, df_ in interests_df.groupby('gender'):
-#     cols = [inter.to_numpy() for _, inter in df_.iloc[:, 1:].items()]
-#     interests_data[gender] = [col[~np.isnan(col)] for col in cols]
-# interests = [np.concat((c1, c2)) for c1, c2 in zip()]
 
 
 fig3, ax3 = plt.subplots(
-    nrows=1, ncols=1, figsize=(7.5, 5.2),
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.11, 'hspace': 0.08})
+    nrows=1, ncols=1, figsize=(8, 4),
+    gridspec_kw={'left': 0.07, 'right': 0.96, 'top': 0.9, 'bottom': 0.14, 'hspace': 0.08})
 fig3.suptitle("Figure 3: Violin plots",
               x=0.02, ha='left')
 
 
 vplot = ax3.violinplot(
     interests_data, positions=np.arange(1, 18), widths=0.6, showmeans=True)
-for i, (m0, m1) in enumerate(mean_interests.T.to_numpy()[1:], start=1):
-    ax3.plot([i-0.2, i+0.2], [m0, m0], color='tab:blue')
-    ax3.plot([i-0.2, i+0.2], [m1, m1], color='tab:orange')
+for i, (m0, m1) in enumerate(mean_interests.T.to_numpy(), start=1):
+    print(i)
+    line_f, = ax3.plot([i-0.2, i+0.2], [m0, m0], color='tab:blue')
+    line_m, = ax3.plot([i-0.2, i+0.2], [m1, m1], color='tab:orange')
 
 ax3.set_xlim(0, 18)
-ax3.tick_params(bottom=False, labelbottom=False)
-ax3.set_ylim(0, 14)
-ax3.set_ylabel('Score', y=-0.05, labelpad=10)
+ax3.set_xticks(np.arange(1, 18), interests, rotation=30)
+ax3.set_ylim(0, 12)
+ax3.set_ylabel('Score', labelpad=4)
 ax3.grid(visible=True, axis='y', linewidth=0.3)
-ax3.legend(handles=[vplot['bodies'][0]], labels=['Female'], ncols=2)
+ax3.legend(handles=[line_f, line_m], labels=['Female', 'Male'], ncols=2)
 
 
 for elt in vplot['bodies']:
-    elt.set_facecolor('#FF7F0E')
+    elt.set_facecolor('plum')
 for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-    vplot[elt].set_edgecolor('#FF7F0E')
-
-# axs3[1].set_xlim(0.5, 17.5)
-# axs3[1].set_xticks(np.arange(1, 18), interests, rotation=30)
-# axs3[1].set_ylim(0, 14)
-# # axs3[1].set_yticks(np.arange(0, 16, 2))
-# # axs3[1].set_ylabel('Median household income\n(k$/year)', labelpad=2)
-# axs3[1].grid(visible=True, axis='y', linewidth=0.3)
-# axs3[1].legend(handles=[vplot['bodies'][0]], labels=['Male'], ncols=2)
+    vplot[elt].set_edgecolor('plum')
 
 plt.show()
 
@@ -352,12 +331,14 @@ fig4.suptitle("Figure 4: Violin plots",
 
 # vplot = ax.boxplot( for d in diffs], widths=0.6, bootstrap=10)
 for i, ax in enumerate(axs4[0]):
-    ax.hist(ev_diff[:, i], bins=np.linspace(-5.5, 5.5, 10),
+    ax.hist(ev_diff[:, i], bins=np.linspace(-5.5, 5.5, 12),
             orientation='horizontal')
     ax.set_xlim(0, 300)
     ax.set_ylim(-5, 5)
     ax.grid(visible=True, axis='x', linewidth=0.3)
-    
+    ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+axs4[0, 0].tick_params(left=True, labelleft=True)
+
 
 for i, ax in enumerate(axs4[1]):
     ax.hist(lf_diff[:, i], bins=np.linspace(-14.5, 14.5, 30),
@@ -365,7 +346,8 @@ for i, ax in enumerate(axs4[1]):
     ax.set_xlim(0, 120)
     ax.set_ylim(-15, 15)
     ax.grid(visible=True, axis='x', linewidth=0.3)
-
+    ax.tick_params(left=False, labelleft=False)
+axs4[1, 0].tick_params(left=True, labelleft=True)
 
 plt.show()
 
@@ -435,10 +417,10 @@ for i, ax in enumerate(axs5[0]):
     
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(0, 12)
-    ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+    ax.tick_params(bottom=False, left=False, labelleft=False)
+    ax.set_xticks([0], [interests[i]])
     ax.grid(visible=True, axis='y', linewidth=0.3)
-
-ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+axs5[0, 0].tick_params(bottom=False, left=True, labelleft=True)
 
 
 for i, ax in enumerate(axs5[1]):
@@ -451,6 +433,7 @@ for i, ax in enumerate(axs5[1]):
     ax.set_ylim(0, 12)
     ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
     ax.grid(visible=True, axis='y', linewidth=0.3)
+axs5[1, 0].tick_params(left=True, labelleft=True)
 
 
 for i, ax in enumerate(axs5[2]):
@@ -464,8 +447,11 @@ for i, ax in enumerate(axs5[2]):
     ax.set_xlim(0, 200)
     ax.set_ylim(-10, 10)
     ax.grid(visible=True, axis='x', linewidth=0.3)
-    # vplot = ax.boxplot(
-    #     [d[:, i] for d in diffs], widths=0.6, bootstrap=10)
+    ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
+    
+axs5[2, 0].tick_params(left=True, labelleft=True)
+
+
 
 plt.show()
 
