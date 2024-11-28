@@ -289,7 +289,6 @@ Follow up
 7_3 : attributes importance ; 100 pts total
 """
 
-# these represent intrinsic attributes, ie exclude interest sharing
 attributes = ['Attractive', 'Sincere', 'Intelligent', 'Fun', 'Ambitious', 'Shared\ninterests']
 attr_kw = ['attr', 'sinc', 'intel', 'fun', 'amb', 'shar']
 
@@ -564,7 +563,6 @@ For the real lookfor, we average the attributes of the people that the subject '
 Other's attribute and self not on the same scale...
 """
 
-
 ## correlation matrices
 gdf = df.groupby('gender')
 
@@ -774,9 +772,9 @@ gdf = df.loc[:, ['iid', 'match', 'dec']].groupby('iid')
 nmatch = np.array([gdf.get_group(i)['match'].sum() for i in iids])
 exp_nmatch = subject_df.loc[iids, 'match_es'].to_numpy()
 
-
 f_dmatch = (exp_nmatch - nmatch)[female_idx] # female match difference
 m_dmatch = (exp_nmatch - nmatch)[male_idx]
+
 
 ## plot
 fig9, ax9 = plt.subplots(
@@ -825,13 +823,28 @@ pd.DataFrame({'p-value': [ttest_res_f.pvalue, ttest_res_m.pvalue],
              index=['Females', 'Males'])
 
 
+
+
 # %%
-# TODO like vs attr correlation
+"""
+### Correlation between dating decision ('dec'), partner appreciation ('like') and attributes
 """
 
+gdf = df.groupby('gender')
+dec_attr_df_f = gdf.get_group(0).loc[:, ['dec', 'like'] + attr_kw]
+dec_attr_df_m = gdf.get_group(1).loc[:, ['dec', 'like'] + attr_kw]
+pd.concat([dec_attr_df_f.corr().iloc[2:, :2],
+           dec_attr_df_m.corr().iloc[2:, :2]],
+          axis=1, keys=['Female', 'Male'])
+
 
 """
-
+Attractivity is the most desirable attribute for both men and wowen, especially for men.
+Being fun and sharing interests is also important for both genders. It is interesting to
+note that these two attributes are more correlated to the appreciation of the partner than attractivity, despite
+the latter being more relevant to the dating decision. Sincerity, intelligence and ambition are the least desirables attributes,
+but more so for the dating decision than for the partner appreciation.
+"""
 
 
 
@@ -1030,4 +1043,9 @@ as likes are distributed, the implicit reserve decreases, and hence the affinity
 threshold (in economic terms, the marginal cost) increases to attribute a like.
 """
 
+# %% Conclusion
+
+"""
+
+"""
 

@@ -21,7 +21,7 @@
 
 # spark = SparkSession.builder.getOrCreate()
 
-
+import json
 
 import numpy as np
 import pandas as pd
@@ -34,9 +34,18 @@ import matplotlib.pyplot as plt
 ## <a name="loading"></a> Data loading and preprocessing
 """
 
-df = pd.read_json('./steam_game_output.json')
-print(df.iloc[0, 1])
+with open('./steam_game_output.json', 'rt', encoding='utf-8') as f:
+    data = json.load(f)
 
+df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
+df = pd.DataFrame.from_dict(df_dict)
+
+# TODO tags df
+# TODO categories df (of bool)
+# TODO platforms df
+# TODO parse owners
+# TODO parse date
+# TODO price in cents
 
 
 # %% EDA
@@ -47,3 +56,15 @@ print(df.iloc[0, 1])
 
 We begin by getting insights about the store locations.
 """
+
+
+"""
+- sales for each genre
+- sales vs tags
+- platfor availability
+- 
+
+
+"""
+
+
