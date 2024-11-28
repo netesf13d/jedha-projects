@@ -13,6 +13,17 @@ from matplotlib.lines import Line2D
 from scipy.stats import ttest_1samp
 
 
+def textstr(data: np.ndarray)-> str:
+    """
+    Make a short summary text (mean, std dev, median) to display.
+    """
+    data = data[~np.isnan(data)]
+    text = (f'Mean   : {np.mean(data):.2f}\n'
+            f'Std dev : {np.std(data):.2f}'
+            f'\nMedian : {np.median(data):.2f}')
+    return text
+
+
 # =============================================================================
 # 
 # =============================================================================
@@ -29,27 +40,15 @@ partner_entries = ~subject_entries
 subject_cols = df.columns[subject_entries]
 subject_df = df[subject_cols].groupby('iid').aggregate(lambda x: x.iloc[0])
 
-# pair_cols = [c for c in df.columns if c not in subject_df.columns]
-
 
 # %% age and income histograms
+"""
+### General statistics
 
-def textstr(data: np.ndarray)-> str:
-    """
-    Make a short summary text (mean, std dev, median) to display.
-    """
-    data = data[~np.isnan(data)]
-    text = (f'Mean   : {np.mean(data):.2f}\n'
-            f'Std dev : {np.std(data):.2f}'
-            f'\nMedian : {np.median(data):.2f}')
-    return text
+#### Age, income and SAT score distributions
+"""
 
-
-# age = subject_df['age']
-# income = subject_df['income']
-# mn_sat = subject_df['mn_sat']
-
-
+## plot
 fig1, axs1 = plt.subplots(
     nrows=1, ncols=3, figsize=(9, 4), dpi=200,
     gridspec_kw={'left': 0.06, 'right': 0.97, 'top': 0.85, 'bottom': 0.13, 'wspace': 0.18})
@@ -90,15 +89,22 @@ axs1[2].text(0.035, 0.84, textstr(subject_df['mn_sat'].to_numpy()),
 plt.show()
 
 """
-Subjects are students at Columbia university hence realtively young
+We present histograms of age, estimated income and SAT score of the participants in figure 1.
+The participants are students at Columbia university hence realtively young (26 years old on average).
 The median household income is rather low, as expected for students which have generally
 not started their professional life.
-The SAT scores are higher than average, as expected for people who follow graduate studies.
+Note that the income distribution is biased since, as indicated in the explanatory document:
+> When there is no income it means that they are either from abroad or did not enter their zip code.
+Foreigners income, which is probably different than that of americans, is thus not represented in the distribution.
+The SAT scores are generally high, as expected for people who follow graduate studies (the country-wide median is around 1000).
 """
 
 
-
 # %% Racial stats
+
+"""
+#### Racial statistics
+"""
 
 ##
 racial_df = subject_df.loc[:, ['race', 'gender', 'age', 'income']]
@@ -115,7 +121,10 @@ racial_df
 racial_df.groupby(['race', 'gender']).count()
 
 """
-More caucasians than the rest.
+The `'age'` column basically gives the number of participants for each race/gender pair.
+The genders are balanced, but there are more caucasian people than all other races combined, probably reflecting
+the racial population in Columbia university. Note that there are no native americans participants.
+We also note the lower number of income entries (asa noted above, this corresponds to foreign students).
 """
 
 ##
@@ -170,13 +179,16 @@ axs2[1].legend(handles=bplot['boxes'], labels=['Female', 'Male'], ncols=2)
 plt.show()
 
 """
-Salaries in the same range except maybe black females but fluctuations.
+We show in figure 2 box plots of the age (top panel) and estimated income (bottom panel) distributions,
+for each gender/race pair. Both the ages and income are in the same range.
+Black females seem to have lower salary than the rest but this may well be fluctuations due to
+the low number of participants in this category.
 """
 
 
 # %% Interests
 """
-
+### Interests
 """
 
 interests = ['sports', 'tvsports', 'exercise', 'dining', 'museums', 'art',
@@ -184,12 +196,16 @@ interests = ['sports', 'tvsports', 'exercise', 'dining', 'museums', 'art',
              'movies', 'concerts', 'music', 'shopping', 'yoga']
 interests_df = subject_df.loc[:, ['gender'] + interests]
 mean_interests = interests_df.groupby('gender').mean()
-interests_df.describe()
-
-##
 interests_data = interests_df.iloc[:, 1:].to_numpy().T
 interests_data = [col[~np.isnan(col)] for col in interests_data]
 
+interests_df.describe()
+
+"""
+We can see that some participants gave answers outside the prescribed range of 1 - 10.
+Misspecified answers are a common problem of such surveys.
+This is one of the difficulties for the analysis this dataset.
+"""
 
 ## plot
 fig3, ax3 = plt.subplots(
@@ -221,14 +237,33 @@ for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
 plt.show()
 
 """
-Choose violin plots because distrib bounded
-We represent as violin plots since the values provided are bounded 
+We represent violin plots of the various attributes in figure 3. The data aggregates both genders,
+and we simply show the mean for each gender as blue (females) and orange (males) horizontal lines.
+Females generally show more interest in everything, except for sports, tv-sports and gaming,
+which are interests traditionally attributed to men.
 """
 
 # %%
 
 """
-Dealing with attributes is more difficult because its a mess.
+### Interests
+
+Analyzing the data relative to attributes is more difficult. The dataset contains many different attribute ratings:
+- 'What are you looking for?'
+- 'What you think the opposite sex looks for?'
+- 'How do you think you measure up?'
+- 'What you think your fellow men/women look for?'
+- 'How do you think other perceive you?'
+- 'Actual importance of attributes in your decisions'
+Moreover, there are other problems:
+- The ratings are not asked for consistently (sometimes on a 1-10 scale, some times by distributing 100 points)
+- There are a lot of missing data
+- The data are sometimes misspecified (rating ouside 1-10 range or with a sum different than 100)
+
+In the following single-subject analysis we will focus on how people perceive themselves (`<attribute>3_*`) and
+what they are looking for (`<attribute>1_*`).
+
+
 Before
 1_1 : what I look for ; waves 6-9 10pts scale, others 100 pts
 2_1 : what the other looks for ; waves 6-9 10pts scale, others 100 pts total
@@ -269,13 +304,17 @@ df_.index = [kw + f'{i}' for i in range(1, 6) for kw in attr_kw[:-1]]
 df_
 
 """
-Less responses over time
+This illustrates the missing data problem. The number of responses given decrease over time.
 """
 
 #%%
 """
-Focus on the self assessment and what I look for: same scale, 4 evals.
+#### Evolution of attribute rating
 
+We will now look at how the participants change their attributes rating over time.
+For our two selected attribute ratings (self-evaluation and looked-for), the researchers ask
+for 4 ratings: before (`'*_1'`), during (`'*_s'`), after (`'*_2'`) the speed dating experiment,
+and also during the follow-up (`'*_3'`).
 """
 ##
 ev_cols = [kw + f'3_{j}' for j in [1, 's', 2, 3] for kw in attr_kw[:-1]]
@@ -283,8 +322,8 @@ self_ev_df = subject_df.loc[:, ev_cols] # self evaluation dataframe
 self_ev_df.count()
 
 """
-We only consider the difference between after and before, since
-there are less counts for the other situations, during and followup.
+Data is mostly available before (`'*_1'`) and after (`'*_2'`) the speed dating experiment.
+We will therefore only consider the evolution between these two moments.
 """
 
 ##
@@ -293,14 +332,13 @@ self_ev = np.array(np.split(self_ev_df.to_numpy(), 4, axis=1))
 ev_diff = self_ev[2] - self_ev[0]
 ev_diff = ev_diff[~np.any(np.isnan(ev_diff), axis=1)]
 
-
-## do the same with what I look for
+# do the same with what I look for
 lf_cols = [kw + f'1_{j}' for j in [1, 's', 2, 3] for kw in attr_kw]
 self_lf_df = subject_df.loc[:, lf_cols] # self lookfor dataframe
 self_lf_df.count()
 
 self_lf = np.array(np.split(self_lf_df.to_numpy(), 4, axis=1))
-self_lf = 100 * self_lf / np.sum(self_lf, axis=-1, keepdims=True)
+self_lf = 100 * self_lf / np.sum(self_lf, axis=-1, keepdims=True) # re-scale to a sum of 100
 lf_diff = self_lf[2] - self_lf[0]
 lf_diff = lf_diff[~np.any(np.isnan(lf_diff), axis=1)]
 
@@ -352,13 +390,18 @@ axs4[1, 0].set_title("Self-evaluated 'attr*_1' ('What you look for in the opposi
 plt.show()
 
 """
-No major change over time, maybe a slight decrease, indicating that people tend to
-overestimate themselves.
+Figure 4 presents the variation of self-evaluation (top panel) and looked-for evaluation (bottom panel) over the course of the speed dating event.
+The self evaluation is given with a 1-10 scale rating, while the looked-for evaluation is given by attributing 100 points.
+There is no change over time on average (maybe a slight decrease ?), yet with some significant but low variations among individuals.
+
+The participants probably re-evaluate their answers based on how went the experiments, yet stay rather consistent over time.
 """
 
 
 #%%
 """
+#### Difference between self-perceived attributes and peer evaluations
+
 Define scope
 - Rescale => 100 pts total
 - Average what can be
@@ -593,7 +636,21 @@ The correlation is weak, people who
 
 # %%
 """
+## <a name="dating"></a> Dating results analysis
+
+
 Let us now explore the dating results proper.
+"""
+
+
+
+
+
+
+"""
+
+### Effect of race on the match probability
+
 """
 
 race_match_df = df.loc[df['gender']==0, ['match', 'race', 'race_o']]
@@ -604,16 +661,6 @@ match_idx = {k: i for i, k in enumerate(list(races.keys()))}
 race_matches = np.full((len(races), len(races)), np.nan, dtype=float)
 for (i, j), v in (matches/norm).iterrows():
     race_matches[match_idx[i], match_idx[j]] = v['match']
-
-
-# race_match_df = df.loc[:, ['match', 'race', 'race_o']]
-# norm = race_match_df.groupby(['race', 'race_o']).count()
-# matches = race_match_df.loc[df['match']==1].groupby(['race', 'race_o']).count()
-
-# match_idx = {k: i for i, k in enumerate(list(races.keys()))}
-# race_matches = np.full((len(races), len(races)), np.nan, dtype=float)
-# for (i, j), v in (matches/norm).iterrows():
-#     race_matches[match_idx[i], match_idx[j]] = v['match']
 
 
 ## Plot heatmap
@@ -655,6 +702,8 @@ plt.show()
 
 # %% 
 """
+### Effect of interests affinity on match probability
+
 number of matches vs interests correlations
 """
 
@@ -707,6 +756,8 @@ However, the effect is very weak
 
 # %%
 """
+### Expected number of matches versus reality
+
 Expected nb of likes / matches vs reality. for women and men
 
 include all data, even with restrained likes
@@ -774,10 +825,21 @@ pd.DataFrame({'p-value': [ttest_res_f.pvalue, ttest_res_m.pvalue],
              index=['Females', 'Males'])
 
 
+# %%
+# TODO like vs attr correlation
+"""
+
+
+"""
+
+
+
 
 # %%
 """
-Age and income difference distribution when match
+### Age and income difference between matching partners
+
+
 """
 
 gd_df = df.loc[df['match']==1, ['pid', 'gender', 'age', 'income']]
@@ -841,12 +903,15 @@ pd.DataFrame({'p-value': [ttest_res_age.pvalue, ttest_res_income.pvalue],
               '99% CI (high)': [ttest_ci_age.high, ttest_ci_income.high]},
              index=['Age difference', 'Income difference'])
 
+"""
+
+"""
 
 
 # %%
 
 """
-Attribute difference when like
+### Attribute difference when 'liking' someone
 
 """
 
@@ -926,7 +991,9 @@ pd.DataFrame({'p-value': ttest_res_m.pvalue,
 
 # %%
 """
-number of likes vs dating order
+### Primality effect
+
+We conclude by investigating a form of primality effect in dating.
 """
 
 order_counts = df['order'].value_counts().to_numpy()
@@ -955,5 +1022,12 @@ ax12.set_ylabel('Like probability')
 plt.show()
 
 """
-
+Figure 12 shows the probability of a like occuring as a function of the dating order.
+There is a clear decrease of the like probability as a function of the dating order, albeit not very strong.
+This effect is iterpreted as follows. Participants begin the session with an implicit number of likes to distribute.
+Otherwise, liking everyone would be equivalent to not be selective at all about potential partners. However,
+as likes are distributed, the implicit reserve decreases, and hence the affinity
+threshold (in economic terms, the marginal cost) increases to attribute a like.
 """
+
+

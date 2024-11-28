@@ -4,9 +4,11 @@ Collection of Jedha projects for certification.
 
 This repository contains the various projects required for the validation of:
 - The certification "Concepteur developpeur en science des donnees" (RNCP35288)
-- The certification "Architecte en Intelligence Artificielle" (RNCP???)
+- The certification "Architecte en Intelligence Artificielle" (RNCP38777)
 
-The projects are divided into 8 blocks. Blocks 1 - 5 are required for the CDSD certification, and blocks 6-8 are required for the AIA certificate. The CDSD also require 
+The projects are divided into 8 blocks. Blocks 1 - 5 are required for the CDSD certification, and blocks 6-8 are required for the AIA certificate.
+
+In addition, the two certifications require a "final project" for validation. The two are available [here]() and [here]().
 
 
 ## Block 01 - Build and Manage a Data Infrastructure
@@ -63,13 +65,20 @@ Optimize the pricing and deploy a dashboard for a car rental service.
 
 
 
-## Block 06 - ??
+## Block 06 - Data Governance and Strategy
+
+### Spotify Data Governance
 
 
-## Block 07 - ??
+## Block 07 - AI Data Architecture Design and Deployment
+
+### Automatic Fraud Detection
 
 
-## Block 08 - ??
+
+## Block 08 - Data Pipelines for AI
+
+### Stripe Business Case
 
 
 
