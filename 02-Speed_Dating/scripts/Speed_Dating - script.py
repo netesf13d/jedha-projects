@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Script version of the Speed Dating project.
 """
-
-import sys
 
 import numpy as np
 import pandas as pd
@@ -44,6 +42,8 @@ subject_df = df[subject_cols].groupby('iid').aggregate(lambda x: x.iloc[0])
 # %% age and income histograms
 """
 ### General statistics
+
+We begin with general participants statistics.
 
 #### Age, income and SAT score distributions
 """
@@ -181,7 +181,7 @@ plt.show()
 """
 We show in figure 2 box plots of the age (top panel) and estimated income (bottom panel) distributions,
 for each gender/race pair. Both the ages and income are in the same range.
-Black females seem to have lower salary than the rest but this may well be fluctuations due to
+Black females seem to have lower salary than the rest. This may well be fluctuations due to
 the low number of participants in this category.
 """
 
@@ -189,6 +189,9 @@ the low number of participants in this category.
 # %% Interests
 """
 ### Interests
+
+Participants were asked to rate their interests on a 1-10 scale for a set of 18 selected activities
+such as exercising, reading, watching movies.
 """
 
 interests = ['sports', 'tvsports', 'exercise', 'dining', 'museums', 'art',
@@ -237,16 +240,16 @@ for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
 plt.show()
 
 """
-We represent violin plots of the various attributes in figure 3. The data aggregates both genders,
+We represent violin plots of the various interests in figure 3. The data aggregates both genders,
 and we simply show the mean for each gender as blue (females) and orange (males) horizontal lines.
 Females generally show more interest in everything, except for sports, tv-sports and gaming,
-which are interests traditionally attributed to men.
+which are traditionally attributed to men.
 """
 
 # %%
 
 """
-### Interests
+### Attributes
 
 Analyzing the data relative to attributes is more difficult. The dataset contains many different attribute ratings:
 - 'What are you looking for?'
@@ -256,7 +259,7 @@ Analyzing the data relative to attributes is more difficult. The dataset contain
 - 'How do you think other perceive you?'
 - 'Actual importance of attributes in your decisions'
 Moreover, there are other problems:
-- The ratings are not asked for consistently (sometimes on a 1-10 scale, some times by distributing 100 points)
+- The ratings were not asked for consistently across different dating sessions (sometimes on a 1-10 scale, sometimes by distributing 100 points)
 - There are a lot of missing data
 - The data are sometimes misspecified (rating ouside 1-10 range or with a sum different than 100)
 
@@ -303,7 +306,7 @@ df_.index = [kw + f'{i}' for i in range(1, 6) for kw in attr_kw[:-1]]
 df_
 
 """
-This illustrates the missing data problem. The number of responses given decrease over time.
+The decrease of number of attribute evaluation responses over time illustrates well the missing data problem.
 """
 
 #%%
@@ -323,6 +326,12 @@ self_ev_df.count()
 """
 Data is mostly available before (`'*_1'`) and after (`'*_2'`) the speed dating experiment.
 We will therefore only consider the evolution between these two moments.
+
+The self-declared looked-for attributes must be normalized:
+- The rating scale is not homogeneous, we have both 1-10 pts scale ratings, and ratings with 100 pts distributed.
+- Even when they should, the ratings sometimes do not sum to 100.
+
+We choose to normalize them so that they sum to 100.
 """
 
 ##
@@ -401,24 +410,12 @@ The participants probably re-evaluate their answers based on how went the experi
 """
 #### Difference between self-perceived attributes and peer evaluations
 
-Define scope
-- Rescale => 100 pts total
-- Average what can be
-- Focus on gender differences in terms of attribues
-
-- Study the differences between what I think the other looks for and what he/she actually looks for
--> only in terms of average
-
-
-- Differences of look for between M/F
-  -> how I perceive myself
-  -> what I look for (!!! add 'shar' attr)
-
-
-Here : how I perceive myself vs how ppl perceive me.
+We focus here on the differences between one's perception of their own attributes and the perception of peers.
+After each date, participants were asked to rate the partners' attributes on a 1-10 scale. We use the averages of these
+ratings to aggregate partners perception.
 """
 
-# self-evauated attributes
+# self-evauated attributes: mean between before and after dating session
 sev_iids = self_ev_df.index.to_numpy()[~np.all(np.isnan(self_ev), axis=(0, 2))]
 sev_genders = subject_df.loc[sev_iids]['gender'].to_numpy()
 sev_attrs = self_ev[:, ~np.all(np.isnan(self_ev), axis=(0, 2))]
@@ -490,9 +487,9 @@ axs5[1, 0].set_title("Peer-evaluated 'attr' ('Rate their attributes on a scale o
 for i, ax in enumerate(axs5[2]):
     evd_f = ev_diff[ev_genders==0, i]
     evd_m = ev_diff[ev_genders==1, i]
-    _, _, patch_f = ax.hist(evd_f, bins=np.linspace(-14.5, 14.5, 30),
+    _, _, patch_f = ax.hist(evd_f, bins=np.linspace(-14.5, 14.5, 59),
                             alpha=0.6)
-    _, _, patch_m = ax.hist(evd_m, bins=np.linspace(-14.5, 14.5, 30),
+    _, _, patch_m = ax.hist(evd_m, bins=np.linspace(-14.5, 14.5, 59),
                             weights=np.full_like(evd_m, -1), alpha=0.6)
     ax.plot([np.mean(evd_f)]*2, [0, 170], color='k', linewidth=0.8)
     ax.plot([np.mean(evd_m)]*2, [0, -170], color='k', linewidth=0.8)
@@ -521,14 +518,20 @@ plt.show()
 
 
 """
+Figure 5 presents for each attribute the participants self-perception of their own attributes (top panel), partners evaluation (middle panel),
+and the evaluation difference (bottom panel). We note that the amplitude of self evaluations is much larger than that of peer evaluation.
+This is mostly an effect of the averaging, which includes more data from peer evaluation. The ratings are quite similar for both men and women,
+in both self and peer-evaluations. The mean rating is around 8 for each attribute in self-evaluations, and around 7 for peer evaluations.
+This systematic overestimation of one's attributes is highlighted in the bottom panel, where we observe a consistent one point difference
+across all attributes for both genders.
 
-
-We can confirm that the mean differences are not zero by doing a t-test.
+We can confirm that these differences are significant by doing a simple one-sample t-test.
 """
 
 ##
 ttest_res_f = ttest_1samp(ev_diff[ev_genders==0], popmean=0, alternative='two-sided')
 ttest_ci_f = ttest_res_f.confidence_interval(confidence_level=0.99)
+print('===== Female t-test results ======')
 pd.DataFrame({'p-value': ttest_res_f.pvalue,
               '99% CI (low)': ttest_ci_f.low,
               '99% CI (high)': ttest_ci_f.high},
@@ -537,30 +540,28 @@ pd.DataFrame({'p-value': ttest_res_f.pvalue,
 ##
 ttest_res_m = ttest_1samp(ev_diff[ev_genders==1], popmean=0, alternative='two-sided')
 ttest_ci_m = ttest_res_m.confidence_interval(confidence_level=0.99)
+print('===== Male t-test results ======')
 pd.DataFrame({'p-value': ttest_res_m.pvalue,
               '99% CI (low)': ttest_ci_m.low,
               '99% CI (high)': ttest_ci_m.high},
              index=attributes[:-1])
 
 """
-
+The results clearly confirm our observations with p-values below $10^{-6}$ for all differences.
+Men and women overestimate their fun the most. Women overestimate more
+their sincerity and ambition than men, and men overestimate mote their attractiveness.
 """
 
 
 
 #%%
 """
-What I think I look for vs what I actually look for
+### Correlation between self-evaluated and empirical looked-for attributes in partners
 
-The data is in some cases on a 1-10 scale, in other cases on a 100 pts total
-scale. In this latter case, 
+We now investigate the correlation between the attributes that the participants declare looking for (`<attribute>1_*`)
+and the attribute ratings of the partners which they are willing to date again (`<attribute>`).
 
-
-We compute the self-evaluated lookfor in the same way as the self evaluation of one'own attributes,
-that is by averaging (after scaling) all the data available : before, during after, and at followup
-For the real lookfor, we average the attributes of the people that the subject 'liked'.
-
-Other's attribute and self not on the same scale...
+The self-declared looked-for attributes are normalized for the same reasons as when we studied the evolution of the ratings (figure 4).
 """
 
 ## correlation matrices
@@ -586,7 +587,7 @@ fig6.suptitle("Figure 6: Correlation between self-evaluated and actual attribute
 
 axs6[0].set_aspect('equal')
 heatmap = axs6[0].pcolormesh(lf_corr_f[::-1]*100, cmap='coolwarm', vmin=-15, vmax=15,
-                             edgecolors='0.2', linewidth=0.5)
+                             edgecolors='0.2', linewidth=0.4)
 axs6[0].tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
 axs6[0].set_xticks(np.linspace(0.5, 5.5, 6), attributes, rotation=50)
 axs6[0].set_yticks(np.linspace(0.5, 5.5, 6), attributes[::-1])
@@ -627,7 +628,12 @@ plt.show()
 
 ##
 """
-The correlation is weak, people who 
+Figure 6 shows heatmaps of the Pearson's correlation coefficient for each attribute pair (self evaluation, evaluation of partner) for both men and women.
+The correlation is weak, below 10% for almost all pairs. We nevertheless observe the following.
+- When looking for an ambitious partner, participants actually look for a parner that rates better on all attributes. This is especially true for women.
+- When looking for an intelligent partner, participants actually look for a partner that rates worse on all attributes. This is, again, especially true for women.
+
+The interpretation of these observations is unclear.
 """
 
 
@@ -636,19 +642,23 @@ The correlation is weak, people who
 """
 ## <a name="dating"></a> Dating results analysis
 
+Let us now explore the dating results proper. We will investigate the following:
+- The effect of sharing a racial background on the atch probability
+- The effect of interests affinity on the match probability
+- The difference between expected and real number of matches over the dating session
+- The difference between self-evaluated attributes and the evaluation of the partner's attributes when willing to date again.
+- Age and income difference in matches
+- A primality effect when deciding to date again someone
 
-Let us now explore the dating results proper.
+Some speed dating sessions have been designed with the additional constraint of a limited number of positive decisions about dating someone again.
+This introduces constraints in some quantities, for instance in the maximal number of possible matches in a session. In the following analysis we do not
+take this into account nor filter the data.
 """
 
-
-
-
-
-
 """
-
 ### Effect of race on the match probability
 
+We begin by studying the match probability between participants for the different races represented.
 """
 
 race_match_df = df.loc[df['gender']==0, ['match', 'race', 'race_o']]
@@ -660,6 +670,7 @@ race_matches = np.full((len(races), len(races)), np.nan, dtype=float)
 for (i, j), v in (matches/norm).iterrows():
     race_matches[match_idx[i], match_idx[j]] = v['match']
 
+print(f"Global match probability: {df['match'].mean():.4f}")
 
 ## Plot heatmap
 fig7, ax7 = plt.subplots(
@@ -693,16 +704,18 @@ fig7.text(0.14, 0.81, 'Female\npartner', ha='center', va='center', fontweight='b
 plt.show()
 
 """
-
+We present in figure 7 the match probabilities between a female partner of given race (row) with a man of a second race (column).
+Although the matrix is *a priori* not symmetric, there is nevertheless a large level of symmetry between males and females.
+We note the following:
+- Black people are quite likely to match. This is in contrast with other races, which are no particular affinity in terms of matches.
+- Black people match frequently with 'other' races, which in turn match more with latinos
+- Asian males are the less likely to match, significantly less than their women counterparts (this observation is actually well documented)
 """
-
 
 
 # %% 
 """
 ### Effect of interests affinity on match probability
-
-number of matches vs interests correlations
 """
 
 int_corr = df['int_corr'].to_numpy()
@@ -716,6 +729,8 @@ ic_vals = np.linspace(-0.975, 0.975, 40)
 p_match = hist_match_ic / hist_ic # np.where(hist_ic, hist_ic, 1)
 std_p_match = p_match * (1-p_match) / np.sqrt(np.where(hist_ic, hist_ic, 1))
 
+attr_match_corr = df.loc[:, ['int_corr', 'match']].corr().iloc[0, 1]
+print(f"Correlation between interests affinity and match probability: {attr_match_corr:.4f}")
 
 ## plot
 fig8, axs8 = plt.subplots(
@@ -747,19 +762,16 @@ axs8[1].set_ylabel('Match probability')
 plt.show()
 
 """
-There is a tendency for the match probability to increase with interests correlations.
-However, the effect is very weak
+We show in figure 8 the histograms of interests correlations (left panel) and the corresponding match probability (right panel).
+There is a clear tendency for the match probability to increase linearly with interests affinity.
+However, an increase of 1 point in interests correlation, leads to only 3.1% increased chances of match.
+This is a very weak effect since the interests correlation lies in the range [-1, 1].
 """
 
 
 # %%
 """
-### Expected number of matches versus reality
-
-Expected nb of likes / matches vs reality. for women and men
-
-include all data, even with restrained likes
-We do not study the number of likes: not enough values.
+### Expected versus real numbers of matches
 """
 
 iids = subject_df.index.to_numpy()
@@ -807,8 +819,13 @@ plt.show()
 
 
 """
-2 effects: self over estimation, over estimation of partners attractivity
+Figure 9 presents histograms of the difference between the expected and real number of matches during the dating session,
+distinguishing males and females. There is an overestimation of the number of matches one will get during the session, with a stronger effect
+for men than women. This can be due to two effects:
+- People over-estimate themselves, thus the number of positive decisions they will *get*.
+- People over-estimate partners, thus the number of positive decisions they will *give*.
 
+As done before, we can check that this difference is significative with a one-sample t-test.
 """
 
 ##
@@ -822,7 +839,10 @@ pd.DataFrame({'p-value': [ttest_res_f.pvalue, ttest_res_m.pvalue],
               '99% CI (high)': [ttest_ci_f.high, ttest_ci_m.high]},
              index=['Females', 'Males'])
 
-
+"""
+The expectation vs reality difference is undubitably significant for men. and also for women,
+although the p-value in this latter case is closer to our threshold of 0.01.
+"""
 
 
 # %%
@@ -851,8 +871,6 @@ but more so for the dating decision than for the partner appreciation.
 # %%
 """
 ### Age and income difference between matching partners
-
-
 """
 
 gd_df = df.loc[df['match']==1, ['pid', 'gender', 'age', 'income']]
@@ -903,7 +921,13 @@ plt.show()
 
 
 """
+Figure 10 presents the age (left panel) and income (right panel) difference between the female and male partner.
+There is a tendency for the age difference to be negative (males are older than women),
+but the distribution is broad and the effect appears limited (less than 1 year).
+The average income difference is negligible.
 
+The measured effects are smaller than in the general population, which is probably related to the fact that this is a student population,
+hence rather homogeneous in terms of age and income.
 """
 
 ttest_res_age = ttest_1samp(age_diff, popmean=0, nan_policy='omit', alternative='two-sided')
@@ -917,15 +941,13 @@ pd.DataFrame({'p-value': [ttest_res_age.pvalue, ttest_res_income.pvalue],
              index=['Age difference', 'Income difference'])
 
 """
-
+As expected, with a one-sample t-test for these two quantities, we conclude only to a significative age difference.
 """
 
 
 # %%
-
 """
-### Attribute difference when 'liking' someone
-
+### Attributes difference associated to positive dating decisions
 """
 
 attr_data = df.loc[df['dec']==1, ['gender'] + [kw + '3_1' for kw in attr_kw[:-1]] + attr_kw[:-1]]
@@ -978,10 +1000,15 @@ plt.show()
 
 
 """
-
+We present in figure 11 hitograms of the difference between self-evaluated attribute ratings (`<attribute>3_*`)
+and the evaluation of partner attributes (`<attribute>`) when one is willing to date the partner again.
+The results here are harder to interpret due to the bias introduced by the attributes rating distributions, and possibly the fact that people are
+more severe towards other than themselves. However, we note that the histograms are skewed toward negative values when considering the ambition and intelligence
+difference in men. In other words, it seems to be a turndown when a woman appears more intelligent or ambitious to the man than himself.
 """
 
 ##
+print('===== Female t-test results ======')
 ttest_res_f = ttest_1samp(f_attr_diff, popmean=0, nan_policy='omit', alternative='two-sided')
 ttest_ci_f = ttest_res_f.confidence_interval(confidence_level=0.99)
 pd.DataFrame({'p-value': ttest_res_f.pvalue,
@@ -990,6 +1017,7 @@ pd.DataFrame({'p-value': ttest_res_f.pvalue,
              index=attributes[:-1])
 
 ##
+print('===== Male t-test results ======')
 ttest_res_m = ttest_1samp(m_attr_diff, popmean=0, nan_policy='omit', alternative='two-sided')
 ttest_ci_m = ttest_res_m.confidence_interval(confidence_level=0.99)
 pd.DataFrame({'p-value': ttest_res_m.pvalue,
@@ -998,13 +1026,13 @@ pd.DataFrame({'p-value': ttest_res_m.pvalue,
              index=attributes[:-1])
 
 """
-
+The t-tests carried here reveal a neat turndown effect of a greater perceived intelligence of the woman partner for men.
 """
 
 
 # %%
 """
-### Primality effect
+### Primality effect in dating decision
 
 We conclude by investigating a form of primality effect in dating.
 """
@@ -1044,8 +1072,19 @@ threshold (in economic terms, the marginal cost) increases to attribute a like.
 """
 
 # %% Conclusion
-
 """
+## <a name="conclusion"></a> Conclusion and perspectives
 
+Throughout the analysis of this dataset, we revealed soe interesting effects about the heterosexual mating behavior.
+- The tendency for people of both genders to overestimate themselves
+- An overestimation of one's success in dating
+- Some strong racial affinities (especially for black people)
+- The tendency for men to be turned down by women appearing more intelligent than themselves
+
+
+However, the dataset is very large, and we only covered a part of it in terms of analysis. In particular, for further analysis
+we could investigate:
+- The follow up. Do people actually date again? With what success?
+- The impact of motivations on the outcome of the dating session (and the follow up)
 """
 

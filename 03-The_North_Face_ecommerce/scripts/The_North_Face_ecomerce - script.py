@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-
+Script version of the North Face ecommerce project.
 """
 
 import numpy as np

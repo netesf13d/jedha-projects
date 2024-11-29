@@ -34,18 +34,33 @@ import matplotlib.pyplot as plt
 ## <a name="loading"></a> Data loading and preprocessing
 """
 
-with open('./steam_game_output.json', 'rt', encoding='utf-8') as f:
+with open('../steam_game_output.json', 'rt', encoding='utf-8') as f:
     data = json.load(f)
 
 df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
-df = pd.DataFrame.from_dict(df_dict)
+raw_df = pd.DataFrame.from_dict(df_dict)
+# parse release date
+raw_df = raw_df.assign(
+    release_date=pd.to_datetime(raw_df['release_date'], format='%Y/%m/%d'))
+# convert price to $
+raw_df = raw_df.assign(price=raw_df['price'].astype(float)/100)
+
+# parse nb of owners 
+
+
+df_ = raw_df.iloc[:100]
+
+#%%
+
+a = df_['owners'].apply(lambda s: s.replace(',', '').split(' .. '))
+
 
 # TODO tags df
 # TODO categories df (of bool)
 # TODO platforms df
 # TODO parse owners
-# TODO parse date
-# TODO price in cents
+# OK TODO parse date
+# OK TODO price in cents
 
 
 # %% EDA

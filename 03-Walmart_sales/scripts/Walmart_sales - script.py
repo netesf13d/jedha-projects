@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script for the Walmart sales project.
+Script version of the Walmart sales project.
 """
 
 from datetime import datetime
@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 """
 
 # Load data
-raw_df = pd.read_csv('./Walmart_Store_sales.csv')
+raw_df = pd.read_csv('../Walmart_Store_sales.csv')
 raw_df = raw_df.assign(Store=raw_df['Store'].astype(int))
 raw_df = raw_df.assign(Date=pd.to_datetime(raw_df['Date'], format='%d-%m-%Y'))
 # Remove records with NaNs in target 'Weekly_Sales'
