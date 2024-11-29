@@ -18,12 +18,12 @@ import matplotlib.pyplot as plt
 """
 
 ##
-pp_df = pd.read_csv('./get_around_pricing_project.csv')
+pp_df = pd.read_csv('../get_around_pricing_project.csv')
 pp_df = pp_df.drop('Unnamed: 0', axis=1)
 pp_df
 
 ##
-da_df = pd.read_excel('./get_around_delay_analysis.xlsx')
+da_df = pd.read_excel('../get_around_delay_analysis.xlsx')
 da_df
 
 """
@@ -35,8 +35,18 @@ However, we will use it to build target feature to train our ML model.
 
 We should include all the data available in our exploratory data analysis. we build a combined dataframe `eda_df` for this purpose.
 """
+
 eda_df = pd.concat([da_df, pp_df], axis=1)
 eda_df
+
+
+"""
+`'checkin_type'`: `{'mobile', 'connect'}` 
+`'state'`: `{'ended', 'cancelled'}`, whether the rental was cancelled or not
+`'delay_at_checkout_in_minutes'`: delay between the expected and actual checkout times (positive means checkout later than expected)
+`'time_delta_with_previous_rental_in_minutes'`: How long the car stood by unrented (longer is a loss of money)
+
+"""
 
 
 # %% EDA
@@ -48,21 +58,26 @@ eda_df
 
 ##
 a = da_df['car_id'].astype(object).describe()
+print(a)
 
 ##
 b = da_df.loc[:, ['delay_at_checkout_in_minutes', 'time_delta_with_previous_rental_in_minutes']].describe()
+print(b)
 
 ##
 c = da_df.loc[:, ['checkin_type', 'state']].describe()
+print(c)
 
 
 """
-super nice
+There are 8143 cars available on the platform
 """
 
 """
 ### some graphs
 
+
+- follow the trajectory of a car
 """
 
 
