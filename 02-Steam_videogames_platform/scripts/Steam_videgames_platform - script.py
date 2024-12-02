@@ -26,6 +26,7 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 
@@ -34,27 +35,30 @@ import matplotlib.pyplot as plt
 ## <a name="loading"></a> Data loading and preprocessing
 """
 
+##
 with open('../steam_game_output.json', 'rt', encoding='utf-8') as f:
     data = json.load(f)
 
 df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
 raw_df = pd.DataFrame.from_dict(df_dict)
+# ccu means concurrent users
+raw_df
+
+##
 # parse release date
 raw_df = raw_df.assign(
     release_date=pd.to_datetime(raw_df['release_date'], format='mixed'))
+
 # convert price to $
 raw_df = raw_df.assign(price=raw_df['price'].astype(float)/100,
                        initialprice=raw_df['initialprice'].astype(float)/100)
-# parse nb of owners
-# log ranges => geometric mean
-owners_range = raw_df['owners'].apply(lambda s: s.replace(',', '').split(' .. '))
-owners_range = np.array(owners_range.to_list(), dtype=np.int64)
-owners_est = np.prod(np.where(owners_range==0, 1, owners_range), axis=1)
-owners_est = np.sqrt(owners_est)
 
-raw_df = raw_df.assign(owners_low=owners_range[:, 0],
-                       owners_high=owners_range[:, 1],
-                       owners_est=owners_est)
+# parse required_age as int
+required_age = raw_df['required_age'] \
+    .astype(str) \
+    .apply(lambda s: ''.join(c for c in s if c.isdigit())) \
+    .astype(int)
+raw_df = raw_df.assign(required_age=required_age)
 
 """
 The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
@@ -62,6 +66,17 @@ In order to preserve such scaling, we estimate the number of owners from the two
 This is problematic for the lowest range (0 - 20000), which we estimate by $\sqrt{20000} \simeq 141}.
 We must keep in mind that this last value probably underrates the actual number of owners.
 """
+
+# parse nb of owners
+# log ranges => geometric mean
+owners_range = raw_df['owners'].apply(lambda s: s.replace(',', '').split(' .. '))
+owners_range = np.array(owners_range.to_list(), dtype=np.int64)
+owners_est = np.prod(np.where(owners_range==0, 1, owners_range), axis=1)
+owners_est = np.sqrt(owners_est)
+raw_df = raw_df.assign(owners_low=owners_range[:, 0],
+                       owners_high=owners_range[:, 1],
+                       owners_est=owners_est)
+
 
 # %% build multiple dataframes
 
@@ -72,6 +87,10 @@ main_cols = [
     'release_date', 'required_age', 'owners_low', 'owners_high', 'owners_est'
 ]
 main_df = raw_df.loc[:, main_cols]
+
+
+##
+release_dates = pd.DatetimeIndex(main_df.loc[:, 'release_date'])
 
 
 ##
@@ -227,17 +246,21 @@ vals = np.sqrt(bins[:-1] * bins[1:])
 vals[0] = 1
 
 
-# fig3, axs3 = plt.subplots(
-#     nrows=1, ncols=2, figsize=(7, 4), dpi=100,
-#     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-# fig3.suptitle('Figure 3: Distribution of published/developed games', x=0.02, ha='left')
+fig3, axs3 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 4), dpi=100,
+    gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
+fig3.suptitle('Figure 3: Distribution of published/developed games', x=0.02, ha='left')
 
-# axs3[0].plot(vals, np.histogram(publishers, bins)[0], marker='o', linestyle='')
-# axs3[0].set_xscale('log')
-# axs3[0].set_yscale('log')
-# axs3[0].grid(visible=True)
-# axs3[0].set_xlabel('number of games published')
-# axs3[0].set_ylabel('number of publishers')
+axs3[0].plot(vals, np.histogram(publishers, bins)[0],
+             marker='o', linestyle='', alpha=0.8, label='publishers')
+axs3[0].plot(vals, np.histogram(developers, bins)[0],
+             marker='o', linestyle='', alpha=0.7, label='developers')
+axs3[0].set_xscale('log')
+axs3[0].set_yscale('log')
+axs3[0].grid(visible=True)
+axs3[0].set_xlabel('number of games published')
+axs3[0].set_ylabel('number of publishers')
+axs3[0].legend()
 
 # axs3[1].plot(vals, np.histogram(developers, bins)[0], marker='o', linestyle='')
 # axs3[1].set_xscale('log')
@@ -246,7 +269,7 @@ vals[0] = 1
 # axs3[1].set_xlabel('number of games developed')
 # axs3[1].set_ylabel('number of developers')
 
-# plt.show()
+plt.show()
 
 """
 Figure 3 shows the 
@@ -278,19 +301,24 @@ fig4, axs4 = plt.subplots(
     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
 fig4.suptitle('Figure 4: Distribution of published/developed games', x=0.02, ha='left')
 
-axs4[0].plot(vals, np.histogram(publishers_by_owners, bins)[0], marker='o', linestyle='')
+axs4[0].plot(vals, np.histogram(publishers_by_owners, bins)[0],
+             marker='o', linestyle='', alpha=0.8, label='publishers')
+axs4[0].plot(vals, np.histogram(developers_by_owners, bins)[0],
+             marker='o', linestyle='', alpha=0.7, label='developpers')
 axs4[0].set_xscale('log')
 axs4[0].set_yscale('log')
 axs4[0].grid(visible=True)
-axs4[0].set_xlabel('number of games published')
-axs4[0].set_ylabel('number of publishers')
+axs4[0].set_xlabel('Customers base')
+axs4[0].set_ylabel('number of publishers / developers')
+axs4[0].legend()
 
-axs4[1].plot(vals, np.histogram(developers_by_owners, bins)[0], marker='o', linestyle='')
-axs4[1].set_xscale('log')
-axs4[1].set_yscale('log')
-axs4[1].grid(visible=True)
-axs4[1].set_xlabel('number of games developed')
-axs4[1].set_ylabel('number of developers')
+
+# axs4[1].plot(vals, np.histogram(developers_by_owners, bins)[0], marker='o', linestyle='')
+# axs4[1].set_xscale('log')
+# axs4[1].set_yscale('log')
+# axs4[1].grid(visible=True)
+# axs4[1].set_xlabel('number of games developed')
+# axs4[1].set_ylabel('number of developers')
 
 plt.show()
 
@@ -305,14 +333,59 @@ Figure 4 shows the
 
 
 - releases evolution in time
+
+
+Comment difficulty to evaluate nb of players evolution
 """
 
+##
+release_df = pd.DataFrame({'nb_releases': np.ones(len(release_dates))},
+                          index=release_dates)
+release_df
+
+##
+releases_per_month = release_df.resample('MS').sum()
+cumulative_releases = releases_per_month.cumsum()
+
+
+##
+fig5, axs5 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 3.5), dpi=100,
+    gridspec_kw={'left': 0.09, 'right': 0.97, 'top': 0.89, 'bottom': 0.14, 'wspace': 0.24})
+fig5.suptitle('Figure 5: Evolution of game releases', x=0.02, ha='left')
+
+axs5[0].plot(releases_per_month.index, releases_per_month,
+             marker='', linestyle='-')
+axs5[0].set_xlim(12410, 19730)
+axs5[0].xaxis.set_major_locator(mdates.YearLocator(4))
+axs5[0].set_ylim(0, 900)
+axs5[0].grid(visible=True)
+axs5[0].set_xlabel('Date')
+axs5[0].set_ylabel('Monthly game releases')
+axs5[0].legend()
+
+
+axs5[1].plot(cumulative_releases.index, cumulative_releases,
+             marker='', linestyle='-')
+axs5[1].set_xlim(12410, 19730)
+axs5[1].xaxis.set_major_locator(mdates.YearLocator(4))
+axs5[1].set_ylim(0, 60000)
+axs5[1].set_yticks(np.linspace(0, 60000, 7), np.arange(0, 70, 10))
+axs5[1].grid(visible=True)
+axs5[1].set_xlabel('Date')
+axs5[1].set_ylabel('Cumulative game releases (x 1000)')
+
+plt.show()
+
+"""
+Jump of about 10-20% around covid period
+"""
 
 
 
 # %%
 """
-
+### Games release evolution
 
 
 
@@ -327,6 +400,43 @@ Figure 4 shows the
 
 
 """
+
+##
+main_df['required_age'].value_counts()
+
+##
+df_ = main_df.loc[main_df['required_age'] > 15, ['name', 'owners_est']] \
+    .sort_values('owners_est', ascending=False)
+df_.head(20)
+
+##
+print(f"Estimated ??? {df_['owners_est'].sum()/1e6:.0f}M")
+print(f"Estimated share of 16+ games: {df_['owners_est'].sum() / main_df['owners_est'].sum():.4f}")
+
+"""
+Although most games have no age requirements, some superproductions have an age requirement.
+In terms of market share, this represents an estimated 4.3% of market share for those games.
+"""
+
+##
+languages_df.iloc[:, 2:].sum().sort_values(ascending=False).head(20)
+
+##
+df_ = main_df.loc[languages_df.iloc[:, 2:].sum(axis=1)>10, ['name', 'owners_est']]
+df_.sort_values('owners_est', ascending=False).head(20)
+
+##
+df_['owners_est'].sum()
+
+"""
+Almost all games are available in english. There is a gap 
+About 20% of them are also available in other european languages (french, german, italian, etc).
+
+
+Translation to subtitles, not necessarily of voice
+"""
+
+
 
 # %% Genres
 
@@ -358,8 +468,13 @@ Figure 4 shows the
 - platform availability evolution tendency (window release date and look at pllatform availability)
 """
 
-
+##
 platforms_df.sum()
+
+##
+main_df.loc[platforms_df['linux'].to_numpy(), ['name', 'owners_est']].sum() # .sort_values('owners_est', ascending=False).head(20)
+
+
 
 platforms_df.sum() / len(platforms_df)
 
