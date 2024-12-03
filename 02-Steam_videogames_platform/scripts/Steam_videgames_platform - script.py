@@ -96,29 +96,32 @@ release_dates = pd.DatetimeIndex(main_df.loc[:, 'release_date'])
 ##
 all_tags = set.union(*[set(tags) for tags in raw_df['tags']])
 tags_df = pd.DataFrame.from_dict(
-    {'appid': main_df['appid']} |
     {t: [tags.get(t, 0) for tags in raw_df['tags']] for t in all_tags},
     dtype='Sparse[int]')
+
+
+##
+genres = [set(genre.split(', ')) for genre in raw_df['genre']]
+all_genres = set.union(*genres)
+genres_df = pd.DataFrame.from_dict(
+    {genre: [(genre in g) for g in genres] for genre in all_genres})
 
 
 ##
 categories = [set(cat) for cat in raw_df['categories']]
 all_categories = set.union(*categories)
 categories_df = pd.DataFrame.from_dict(
-    {'appid': main_df['appid'], 'name': main_df['name']} |
     {c: [(c in cat) for cat in categories] for c in all_categories})
 
 
 ##
-platforms_df = pd.DataFrame(raw_df['platforms'].to_list(),
-                            index=main_df['appid'])
+platforms_df = pd.DataFrame(raw_df['platforms'].to_list())
 
 
 ##
 languages = [set(lang.split(', ')) for lang in raw_df['languages']]
 all_languages = set.union(*languages)
 languages_df = pd.DataFrame.from_dict(
-    {'appid': main_df['appid'], 'name': main_df['name']} |
     {lang: [(lang in langs) for langs in languages] for lang in all_languages})
 
 
@@ -419,10 +422,10 @@ In terms of market share, this represents an estimated 4.3% of market share for 
 """
 
 ##
-languages_df.iloc[:, 2:].sum().sort_values(ascending=False).head(20)
+languages_df.sum().sort_values(ascending=False).head(20)
 
 ##
-df_ = main_df.loc[languages_df.iloc[:, 2:].sum(axis=1)>10, ['name', 'owners_est']]
+df_ = main_df.loc[languages_df.sum(axis=1)>10, ['name', 'owners_est']]
 df_.sort_values('owners_est', ascending=False).head(20)
 
 ##
@@ -443,14 +446,38 @@ Translation to subtitles, not necessarily of voice
 """
 ## <a name="genres"></a> Genres analysis
 
-- most represented in terms of nb games
-- best rated genres
+OK - most represented in terms of nb games
+OK - best rated genres
 - genres by publishers
 - number of players by genres
 - most lucrative genres (nb players * price)
 - genres evolution
 """
 
+##
+genres_df.sum().sort_values(ascending=False)
+
+"""
+Mostly independent games
+action, adventure, strategy, simulation, RPG, sports, racing
+"""
+
+##
+grades = main_df['positive'] / (main_df['positive'] + main_df['negative'])
+weights = (main_df['positive'] + main_df['negative']).apply(np.sqrt)
+
+genre_grades = {}
+for genre_name, genre in genres_df.items():
+    w = weights.loc[genre]
+    genre_grades[genre_name] = (grades.loc[genre] * w).sum() / w.sum()
+grades_df = pd.Series(genre_grades, name='grade')
+grades_df.sort_values(ascending=False)
+
+"""
+Generally positive
+"""
+
+##
 
 
 
