@@ -175,36 +175,100 @@ df_.sort_values('revenues_est', ascending=False).iloc[:20]
 
 # TODO fig
 ##
-owners_distrib = main_df['owners_est'].value_counts()
-
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(5, 4), dpi=100,
-    gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-fig1.suptitle('Figure 1: Distribution of game owners', x=0.02, ha='left')
+    gridspec_kw={'left': 0.13, 'right': 0.95, 'top': 0.89, 'bottom': 0.14})
+fig1.suptitle('Figure 1: Game prices distribution', x=0.02, ha='left')
 
-ax1.plot(owners_distrib.index, owners_distrib.to_numpy(), marker='o', linestyle='')
-ax1.set_xscale('log')
-ax1.set_yscale('log')
+ax1.hist(df_['price'], bins = np.linspace(0, 100, 51))
+ax1.set_xlim(0, 80)
+ax1.set_ylim(0, 20000)
+ax1.set_yticks(np.linspace(0, 20000, 11), np.arange(0, 21, 2))
 ax1.grid(visible=True)
-ax1.set_xlabel('number of owners')
-ax1.set_ylabel('number of games')
+ax1.set_xlabel('Price')
+ax1.set_ylabel('Number of owners (x1000)')
 
 plt.show()
 
+#%%
 ##
-# fig2, axs2 = plt.subplots(
-#     nrows=1, ncols=1, figsize=(5, 4), dpi=100,
-#     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-# fig2.suptitle('Figure 1: Distribution of game owners', x=0.02, ha='left')
+owners_distrib = df_['owners_est'].value_counts()
 
-# axs2.plot(owners_distrib.index, owners_distrib.to_numpy(), marker='o', linestyle='')
-# axs2.set_xscale('log')
-# axs2.set_yscale('log')
-# axs2.grid(visible=True)
-# axs2.set_xlabel('number of owners')
-# axs2.set_ylabel('number of games')
+##
+tot_owners = df_['owners_est'].sum()
+cum_owners = (df_['owners_est'].sort_values().cumsum() / tot_owners).to_numpy()
+own_frac = np.linspace([1], [0], 201, endpoint=True)
+own_nb_games = len(cum_owners) - np.argmax(cum_owners >= own_frac, axis=-1)
+own_nb_games[0] = 0
 
-# plt.show()
+#%%
+##
+bins = np.concatenate([[0], np.logspace(4, 10, 19)])
+revenues_distrib = np.histogram(df_['revenues_est'], bins=bins)[0]
+vals = np.sqrt(bins[:-1] * bins[1:])
+vals[0] = np.sqrt(1e4)
+
+##
+tot_revenues = df_['revenues_est'].sum()
+cum_revenues = (df_['revenues_est'].sort_values().cumsum() / tot_revenues).to_numpy()
+cum_revenues = cum_revenues[cum_revenues > 0]
+rev_frac = np.linspace([1], [0], 201, endpoint=True)
+rev_nb_games = len(cum_revenues) - np.argmax(cum_revenues >= rev_frac, axis=-1)
+rev_nb_games[0] = 0
+
+
+#%%
+##
+fig2, axs2 = plt.subplots(
+    nrows=2, ncols=2, figsize=(7, 6), dpi=100,
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.89, 'bottom': 0.1,
+                 'wspace': 0.24, 'hspace': 0.32})
+fig2.suptitle('Figure 2: Distribution of game owners and revenues', x=0.02, ha='left')
+
+
+axs2[0, 0].plot(owners_distrib.index, owners_distrib.to_numpy(),
+                marker='o', linestyle='')
+axs2[0, 0].set_xscale('log')
+axs2[0, 0].set_xlim(1e1, 1e10)
+axs2[0, 0].set_yscale('log')
+axs2[0, 0].set_ylim(3e-1, 1e5)
+axs2[0, 0].grid(visible=True)
+axs2[0, 0].set_xlabel('Number of owners')
+axs2[0, 0].set_ylabel('Number of games')
+
+
+axs2[0, 1].plot(own_nb_games, own_frac, marker='', linestyle='-')
+axs2[0, 1].plot([0, own_nb_games[100], own_nb_games[100]], [0.5, 0.5, 0],
+                color='k', lw=0.8, ls='--')
+axs2[0, 1].set_xscale('log')
+axs2[0, 1].set_xlim(8e-1, 1e5)
+axs2[0, 1].set_ylim(0, 1)
+axs2[0, 1].grid(visible=True)
+axs2[0, 1].set_xlabel('Number of games')
+axs2[0, 1].set_ylabel('Fraction of total game usage')
+
+
+axs2[1, 0].plot(vals, revenues_distrib, marker='o', linestyle='')
+axs2[1, 0].set_xscale('log')
+axs2[1, 0].set_xlim(1e1, 1e10)
+axs2[1, 0].set_yscale('log')
+axs2[1, 0].set_ylim(3e-1, 1e5)
+axs2[1, 0].grid(visible=True)
+axs2[1, 0].set_xlabel('Game revenue')
+axs2[1, 0].set_ylabel('number of games')
+
+
+axs2[1, 1].plot(rev_nb_games, rev_frac, marker='', linestyle='-')
+axs2[1, 1].plot([0, rev_nb_games[100], rev_nb_games[100]], [0.5, 0.5, 0],
+                color='k', lw=0.8, ls='--')
+axs2[1, 1].set_xscale('log')
+axs2[1, 1].set_xlim(8e-1, 1e5)
+axs2[1, 1].set_ylim(0, 1)
+axs2[1, 1].grid(visible=True)
+axs2[1, 1].set_xlabel('Number of games')
+axs2[1, 1].set_ylabel('Fraction of total revenues')
+
+plt.show()
 
 
 """
@@ -214,10 +278,11 @@ reveal some important characteristics of the game market.
 Above a certain threshold, the number of games with a $n$ owners is roughly proportional to $p(n) = \frac{A}{n^{\alpha}},
 where the exponent $\alpha$ is an empirical parameter of the distribution. The most important consequence is that a very small
 fraction of the games concentrates most of the game usage.
-- Some games are free, with sometimes a huge number of owners (eg Dota 2 with more than 200M users). Their apparent revenue (as we estimate it)
+- Most games are free, with sometimes a huge number of owners (eg Dota 2 with more than 200M users). Their apparent revenue (as we estimate it)
 is zero. Such games actually generate a major part of their revenue by selling in-games goods on dedicated marketplaces. This is an important
 aspect of the video game industry that we will not be able to analyze here.
-- The distribution of revenues shows that a large fraction is generated from a minor fraction of the games. Although we are missing 
+- The distribution of revenues shows that a large fraction is generated from a minor fraction of the games.
+About half the counted revenues originate from 200 games (less than 0.5 %!). Although we are missing 
 the revenues from microtransactions, advertisement, etc, the market structure is actually well reproduced by the domination of a few superproductions.
 """
 
@@ -248,29 +313,21 @@ bins = np.logspace(0, 3, 13)
 vals = np.sqrt(bins[:-1] * bins[1:])
 vals[0] = 1
 
-
-fig3, axs3 = plt.subplots(
-    nrows=1, ncols=2, figsize=(7, 4), dpi=100,
+fig3, ax3 = plt.subplots(
+    nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
 fig3.suptitle('Figure 3: Distribution of published/developed games', x=0.02, ha='left')
 
-axs3[0].plot(vals, np.histogram(publishers, bins)[0],
+ax3.plot(vals, np.histogram(publishers, bins)[0],
              marker='o', linestyle='', alpha=0.8, label='publishers')
-axs3[0].plot(vals, np.histogram(developers, bins)[0],
+ax3.plot(vals, np.histogram(developers, bins)[0],
              marker='o', linestyle='', alpha=0.7, label='developers')
-axs3[0].set_xscale('log')
-axs3[0].set_yscale('log')
-axs3[0].grid(visible=True)
-axs3[0].set_xlabel('number of games published')
-axs3[0].set_ylabel('number of publishers')
-axs3[0].legend()
-
-# axs3[1].plot(vals, np.histogram(developers, bins)[0], marker='o', linestyle='')
-# axs3[1].set_xscale('log')
-# axs3[1].set_yscale('log')
-# axs3[1].grid(visible=True)
-# axs3[1].set_xlabel('number of games developed')
-# axs3[1].set_ylabel('number of developers')
+ax3.set_xscale('log')
+ax3.set_yscale('log')
+ax3.grid(visible=True)
+ax3.set_xlabel('number of games published')
+ax3.set_ylabel('number of publishers')
+ax3.legend()
 
 plt.show()
 
@@ -285,7 +342,7 @@ publishers_by_owners = main_df.loc[:, ['publisher', 'owners_est']] \
                               .sort_values('owners_est', ascending=False)
 publishers_by_owners
 
-#
+##
 developers_by_owners = main_df.loc[:, ['developer', 'owners_est']] \
                               .groupby('developer') \
                               .sum() \
@@ -294,34 +351,24 @@ developers_by_owners
 
 
 ## plot
-
 bins = np.concatenate([[1, 10000], np.logspace(4, 9, 16)])
 vals = np.sqrt(bins[:-1] * bins[1:])
 
-
-fig4, axs4 = plt.subplots(
-    nrows=1, ncols=2, figsize=(7, 4), dpi=100,
+fig4, ax4 = plt.subplots(
+    nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
 fig4.suptitle('Figure 4: Distribution of published/developed games', x=0.02, ha='left')
 
-axs4[0].plot(vals, np.histogram(publishers_by_owners, bins)[0],
+ax4.plot(vals, np.histogram(publishers_by_owners, bins)[0],
              marker='o', linestyle='', alpha=0.8, label='publishers')
-axs4[0].plot(vals, np.histogram(developers_by_owners, bins)[0],
+ax4.plot(vals, np.histogram(developers_by_owners, bins)[0],
              marker='o', linestyle='', alpha=0.7, label='developpers')
-axs4[0].set_xscale('log')
-axs4[0].set_yscale('log')
-axs4[0].grid(visible=True)
-axs4[0].set_xlabel('Customers base')
-axs4[0].set_ylabel('number of publishers / developers')
-axs4[0].legend()
-
-
-# axs4[1].plot(vals, np.histogram(developers_by_owners, bins)[0], marker='o', linestyle='')
-# axs4[1].set_xscale('log')
-# axs4[1].set_yscale('log')
-# axs4[1].grid(visible=True)
-# axs4[1].set_xlabel('number of games developed')
-# axs4[1].set_ylabel('number of developers')
+ax4.set_xscale('log')
+ax4.set_yscale('log')
+ax4.grid(visible=True)
+ax4.set_xlabel('Customers base')
+ax4.set_ylabel('number of publishers / developers')
+ax4.legend()
 
 plt.show()
 
@@ -448,10 +495,10 @@ Translation to subtitles, not necessarily of voice
 
 OK - most represented in terms of nb games
 OK - best rated genres
-- genres by publishers
-- number of players by genres
-- most lucrative genres (nb players * price)
-- genres evolution
+OK - genres by publishers
+OK - number of players by genres
+# - most lucrative genres (nb players * price)
+OK - genres evolution
 """
 
 ##
@@ -478,8 +525,74 @@ Generally positive
 """
 
 ##
+def genres_by_publisher(publisher: str)-> pd.DataFrame:
+    df_ = genres_df[main_df['publisher'] == publisher]
+    return df_.sum()
+
+genres_by_publisher('Valve')
+genres_by_publisher('Ubisoft')
 
 
+##
+genre_owners = {}
+for genre_name, genre in genres_df.items():
+    genre_owners[genre_name] = main_df.loc[genre, 'owners_est'].sum()
+genre_owners_df = pd.Series(genre_owners, name='grade')
+genre_owners_df.sort_values(ascending=False)
+
+"""
+Action and advrenture are the most popular genre. Independent (`'Indie'`) games take
+a significant market share.
+"""
+
+## 
+genre_release_df = genres_df.set_index(release_dates)
+genre_releases_per_month = genre_release_df.resample('MS').sum()
+cumulative_genre_releases = genre_releases_per_month.cumsum()
+
+##
+COLORS = [
+    '#7e1e9c', '#15b01a', '#0343df', '#ff81c0', '#653700', '#e50000',
+    '#95d0fc', '#029386', '#f97306', '#96f97b', '#c20078', '#ffff14',
+    '#75bbfd', '#929591', '#0cff0c', '#bf77f6', '#9a0eea', '#033500',
+    '#06c2ac', '#c79fef', '#00035b', '#d1b26f', '#00ffff', '#06470c',
+    ]
+
+fig6, axs6 = plt.subplots(
+    nrows=1, ncols=2, figsize=(8, 5), dpi=100,
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.57, 'bottom': 0.1, 'wspace': 0.25})
+fig6.suptitle('Figure 6: Evolution of game genre releases', x=0.02, ha='left')
+
+polys = axs6[0].stackplot(genre_releases_per_month.index, genre_releases_per_month.T,
+                  colors=COLORS)
+axs6[0].set_xlim(12410, 19730)
+axs6[0].xaxis.set_major_locator(mdates.YearLocator(4))
+axs6[0].set_ylim(0, 2500)
+axs6[0].set_yticks(np.linspace(0, 2500, 6), np.linspace(0, 2.5, 6))
+axs6[0].grid(visible=True)
+axs6[0].set_xlabel('Date')
+axs6[0].set_ylabel('Monthly game releases (x 1000)')
+
+
+
+axs6[1].stackplot(cumulative_genre_releases.index, cumulative_genre_releases.T,
+                  baseline='zero', colors=COLORS)
+axs6[1].set_xlim(12410, 19730)
+axs6[1].xaxis.set_major_locator(mdates.YearLocator(4))
+axs6[1].set_ylim(0, 160000)
+axs6[1].set_yticks(np.linspace(0, 160000, 9), np.arange(0, 180, 20))
+axs6[1].grid(visible=True)
+axs6[1].set_xlabel('Date')
+axs6[1].set_ylabel('Cumulative game releases (x 1000)')
+
+fig6.legend(handles=polys, labels=genre_release_df.columns.to_list(),
+            ncols=4, loc=(0.02, 0.59))
+
+plt.show()
+
+"""
+The increasing trend in games release is the same for all the major genres.
+"""
 
 
 # %% Platform
@@ -488,24 +601,92 @@ Generally positive
 ## <a name="platform"></a> Platform analysis
 
 
-- general platform availability
-- genres and platforms
-- nb owners and platforms
-- price and platform
-- platform availability evolution tendency (window release date and look at pllatform availability)
+OK - general platform availability
+OK - nb owners and platforms
+OK - genres and platforms
+# - price and platform
+- platform availability evolution tendency (window release date and look at platform availability)
 """
 
 ##
 platforms_df.sum()
 
 ##
-main_df.loc[platforms_df['linux'].to_numpy(), ['name', 'owners_est']].sum() # .sort_values('owners_est', ascending=False).head(20)
-
-
-
 platforms_df.sum() / len(platforms_df)
 
 
+"""
+Almost all games are available on Windows, while only 23% and !%% of the games are available on Mac and linux, respectively.
+"""
+
+##
+# main_df.loc[platforms_df['linux'], ['name', 'owners_est']].sum() # .sort_values('owners_est', ascending=False).head(20)
+df_ = main_df.loc[:, ['owners_est']*3].set_axis(platforms_df.columns, axis=1)
+df_ = df_.mask(~platforms_df.to_numpy(), other=0.).sum()
+df_
+
+##
+df_ / main_df['owners_est'].sum()
+
+"""
+Although only 15-20% of the games are available to Mac and Linux users, the availability rises to 30-40%
+in terms of games usage basis. This means that popular games tend to be available on Mac and Linux.
+"""
+
+##
+genre_availability = {}
+for platform, mask in platforms_df.items():
+    genre_availability[platform] = genres_df.loc[mask].sum()
+genre_availability_df = pd.DataFrame(genre_availability)
+idx = genre_availability_df.sum(axis=1).sort_values(ascending=False).index
+genre_availability_df.loc[idx]
+
+##
+(genre_availability_df / genres_df.sum().to_numpy()[:, None]).loc[idx]
+
+"""
+Independent and strategy games have a larger availability on Mac and Linux platforms than average.
+"""
+
+##
+platform_release_df = platforms_df.set_index(release_dates)
+platform_releases_per_month = platform_release_df.resample('MS').sum()
+cumulative_platform_releases = platform_releases_per_month.cumsum()
+
+##
+fig7, axs7 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 3.8), dpi=100,
+    gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.83, 'bottom': 0.13, 'wspace': 0.25})
+fig7.suptitle('Figure 7: Evolution of game releases in different platforms', x=0.02, ha='left')
+
+polys = axs7[0].stackplot(platform_releases_per_month.index, platform_releases_per_month.T)
+axs7[0].set_xlim(12410, 19730)
+axs7[0].xaxis.set_major_locator(mdates.YearLocator(4))
+axs7[0].set_ylim(0, 1200)
+axs7[0].set_yticks(np.linspace(0, 1200, 7))
+axs7[0].grid(visible=True)
+axs7[0].set_xlabel('Date')
+axs7[0].set_ylabel('Monthly game releases (x 1000)')
+
+
+
+axs7[1].stackplot(cumulative_platform_releases.index, cumulative_platform_releases.T)
+axs7[1].set_xlim(12410, 19730)
+axs7[1].xaxis.set_major_locator(mdates.YearLocator(4))
+axs7[1].set_ylim(0, 80000)
+axs7[1].set_yticks(np.linspace(0, 80000, 9), np.arange(0, 90, 10))
+axs7[1].grid(visible=True)
+axs7[1].set_xlabel('Date')
+axs7[1].set_ylabel('Cumulative game releases (x 1000)')
+
+fig7.legend(handles=polys, labels=platform_release_df.columns.to_list(),
+            ncols=3, loc=(0.3, 0.86))
+
+plt.show()
+
+"""
+The trend is stable over time.
+"""
 
 
 
