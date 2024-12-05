@@ -4,22 +4,6 @@
 
 """
 
-# import os
-# import sys
-
-# os.environ['PYSPARK_PYTHON'] = sys.executable
-# os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
-
-# import findspark
-# findspark.init("/home/netes/.spark/spark-3.5.3-bin-hadoop3")
-
-# from pyspark.sql import SparkSession
-# from pyspark import SparkContext
-
-# sc = SparkContext(appName="jedha_stuff")
-
-
-# spark = SparkSession.builder.getOrCreate()
 
 import json
 
@@ -125,15 +109,8 @@ languages_df = pd.DataFrame.from_dict(
     {lang: [(lang in langs) for langs in languages] for lang in all_languages})
 
 
-# OK TODO tags df
-# OK TODO categories df (of bool)
-# OK TODO platforms df
-# OK TODO parse owners
-# OK TODO parse date
-# OK TODO price in cents
-
-
 # %% Macro
+# TODO comment
 """
 ## <a name="macro"></a> Macro-level analysis
 
@@ -173,7 +150,6 @@ df_.sort_values('owners_est', ascending=False).iloc[:20]
 df_.sort_values('revenues_est', ascending=False).iloc[:20]
 
 
-# TODO fig
 ##
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(5, 4), dpi=100,
@@ -190,7 +166,13 @@ ax1.set_ylabel('Number of owners (x1000)')
 
 plt.show()
 
-#%%
+"""
+Figure 1 shows the distribution of prices.
+There are many free games (7700)
+We note the price pattern 4.99, 9.99, 14.99...
+"""
+
+
 ##
 owners_distrib = df_['owners_est'].value_counts()
 
@@ -201,7 +183,6 @@ own_frac = np.linspace([1], [0], 201, endpoint=True)
 own_nb_games = len(cum_owners) - np.argmax(cum_owners >= own_frac, axis=-1)
 own_nb_games[0] = 0
 
-#%%
 ##
 bins = np.concatenate([[0], np.logspace(4, 10, 19)])
 revenues_distrib = np.histogram(df_['revenues_est'], bins=bins)[0]
@@ -217,12 +198,11 @@ rev_nb_games = len(cum_revenues) - np.argmax(cum_revenues >= rev_frac, axis=-1)
 rev_nb_games[0] = 0
 
 
-#%%
 ##
 fig2, axs2 = plt.subplots(
     nrows=2, ncols=2, figsize=(7, 6), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.89, 'bottom': 0.1,
-                 'wspace': 0.24, 'hspace': 0.32})
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.9, 'bottom': 0.1,
+                 'wspace': 0.24, 'hspace': 0.36})
 fig2.suptitle('Figure 2: Distribution of game owners and revenues', x=0.02, ha='left')
 
 
@@ -287,13 +267,14 @@ the revenues from microtransactions, advertisement, etc, the market structure is
 """
 
 # %%
-
 """
 ### Games publishers and developers
 
-We now study how the market is shared among game publishers and developers.
+We now study how the market is shared among game publishers and developers. We first analyze things in terms
+of games released. One important metric in the game industry is the number of units sold, which we analyze in second.
 
-OK - publisher with most releases
+
+#### Games producers by games releases
 """
 
 ##
@@ -305,8 +286,10 @@ developers = main_df['developer'].value_counts()
 developers
 
 """
-The total number of publishers/developers is about 30000.
-Among these, only 1000 published/developed 6 games or more.
+There are about 30000 publishers/developers. We recognize some well known companies among top publishers
+(SEGA, Square Enix). The developer names are less familiar, but we note the presence of individuals
+(Laush Dmitriy Sergeevich, Artur Smiarowski). These are independent developers, that actually take a large
+part of the released games.
 """
 
 bins = np.logspace(0, 3, 13)
@@ -316,7 +299,7 @@ vals[0] = 1
 fig3, ax3 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-fig3.suptitle('Figure 3: Distribution of published/developed games', x=0.02, ha='left')
+fig3.suptitle('Figure 3: Distribution of released games', x=0.02, ha='left')
 
 ax3.plot(vals, np.histogram(publishers, bins)[0],
              marker='o', linestyle='', alpha=0.8, label='publishers')
@@ -326,13 +309,22 @@ ax3.set_xscale('log')
 ax3.set_yscale('log')
 ax3.grid(visible=True)
 ax3.set_xlabel('number of games published')
-ax3.set_ylabel('number of publishers')
+ax3.set_ylabel('number of publishers/developers')
 ax3.legend()
 
 plt.show()
 
 """
-Figure 3 shows the 
+Figure 3 shows the distribution of games release by publisher/developer. The plotted values were obtained
+in the same way as figure 2: the raw values were binned in logarithmic ranges and positioned at the geometric mean of the bounds.
+Similarly to figure 2, we note that the distribution is fat-tailed. Out of the 30000, more than 20000 developers/publishers released only one game.
+Only a dozen released more than 100 games.
+"""
+
+"""
+#### Games producers by units owned
+
+We consider the total number of games sold by (or downloaded from) a publisher/developer.
 """
 
 ##
@@ -349,6 +341,12 @@ developers_by_owners = main_df.loc[:, ['developer', 'owners_est']] \
                               .sort_values('owners_est', ascending=False)
 developers_by_owners
 
+"""
+Here we sort the publishers/developers by number of owners of their games.
+The top names are all well known companies. The inhomogeneity in terms of owner base is large,
+ranging over 7 orders of magnitude. This is a combined effect: the largest companies also attract the largest public.
+"""
+
 
 ## plot
 bins = np.concatenate([[1, 10000], np.logspace(4, 9, 16)])
@@ -357,7 +355,7 @@ vals = np.sqrt(bins[:-1] * bins[1:])
 fig4, ax4 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-fig4.suptitle('Figure 4: Distribution of published/developed games', x=0.02, ha='left')
+fig4.suptitle('Figure 4: Distribution of owned games', x=0.02, ha='left')
 
 ax4.plot(vals, np.histogram(publishers_by_owners, bins)[0],
              marker='o', linestyle='', alpha=0.8, label='publishers')
@@ -366,18 +364,21 @@ ax4.plot(vals, np.histogram(developers_by_owners, bins)[0],
 ax4.set_xscale('log')
 ax4.set_yscale('log')
 ax4.grid(visible=True)
-ax4.set_xlabel('Customers base')
+ax4.set_xlabel('Total units owned')
 ax4.set_ylabel('number of publishers / developers')
 ax4.legend()
 
 plt.show()
 
 """
-Figure 4 shows the 
+Figure 4 shows the distribution of owned games by publisher/developer. The position of the first point is approximative due to the large uncertainty in the estination of owners in this case.
+As expected, we recover a fat-tailed distribution,
+with a number of units owned that spreads over 7 orders of magnitude. Some companies having "sold" close to 1 bilion games in total.
+
 """
 
 # %% 
-
+# TDOO comment
 """
 ### Games release evolution
 
@@ -434,6 +435,7 @@ Jump of about 10-20% around covid period
 
 
 # %%
+# TODO comment
 """
 ### Games release evolution
 
@@ -489,7 +491,7 @@ Translation to subtitles, not necessarily of voice
 
 
 # %% Genres
-
+# TODO comment
 """
 ## <a name="genres"></a> Genres analysis
 
@@ -596,7 +598,7 @@ The increasing trend in games release is the same for all the major genres.
 
 
 # %% Platform
-
+# TODO comment
 """
 ## <a name="platform"></a> Platform analysis
 
@@ -688,5 +690,45 @@ plt.show()
 The trend is stable over time.
 """
 
+# %% Conclusion
 
+"""
+## <a name="conclusion"></a> Conclusion and perspectives
+
+We can summarize the results of our study of Steam's game marketplace with the following points:
+- In terms of shares, the market is dominated by a few superproductions from major publisher companies.
+These games are played by many players and generate the largest revenues. This market structure is actually
+quite general and occurs accross the whole entertainment inductry (music, movies, series, etc).
+- About half publishers/developers released only one game. These are independent people or very small companies.
+Similarly to the revenues, the game release-by-company distribution is fat tailed,
+with only about 10 companies having released more than 100 games. 
+- This structure translates to the distribution of the company's customer base. The amplitude of variation here is even larger,
+considering that games released by large comanies also have more players.
+- The game releases seem stable since early 2020 with about 700-800 monthly releases.
+- The genre and platform availability of released games is stable over time
+
+
+In terms of strategy for a new videogame from an important company such as Ubisoft, we can provide the following advices:
+- The company has enough ressources to make a superproduction, which is definitely an option to consider.
+However, the associated production costs are also large and so are the financial risks.
+- For a video game with a completely new gameplay or concept, the risks might be unacceptable. For
+such a game, one could consider being less ambitious and test the concept on a smaller scale, for instance by
+publishing a game with limited production costs.
+- In terms of genres, one should focus on the main genres: action adventure, strategy, RPG, etc. and choose from
+those in which the company has expertise.
+- For a large production, translating the game is a necessity. Adapting the game to many platforms is also
+strategic since the associated costs are low as compared to the other production costs.
+The gains in players likely outweights the adaptation costs.
+
+
+Our analysis has some limitations, some of which we mentioned in the introduction. We recall the most important ones:
+- We have very limited information on the actual game usage. The number of game owners is provided as a rather braod range
+which forced us to construct a very rough estimate. We do not now whether people actually play to the game, nor how
+many time they spend playing.
+- The number of game owners corresponds to the values at the time when the datset was built. We have no information
+about its evolution in time, which would be useful to make prospects.
+- Our data are limited to computer platforms. it would be very beneficial to a market analysis to include video games usage in phones or consoles.
+- Even in the scope of computer platforms, we are only considering Steam's marketplace.
+We miss information for video games not directly available on Steam (for instance, Fortnite, one on the most played games).
+"""
 
