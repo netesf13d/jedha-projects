@@ -114,6 +114,8 @@ languages_df = pd.DataFrame.from_dict(
 """
 ## <a name="macro"></a> Macro-level analysis
 
+We begin our study by analyzing the market globally
+
 * Game pt of view
 * Publisher pt of view
 
@@ -378,15 +380,15 @@ with a number of units owned that spreads over 7 orders of magnitude. Some compa
 """
 
 # %% 
-# TDOO comment
 """
-### Games release evolution
+### Game releasse evolution
 
+A company can take more risks in terms of game production in the context of a healthy game market.
+The situation of the latter is therefore an important for our analysis.
+In this section, we study it through the evolution of game releases.
 
-- releases evolution in time
-
-
-Comment difficulty to evaluate nb of players evolution
+A better indication of the market health would be the evolution of the number of players,
+which is not available in this dataset.
 """
 
 ##
@@ -413,7 +415,6 @@ axs5[0].set_ylim(0, 900)
 axs5[0].grid(visible=True)
 axs5[0].set_xlabel('Date')
 axs5[0].set_ylabel('Monthly game releases')
-axs5[0].legend()
 
 
 axs5[1].plot(cumulative_releases.index, cumulative_releases,
@@ -429,7 +430,13 @@ axs5[1].set_ylabel('Cumulative game releases (x 1000)')
 plt.show()
 
 """
-Jump of about 10-20% around covid period
+Figure 5 presents the monthly game releases (left panel) and cumulated releases (right panel).
+Monthly releases stayed under 50 until 2013, when they increased steadily to 400 in 2017.
+This is possibly the result of an increase in popularity of Steam's platform, or a change of some sort in policy.
+For instance it could be the possibility for independent game developers to publish their games on the platform.
+We then note a jump of about 200 releases in 2017, which stabilizes at 600 during about 3 years. Its cause is unclear.
+This is followed, in early 2020 by another jump in game releases. This last increase occurs during the global COVID lockdown.
+The number of releases is stable between 700 and 800 since then.
 """
 
 
@@ -437,7 +444,7 @@ Jump of about 10-20% around covid period
 # %%
 # TODO comment
 """
-### Games release evolution
+### General game availability
 
 
 
@@ -462,12 +469,14 @@ df_ = main_df.loc[main_df['required_age'] > 15, ['name', 'owners_est']] \
 df_.head(20)
 
 ##
-print(f"Estimated ??? {df_['owners_est'].sum()/1e6:.0f}M")
-print(f"Estimated share of 16+ games: {df_['owners_est'].sum() / main_df['owners_est'].sum():.4f}")
+print(f"Estimated number of age-restricted games (16+ yo) sold: {df_['owners_est'].sum()/1e6:.0f}M")
+print(f"Estimated market share of age-restricted games: {df_['owners_est'].sum() / main_df['owners_est'].sum():.4f}")
 
 """
-Although most games have no age requirements, some superproductions have an age requirement.
-In terms of market share, this represents an estimated 4.3% of market share for those games.
+Although most games have no age requirements, some superproductions do have an age limit.
+Age-restricted games represent an estimated 4.3% of the global market share.
+Producing an age-restricted game has both advantages and disadvantages. On the one hand, the potential customer basis
+is mechanically reduced. On the other hand, it allows producers to introduce more features and mechanics in their games.
 """
 
 ##
