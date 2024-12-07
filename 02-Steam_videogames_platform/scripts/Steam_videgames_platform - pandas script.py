@@ -110,34 +110,19 @@ languages_df = pd.DataFrame.from_dict(
 
 
 # %% Macro
-# TODO comment
 """
 ## <a name="macro"></a> Macro-level analysis
 
-We begin our study by analyzing the market globally
+We begin our study by analyzing the market globally. We will focus on the following:
+- Games popularity and revenues
+- Publishers and developers popularity and revenues
+- Evolution of the market in terms of game releases
+- Games public and availability
 
-* Game pt of view
-* Publisher pt of view
 
+### Games popularity and revenues
 
-OK - Users distrib
-OK - prizes distrib
-OK - games revenues
-
-- releases evolution in time
-- most represented languages
-- required_age stats
-
-"""
-
-"""
-### Game usage and revenues
-
-We begin by analyzing global game consumption and associated revenues
-
-OK - Users distrib
-OK - prizes distrib
-OK - games revenues
+There are interesting patterns in game usage, price and revenues which we highlight here.
 """
 
 ##
@@ -145,12 +130,25 @@ df_ = main_df.loc[:, ['name', 'owners_est', 'price']]
 df_ = df_.assign(revenues_est=df_['price']*df_['owners_est'])
 print(df_.describe(percentiles=[0.25, 0.5, 0.75, 0.90, 0.99, 0.999]))
 
+"""
+The basic statistics shown here reveal interesting characteristics of the game market.
+- The average game price is below 10$. Actually, 7780 games are free. Such games actually generate a major part of their revenue
+in-game microtransactions. This is an important aspect of the video game industry that we will not be able to analyze here.
+- Concerning game owners and revenues, the mean and the median differ by 3 orgers of magnitude. The market is thus extremely inhomogeneous.
+"""
+
+
 ##
 df_.sort_values('owners_est', ascending=False).iloc[:20]
 
 ##
 df_.sort_values('revenues_est', ascending=False).iloc[:20]
 
+"""
+Among the most popular games, we recognize well known games and franchises. We also note that among
+the most popular games, more than half are free to play. This shows that microtransactions are an important part of
+games revenues from Steam's platform. We will not be able to analyze them with this dataset.
+"""
 
 ##
 fig1, ax1 = plt.subplots(
@@ -169,9 +167,8 @@ ax1.set_ylabel('Number of owners (x1000)')
 plt.show()
 
 """
-Figure 1 shows the distribution of prices.
-There are many free games (7700)
-We note the price pattern 4.99, 9.99, 14.99...
+Figure 1 shows the distribution of prices. We recover the fact that game prices are low in general. 
+We note that prices have preferential values: 4.99, 9.99, 14.99...
 """
 
 
@@ -206,6 +203,8 @@ fig2, axs2 = plt.subplots(
     gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.9, 'bottom': 0.1,
                  'wspace': 0.24, 'hspace': 0.36})
 fig2.suptitle('Figure 2: Distribution of game owners and revenues', x=0.02, ha='left')
+fig2.text(0.5, 0.92, 'Game owners', ha='center', fontsize=11)
+fig2.text(0.5, 0.46, 'Game revenues', ha='center', fontsize=11)
 
 
 axs2[0, 0].plot(owners_distrib.index, owners_distrib.to_numpy(),
@@ -219,7 +218,7 @@ axs2[0, 0].set_xlabel('Number of owners')
 axs2[0, 0].set_ylabel('Number of games')
 
 
-axs2[0, 1].plot(own_nb_games, own_frac, marker='', linestyle='-')
+axs2[0, 1].plot(own_nb_games, 1-own_frac, marker='', linestyle='-')
 axs2[0, 1].plot([0, own_nb_games[100], own_nb_games[100]], [0.5, 0.5, 0],
                 color='k', lw=0.8, ls='--')
 axs2[0, 1].set_xscale('log')
@@ -240,7 +239,7 @@ axs2[1, 0].set_xlabel('Game revenue')
 axs2[1, 0].set_ylabel('number of games')
 
 
-axs2[1, 1].plot(rev_nb_games, rev_frac, marker='', linestyle='-')
+axs2[1, 1].plot(rev_nb_games, 1-rev_frac, marker='', linestyle='-')
 axs2[1, 1].plot([0, rev_nb_games[100], rev_nb_games[100]], [0.5, 0.5, 0],
                 color='k', lw=0.8, ls='--')
 axs2[1, 1].set_xscale('log')
@@ -250,19 +249,21 @@ axs2[1, 1].grid(visible=True)
 axs2[1, 1].set_xlabel('Number of games')
 axs2[1, 1].set_ylabel('Fraction of total revenues')
 
+
 plt.show()
 
 
 """
-The statistics presented above and the distribution of game owners, prices and revenues shown in figure 1
-reveal some important characteristics of the game market.
+Figure 2 shows the some characteristics of the distributions of game owners (top) and game revenues (bottom).
+The left panels show the estimated distributions. These were obtained by binning the values in logarithmic ranges
+with the resulting counts positioned at the geometric mean of the bounds. The points at low game owners/game revenues are not good
+estimates: the lowest range (1-20000) in game owners spans many orders of magnitude and does not suit well to a logarithmic representation.
+The right panels show the fraction of total game units downloaded or game revenues as a function of the number of games, sorted by decreasing importance. 
+These results reveal some important characteristics of the game market:
 - The distribution of game owners (and therefore of revenues) is fat tailed.
 Above a certain threshold, the number of games with a $n$ owners is roughly proportional to $p(n) = \frac{A}{n^{\alpha}},
 where the exponent $\alpha$ is an empirical parameter of the distribution. The most important consequence is that a very small
 fraction of the games concentrates most of the game usage.
-- Most games are free, with sometimes a huge number of owners (eg Dota 2 with more than 200M users). Their apparent revenue (as we estimate it)
-is zero. Such games actually generate a major part of their revenue by selling in-games goods on dedicated marketplaces. This is an important
-aspect of the video game industry that we will not be able to analyze here.
 - The distribution of revenues shows that a large fraction is generated from a minor fraction of the games.
 About half the counted revenues originate from 200 games (less than 0.5 %!). Although we are missing 
 the revenues from microtransactions, advertisement, etc, the market structure is actually well reproduced by the domination of a few superproductions.
@@ -442,22 +443,11 @@ The number of releases is stable between 700 and 800 since then.
 
 
 # %%
-# TODO comment
 """
 ### General game availability
 
-
-
-- most represented languages
-- required_age stats
-
-
-- sales for each genre
-- sales vs tags
-- platform availability
-- 
-
-
+We conclude this section by analyzing games availability on the platform. This should help getting insights
+about the target audience for a new game. We focus here on age restrictions and language availabilty.
 """
 
 ##
@@ -469,8 +459,10 @@ df_ = main_df.loc[main_df['required_age'] > 15, ['name', 'owners_est']] \
 df_.head(20)
 
 ##
-print(f"Estimated number of age-restricted games (16+ yo) sold: {df_['owners_est'].sum()/1e6:.0f}M")
-print(f"Estimated market share of age-restricted games: {df_['owners_est'].sum() / main_df['owners_est'].sum():.4f}")
+print("Estimated number of age-restricted games (16+ yo) sold:",
+      f"{df_['owners_est'].sum()/1e6:.0f} M")
+print("Estimated market share of age-restricted games:",
+      f"{100 * df_['owners_est'].sum() / main_df['owners_est'].sum():.4} %")
 
 """
 Although most games have no age requirements, some superproductions do have an age limit.
@@ -487,14 +479,21 @@ df_ = main_df.loc[languages_df.sum(axis=1)>10, ['name', 'owners_est']]
 df_.sort_values('owners_est', ascending=False).head(20)
 
 ##
+print("Estimated number of games sold available in 10+ languages:",
+      f"{df_['owners_est'].sum()/1e6:.0f} M")
+print("Estimated market share of games available in 10+ languages:",
+      f"{100 * df_['owners_est'].sum() / main_df['owners_est'].sum():.4} %")
 df_['owners_est'].sum()
 
+
 """
-Almost all games are available in english. There is a gap 
-About 20% of them are also available in other european languages (french, german, italian, etc).
+Almost all games are available in english. There is a large gap in language availability between english and other
+languages. Only about 20% of them are also available in other european languages (french, german, italian, etc).
+However, those games that attract many players also are available in many languages. About 40% of games downloaded
+are available in more than 10 languages.
 
-
-Translation to subtitles, not necessarily of voice
+It is important to note that language availability does not necessarily means translation of in-game voices,
+the availability may be limited to menu translation and subtitles.
 """
 
 
@@ -504,12 +503,9 @@ Translation to subtitles, not necessarily of voice
 """
 ## <a name="genres"></a> Genres analysis
 
-OK - most represented in terms of nb games
-OK - best rated genres
-OK - genres by publishers
-OK - number of players by genres
-# - most lucrative genres (nb players * price)
-OK - genres evolution
+Some game genres are more popular than others, or more expensive to develop. Some developers/publishers have more expertise
+in some specific genres. The choice of the genre for a game release must take these factors into account.
+We now analyze the market from the games genres perspective.
 """
 
 ##
@@ -607,16 +603,12 @@ The increasing trend in games release is the same for all the major genres.
 
 
 # %% Platform
-# TODO comment
 """
 ## <a name="platform"></a> Platform analysis
 
-
-OK - general platform availability
-OK - nb owners and platforms
-OK - genres and platforms
-# - price and platform
-- platform availability evolution tendency (window release date and look at platform availability)
+The choice of platform availability is important in game production. Being available in different platforms brings more public,
+but this may not be worth the extra costs (eg licences and software adaptation). We therefore conclude our study of the game market
+by focusing on the importance of the different platform available: Windows, Mac and Linux.
 """
 
 ##
@@ -627,7 +619,8 @@ platforms_df.sum() / len(platforms_df)
 
 
 """
-Almost all games are available on Windows, while only 23% and !%% of the games are available on Mac and linux, respectively.
+Almost all games are available on Windows, while only 23% and 15% of the games are available on Mac and linux, respectively.
+This makes Windows a mandatory platform for computer games.
 """
 
 ##
@@ -640,8 +633,8 @@ df_
 df_ / main_df['owners_est'].sum()
 
 """
-Although only 15-20% of the games are available to Mac and Linux users, the availability rises to 30-40%
-in terms of games usage basis. This means that popular games tend to be available on Mac and Linux.
+Although only 15/23% of the games are available to Linux and Mac users, the availability rises to 33/41%
+in terms of downloaded games. This means that popular games tend to be available on Mac and Linux.
 """
 
 ##
@@ -696,7 +689,9 @@ fig7.legend(handles=polys, labels=platform_release_df.columns.to_list(),
 plt.show()
 
 """
-The trend is stable over time.
+Figure 7 shows the evolution of game releases over time (left panel) and the cumulated number (right panel).
+The trend is stable over time. The different pLatforms availability does not change significantly over time.
+No platform seems to be taking over the others.
 """
 
 # %% Conclusion
