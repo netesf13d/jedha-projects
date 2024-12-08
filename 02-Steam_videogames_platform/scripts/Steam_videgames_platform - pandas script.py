@@ -512,8 +512,11 @@ We now analyze the market from the games genres perspective.
 genres_df.sum().sort_values(ascending=False)
 
 """
-Mostly independent games
-action, adventure, strategy, simulation, RPG, sports, racing
+Most games are from independent developers/publishers. This is expected since those games are
+in general faster to produce, and their development is acessible to many people.
+THe most proeminent genres are the action-adventure games. Casual games, aiming at a broad
+public rather than the hobbyist player, are also proeminent. This is explained by the fact
+those, like independent games, are smaller and thus faster to produce.
 """
 
 ##
@@ -528,17 +531,30 @@ grades_df = pd.Series(genre_grades, name='grade')
 grades_df.sort_values(ascending=False)
 
 """
-Generally positive
+All genres receive generally positive reviews.
 """
 
 ##
+def genres_by_developer(developer: str)-> pd.DataFrame:
+    df_ = genres_df[main_df['develper'] == developer]
+    return df_.sum()
+
 def genres_by_publisher(publisher: str)-> pd.DataFrame:
     df_ = genres_df[main_df['publisher'] == publisher]
     return df_.sum()
 
+##
 genres_by_publisher('Valve')
 genres_by_publisher('Ubisoft')
 
+##
+genres_by_developer('Valve')
+genres_by_developer('Ubisoft')
+
+"""
+We can see that some publishers are specialized in some genres. For instance, Valve published
+almost exclusively action games. Ubisoft, on the other hand, is more diversified.
+"""
 
 ##
 genre_owners = {}
@@ -689,7 +705,7 @@ fig7.legend(handles=polys, labels=platform_release_df.columns.to_list(),
 plt.show()
 
 """
-Figure 7 shows the evolution of game releases over time (left panel) and the cumulated number (right panel).
+Figure 7 shows stack plots of monthly game releases over time (left panel) and their cumulated number (right panel).
 The trend is stable over time. The different pLatforms availability does not change significantly over time.
 No platform seems to be taking over the others.
 """
