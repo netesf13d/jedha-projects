@@ -145,9 +145,9 @@ df_.sort_values('owners_est', ascending=False).iloc[:20]
 df_.sort_values('revenues_est', ascending=False).iloc[:20]
 
 """
-Among the most popular games, we recognize well known games and franchises. We also note that among
-the most popular games, more than half are free to play. This shows that microtransactions are an important part of
-games revenues from Steam's platform. We will not be able to analyze them with this dataset.
+Among the most popular games, we recognize well known games and franchises (Elden Ring, Grand Theft Auto, The Witcher, etc). We also note that among
+them, more than half are free to play. This shows that microtransactions are an important part of
+games revenues from Steam's platform. We will not be able to analyze this source of revenues with this dataset.
 """
 
 ##
@@ -168,7 +168,7 @@ plt.show()
 
 """
 Figure 1 shows the distribution of prices. We recover the fact that game prices are low in general. 
-We note that prices have preferential values: 4.99, 9.99, 14.99...
+We note that prices have preferential values: 4.99, 9.99, 14.99, etc.
 """
 
 
@@ -261,7 +261,7 @@ estimates: the lowest range (1-20000) in game owners spans many orders of magnit
 The right panels show the fraction of total game units downloaded or game revenues as a function of the number of games, sorted by decreasing importance. 
 These results reveal some important characteristics of the game market:
 - The distribution of game owners (and therefore of revenues) is fat tailed.
-Above a certain threshold, the number of games with a $n$ owners is roughly proportional to $p(n) = \frac{A}{n^{\alpha}},
+Above a certain threshold, the number of games with a $n$ owners is roughly proportional to $p(n) = \frac{A}{n^{1+\alpha}},
 where the exponent $\alpha$ is an empirical parameter of the distribution. The most important consequence is that a very small
 fraction of the games concentrates most of the game usage.
 - The distribution of revenues shows that a large fraction is generated from a minor fraction of the games.
@@ -375,14 +375,12 @@ plt.show()
 
 """
 Figure 4 shows the distribution of owned games by publisher/developer. The position of the first point is approximative due to the large uncertainty in the estination of owners in this case.
-As expected, we recover a fat-tailed distribution,
-with a number of units owned that spreads over 7 orders of magnitude. Some companies having "sold" close to 1 bilion games in total.
-
+As expected, we recover a fat-tailed distribution, with a number of units owned that spreads over 7 orders of magnitude. Some companies having "sold" close to 1 billion games in total.
 """
 
 # %% 
 """
-### Game releasse evolution
+### Evolution of game releases
 
 A company can take more risks in terms of game production in the context of a healthy game market.
 The situation of the latter is therefore an important for our analysis.
@@ -499,7 +497,6 @@ the availability may be limited to menu translation and subtitles.
 
 
 # %% Genres
-# TODO comment
 """
 ## <a name="genres"></a> Genres analysis
 
@@ -512,7 +509,7 @@ We now analyze the market from the games genres perspective.
 genres_df.sum().sort_values(ascending=False)
 
 """
-Most games are from independent developers/publishers. This is expected since those games are
+Most games are from independent developers/publishers (`'Indie'` genre). This is expected since those games are
 in general faster to produce, and their development is acessible to many people.
 THe most proeminent genres are the action-adventure games. Casual games, aiming at a broad
 public rather than the hobbyist player, are also proeminent. This is explained by the fact
@@ -536,7 +533,7 @@ All genres receive generally positive reviews.
 
 ##
 def genres_by_developer(developer: str)-> pd.DataFrame:
-    df_ = genres_df[main_df['develper'] == developer]
+    df_ = genres_df[main_df['developer'] == developer]
     return df_.sum()
 
 def genres_by_publisher(publisher: str)-> pd.DataFrame:
@@ -548,12 +545,13 @@ genres_by_publisher('Valve')
 genres_by_publisher('Ubisoft')
 
 ##
-genres_by_developer('Valve')
-genres_by_developer('Ubisoft')
+genres_by_developer('CAPCOM Co., Ltd.')
+genres_by_developer('Bethesda Game Studios')
 
 """
 We can see that some publishers are specialized in some genres. For instance, Valve published
-almost exclusively action games. Ubisoft, on the other hand, is more diversified.
+almost exclusively action games. Ubisoft, on the other hand, is more diversified. Developers
+also specialize in some game genres. Bethesda produces mainly RPGs, while Capcom delelops action-adventure games.
 """
 
 ##
@@ -564,7 +562,7 @@ genre_owners_df = pd.Series(genre_owners, name='grade')
 genre_owners_df.sort_values(ascending=False)
 
 """
-Action and advrenture are the most popular genre. Independent (`'Indie'`) games take
+Action and adventure are the most popular genres. Independent games also take
 a significant market share.
 """
 
@@ -587,15 +585,14 @@ fig6, axs6 = plt.subplots(
 fig6.suptitle('Figure 6: Evolution of game genre releases', x=0.02, ha='left')
 
 polys = axs6[0].stackplot(genre_releases_per_month.index, genre_releases_per_month.T,
-                  colors=COLORS)
+                          colors=COLORS)
 axs6[0].set_xlim(12410, 19730)
 axs6[0].xaxis.set_major_locator(mdates.YearLocator(4))
 axs6[0].set_ylim(0, 2500)
 axs6[0].set_yticks(np.linspace(0, 2500, 6), np.linspace(0, 2.5, 6))
 axs6[0].grid(visible=True)
 axs6[0].set_xlabel('Date')
-axs6[0].set_ylabel('Monthly game releases (x 1000)')
-
+axs6[0].set_ylabel('Monthly releases (x 1000)')
 
 
 axs6[1].stackplot(cumulative_genre_releases.index, cumulative_genre_releases.T,
@@ -606,7 +603,7 @@ axs6[1].set_ylim(0, 160000)
 axs6[1].set_yticks(np.linspace(0, 160000, 9), np.arange(0, 180, 20))
 axs6[1].grid(visible=True)
 axs6[1].set_xlabel('Date')
-axs6[1].set_ylabel('Cumulative game releases (x 1000)')
+axs6[1].set_ylabel('Cumulative releases (x 1000)')
 
 fig6.legend(handles=polys, labels=genre_release_df.columns.to_list(),
             ncols=4, loc=(0.02, 0.59))
@@ -614,7 +611,9 @@ fig6.legend(handles=polys, labels=genre_release_df.columns.to_list(),
 plt.show()
 
 """
-The increasing trend in games release is the same for all the major genres.
+Figure 7 shows stack plots of monthly genre releases (left panel) and cumulated releases (right panel) over time.
+The counts are larger than the number of games since the latter can have multiple genres. The incresaing trend
+in game releases appear to be balanced between all the major genres. No genre is gaining interest over time.
 """
 
 
@@ -640,7 +639,6 @@ This makes Windows a mandatory platform for computer games.
 """
 
 ##
-# main_df.loc[platforms_df['linux'], ['name', 'owners_est']].sum() # .sort_values('owners_est', ascending=False).head(20)
 df_ = main_df.loc[:, ['owners_est']*3].set_axis(platforms_df.columns, axis=1)
 df_ = df_.mask(~platforms_df.to_numpy(), other=0.).sum()
 df_
@@ -711,7 +709,6 @@ No platform seems to be taking over the others.
 """
 
 # %% Conclusion
-
 """
 ## <a name="conclusion"></a> Conclusion and perspectives
 
