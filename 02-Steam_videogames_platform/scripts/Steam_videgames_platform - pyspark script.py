@@ -4,14 +4,22 @@
 
 """
 
+import re
 import sys
+
+
+# required for python worker connection
+# also `set PYSPARK_PYTHON=python` ?
+import findspark
+findspark.init()
+
 
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql import types as sql_types
+from pyspark.sql.types import ArrayType, StringType
 
-# sc = SparkContext(appName="steam-videogames-platform-analysis")
+sc = SparkContext(appName="steam-videogames-platform-analysis")
 spark = SparkSession.builder.getOrCreate()
 
 
@@ -71,16 +79,38 @@ To make things simpler, we extract the `'data'` column, for easier access to the
 ## extract the 'data' fields as a dataframe
 df = raw_df.select('data.*').alias('*')
 df.drop('tags').printSchema() # drop 'tags' to have a more concise schema 
-# df.printSchema(2) # pyspark > 3.5.0
+# or with pyspark version > 3.5.0
+# df.printSchema(2)
 
 ##
-# convert price to $
+## convert price to $
 df = df.withColumn('price', df['price'].cast('float') / 100) \
        .withColumn('initialprice', df['initialprice'].cast('float') / 100)
 
-# parse required_age as int
-def parse_required_age():
-    pass
+## parse required_age as int
+@F.udf(returnType='Integer')
+def parse_age(x):
+    if x is not None:
+        return int(re.findall(r'\d+', x)[0])
+
+df = df.withColumn('required_age', parse_age(df['required_age']))
+
+# or with pyspark version > 3.5.0
+# df = df.withColumn('required_age', F.regex_extract_all(df['required_age'], r'\d+'))
+
+
+"""
+The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
+In order to preserve such scaling, we estimate the number of owners from the two bounds by taking their *geometric* mean.
+This is problematic for the lowest range (0 - 20000), which we estimate by $\sqrt{20000} \simeq 141}.
+We must keep in mind that this last value probably underrates the actual number of owners.
+"""
+
+##
+
+
+
+
 
 
 sys.exit()
