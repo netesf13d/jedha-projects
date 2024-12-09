@@ -27,7 +27,7 @@ df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
 raw_df = pd.DataFrame.from_dict(df_dict)
 # ccu means concurrent users
 raw_df
-
+import sys; sys.exit()
 ##
 # parse release date
 raw_df = raw_df.assign(

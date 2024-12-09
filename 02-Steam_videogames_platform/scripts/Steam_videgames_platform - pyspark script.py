@@ -9,6 +9,7 @@ import sys
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql import types as sql_types
 
 # sc = SparkContext(appName="steam-videogames-platform-analysis")
 spark = SparkSession.builder.getOrCreate()
@@ -32,6 +33,8 @@ import matplotlib.dates as mdates
 raw_df = spark.read.json('../steam_game_output.json')
 raw_df.printSchema()
 
+
+
 # %%
 
 
@@ -39,7 +42,45 @@ raw_df.printSchema()
 
 ## parse release date
 # raw_df.select('data.release_date').dtypes => [('release_date', 'string')]
+# a = F.to_date(raw_df.data.release_date, 'yyyy/MM/dd')
+# df = raw_df.withColumn('date', to_date_(raw_df.data.release_date)) \
+#            .withColumn('release_date', raw_df.data.release_date)
+# df.filter('date is NULL').show()
+# df.select([F.count(F.when(F.col(c).isNull(), c)).alias(c) for c in df.columns]).show()
+# raw_df.select(F.to_date(raw_df.data.release_date, 'yyyy/MM/d')).show()
 
+
+# df = raw_df.withColumn('data.release_date', to_date_(raw_df.data.release_date))
+
+## parse release date
+def to_date_(col, formats=('yyyy/MM/d', 'yyyy/MM')):
+    return F.coalesce(*[F.to_date(col, f) for f in formats])
+
+raw_df = raw_df.withColumn(
+    'data',
+    raw_df['data'].withField('release_date', to_date_(raw_df['data.release_date']))
+)
+
+
+"""
+This code is unnecessarily complex: we modify a field inside the struct column `'data'` of the dataset.
+This column basically contains all the data, including the a replica of the other column `'id'`.
+To make things simpler, we extract the `'data'` column, for easier access to the different fields.
+"""
+
+## extract the 'data' fields as a dataframe
+df = raw_df.select('data.*').alias('*')
+df.drop('tags').printSchema() # drop 'tags' to have a more concise schema 
+# df.printSchema(2) # pyspark > 3.5.0
+
+##
+# convert price to $
+df = df.withColumn('price', df['price'].cast('float') / 100) \
+       .withColumn('initialprice', df['initialprice'].cast('float') / 100)
+
+# parse required_age as int
+def parse_required_age():
+    pass
 
 
 sys.exit()
@@ -98,6 +139,7 @@ owners_est = np.sqrt(owners_est)
 raw_df = raw_df.assign(owners_low=owners_range[:, 0],
                        owners_high=owners_range[:, 1],
                        owners_est=owners_est)
+
 
 
 # %% build multiple dataframes
