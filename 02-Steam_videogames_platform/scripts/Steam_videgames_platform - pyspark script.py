@@ -82,7 +82,6 @@ df.drop('tags').printSchema() # drop 'tags' to have a more concise schema
 # or with pyspark version > 3.5.0
 # df.printSchema(2)
 
-
 ## convert price to $
 df = df.withColumn('price', df['price'].cast('float') / 100) \
        .withColumn('initialprice', df['initialprice'].cast('float') / 100)
@@ -110,18 +109,31 @@ df = df.withColumn('owners_low', owners_low) \
        .withColumn('owners_est', owners_est)
 df.select('owners_low', 'owners_high', 'owners_est').show()
 
+
 # %%
 
 ##
 main_cols = [
     'appid', 'name', 'developer', 'publisher', 'genre', 'type',
     'positive', 'negative', 'price', 'initialprice', 'discount', 'ccu',
-    'release_date', 'required_age'#, 'owners_low', 'owners_high', 'owners_est'
+    'release_date', 'required_age', 'owners_low', 'owners_high', 'owners_est'
 ]
-main_df = raw_df.select(*[F.col(f'data.{col}').alias(col) for col in main_cols])
+main_df = df.select(*main_cols)
+
+##
+release_dates = df.select('release_date')
+
+##
+tags_df = raw_df.select('data.tags.*') \
+                .alias('*') \
+                .fillna(0)
+
+##
+# raw_df.select('data.genre').show()
 
 
 
+sys.exit()
 
 # %% build multiple dataframes
 
