@@ -8,7 +8,7 @@ import re
 import sys
 
 
-# required for python worker connection
+# required for python worker connectback
 # also `set PYSPARK_PYTHON=python` ?
 import findspark
 findspark.init()
@@ -82,22 +82,17 @@ df.drop('tags').printSchema() # drop 'tags' to have a more concise schema
 # or with pyspark version > 3.5.0
 # df.printSchema(2)
 
-##
+
 ## convert price to $
 df = df.withColumn('price', df['price'].cast('float') / 100) \
        .withColumn('initialprice', df['initialprice'].cast('float') / 100)
 
 ## parse required_age as int
-@F.udf(returnType='Integer')
-def parse_age(x):
-    if x is not None:
-        return int(re.findall(r'\d+', x)[0])
-
-df = df.withColumn('required_age', parse_age(df['required_age']))
-
-# or with pyspark version > 3.5.0
-# df = df.withColumn('required_age', F.regex_extract_all(df['required_age'], r'\d+'))
-
+df = df.withColumn(
+    'required_age',
+    F.regexp_extract(df['required_age'], r'\d+', 0).cast('Integer')
+)
+df.select('required_age').show()
 
 """
 The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
@@ -107,13 +102,16 @@ We must keep in mind that this last value probably underrates the actual number 
 """
 
 ##
+owners_low = F.regexp_replace(F.split(df['owners'], ' .. ')[0], ',', '').cast('Double')
+owners_high = F.regexp_replace(F.split(df['owners'], ' .. ')[1], ',', '').cast('Double')
+owners_est = F.sqrt(F.when(owners_low==0, 1).otherwise(owners_low) * owners_high)
+df = df.withColumn('owners_low', owners_low) \
+       .withColumn('owners_high', owners_high) \
+       .withColumn('owners_est', owners_est)
+df.select('owners_low', 'owners_high', 'owners_est').show()
 
+# %%
 
-
-
-
-
-sys.exit()
 ##
 main_cols = [
     'appid', 'name', 'developer', 'publisher', 'genre', 'type',
@@ -122,53 +120,6 @@ main_cols = [
 ]
 main_df = raw_df.select(*[F.col(f'data.{col}').alias(col) for col in main_cols])
 
-
-
-
-
-sys.exit()
-
-##
-with open('../steam_game_output.json', 'rt', encoding='utf-8') as f:
-    data = json.load(f)
-
-df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
-raw_df = pd.DataFrame.from_dict(df_dict)
-# ccu means concurrent users
-raw_df
-
-##
-# parse release date
-raw_df = raw_df.assign(
-    release_date=pd.to_datetime(raw_df['release_date'], format='mixed'))
-
-# convert price to $
-raw_df = raw_df.assign(price=raw_df['price'].astype(float)/100,
-                       initialprice=raw_df['initialprice'].astype(float)/100)
-
-# parse required_age as int
-required_age = raw_df['required_age'] \
-    .astype(str) \
-    .apply(lambda s: ''.join(c for c in s if c.isdigit())) \
-    .astype(int)
-raw_df = raw_df.assign(required_age=required_age)
-
-"""
-The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
-In order to preserve such scaling, we estimate the number of owners from the two bounds by taking their *geometric* mean.
-This is problematic for the lowest range (0 - 20000), which we estimate by $\sqrt{20000} \simeq 141}.
-We must keep in mind that this last value probably underrates the actual number of owners.
-"""
-
-# parse nb of owners
-# log ranges => geometric mean
-owners_range = raw_df['owners'].apply(lambda s: s.replace(',', '').split(' .. '))
-owners_range = np.array(owners_range.to_list(), dtype=np.int64)
-owners_est = np.prod(np.where(owners_range==0, 1, owners_range), axis=1)
-owners_est = np.sqrt(owners_est)
-raw_df = raw_df.assign(owners_low=owners_range[:, 0],
-                       owners_high=owners_range[:, 1],
-                       owners_est=owners_est)
 
 
 
