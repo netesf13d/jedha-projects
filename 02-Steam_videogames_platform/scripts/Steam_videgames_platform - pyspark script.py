@@ -45,21 +45,6 @@ raw_df.printSchema()
 
 # %%
 
-
-# raw_df.select('data').show(1)
-
-## parse release date
-# raw_df.select('data.release_date').dtypes => [('release_date', 'string')]
-# a = F.to_date(raw_df.data.release_date, 'yyyy/MM/dd')
-# df = raw_df.withColumn('date', to_date_(raw_df.data.release_date)) \
-#            .withColumn('release_date', raw_df.data.release_date)
-# df.filter('date is NULL').show()
-# df.select([F.count(F.when(F.col(c).isNull(), c)).alias(c) for c in df.columns]).show()
-# raw_df.select(F.to_date(raw_df.data.release_date, 'yyyy/MM/d')).show()
-
-
-# df = raw_df.withColumn('data.release_date', to_date_(raw_df.data.release_date))
-
 ## parse release date
 def to_date_(col, formats=('yyyy/MM/d', 'yyyy/MM')):
     return F.coalesce(*[F.to_date(col, f) for f in formats])
@@ -121,16 +106,27 @@ main_cols = [
 main_df = df.select(*main_cols)
 
 ##
-release_dates = df.select('release_date')
+release_dates = df.select('appid', 'release_date')
 
 ##
-tags_df = raw_df.select('data.tags.*') \
+tags_df = raw_df.select('data.appid', 'data.tags.*') \
                 .alias('*') \
                 .fillna(0)
 
+# %%
 ##
 # raw_df.select('data.genre').show()
-
+genres = raw_df.select(
+    F.col('data.appid').alias('appid'),
+    F.explode(F.split(raw_df['data.genre'], ', ')).alias('genre')
+)
+all_genres = genres.select(genres['genre']).distinct()
+genres_df = genres.join(all_genres, 'genre', 'outer')
+# genres_df = genres_df.withColumn('is_present', F.when(all_genres['genre'].isNotNull(), True).otherwise(False))
+                  # .groupBy('appid') \
+                  # .pivot('genre') \
+                  # .agg(F.first('is_present'))
+# a = raw_df.select(F.explode(F.split(raw_df['data.genre'], ', '))).distinct()
 
 
 sys.exit()
