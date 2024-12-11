@@ -45,6 +45,9 @@ raw_df.printSchema()
 
 # %%
 
+# TODO cast to int conditionally on bigint
+
+
 ## parse release date
 def to_date_(col, formats=('yyyy/MM/d', 'yyyy/MM')):
     return F.coalesce(*[F.to_date(col, f) for f in formats])
@@ -109,74 +112,76 @@ main_df = df.select(*main_cols)
 release_dates = df.select('appid', 'release_date')
 
 ##
-tags_df = raw_df.select('data.appid', 'data.tags.*') \
-                .alias('*') \
-                .fillna(0)
+tags_df = df.select('appid', 'tags.*') \
+            .alias('*') \
+            .fillna(0)
+
+
+##
+genres = df.select('appid', F.explode(F.split(df['genre'], ', ')).alias('genre'))
+
+genres_df = genres.groupby('appid') \
+                  .pivot('genre') \
+                  .count()
+genres_df = genres_df.select(
+    'appid',
+    *[F.when(F.col(c).isNull(), False).otherwise(True).alias(c)
+      for c in genres_df.columns if c != 'appid']
+)
+
+"""
+Another less idiomatic approach would be:
+```python
+genres = raw_df.select(
+    F.col('data.appid').alias('appid'),
+    F.split(raw_df['data.genre'], ', ').alias('genre')
+)
+all_genres = genres.select(F.explode(genres['genre']).alias('genre')).distinct()
+for x in all_genres.collect():
+    genres = genres.withColumn(x[0], F.array_contains(genres['genre'], x[0]))
+
+genres_df = genres.select('appid', *[x[0] for x in all_genres.collect()])
+```
+"""
+
+
+##
+categories = df.select('appid', F.explode(df['categories']).alias('category'))
+
+categories_df = categories.groupby('appid') \
+                          .pivot('category') \
+                          .count()
+categories_df = categories_df.select(
+    'appid',
+    *[F.when(F.col(c).isNull(), False).otherwise(True).alias(c)
+      for c in categories_df.columns if c != 'appid']
+)
+
+
+##
+platforms_df = df.select('appid', 'platforms.*') \
+                 .alias('*')
 
 # %%
 ##
-# raw_df.select('data.genre').show()
-genres = raw_df.select(
-    F.col('data.appid').alias('appid'),
-    F.explode(F.split(raw_df['data.genre'], ', ')).alias('genre')
+# TODO replace weird chars
+languages = df.select(
+    'appid',
+    F.explode(F.split(df['languages'], ', ')).alias('language')
 )
-all_genres = genres.select(genres['genre']).distinct()
-genres_df = genres.join(all_genres, 'genre', 'outer')
-# genres_df = genres_df.withColumn('is_present', F.when(all_genres['genre'].isNotNull(), True).otherwise(False))
-                  # .groupBy('appid') \
-                  # .pivot('genre') \
-                  # .agg(F.first('is_present'))
-# a = raw_df.select(F.explode(F.split(raw_df['data.genre'], ', '))).distinct()
+
+languages_df = languages.groupby('appid') \
+                  .pivot('language') \
+                  .count()
+languages_df = languages_df.select(
+    'appid',
+    *[F.when(F.col(c).isNull(), False).otherwise(True).alias(c)
+      for c in languages_df.columns if c != 'appid']
+)
+
 
 
 sys.exit()
-
-# %% build multiple dataframes
-
-##
-main_cols = [
-    'appid', 'name', 'developer', 'publisher', 'genre', 'type',
-    'positive', 'negative', 'price', 'initialprice', 'discount', 'ccu',
-    'release_date', 'required_age', 'owners_low', 'owners_high', 'owners_est'
-]
-main_df = raw_df.loc[:, main_cols]
-
-
-##
-release_dates = pd.DatetimeIndex(main_df.loc[:, 'release_date'])
-
-
-##
-all_tags = set.union(*[set(tags) for tags in raw_df['tags']])
-tags_df = pd.DataFrame.from_dict(
-    {t: [tags.get(t, 0) for tags in raw_df['tags']] for t in all_tags},
-    dtype='Sparse[int]')
-
-
-##
-genres = [set(genre.split(', ')) for genre in raw_df['genre']]
-all_genres = set.union(*genres)
-genres_df = pd.DataFrame.from_dict(
-    {genre: [(genre in g) for g in genres] for genre in all_genres})
-
-
-##
-categories = [set(cat) for cat in raw_df['categories']]
-all_categories = set.union(*categories)
-categories_df = pd.DataFrame.from_dict(
-    {c: [(c in cat) for cat in categories] for c in all_categories})
-
-
-##
-platforms_df = pd.DataFrame(raw_df['platforms'].to_list())
-
-
-##
-languages = [set(lang.split(', ')) for lang in raw_df['languages']]
-all_languages = set.union(*languages)
-languages_df = pd.DataFrame.from_dict(
-    {lang: [(lang in langs) for langs in languages] for lang in all_languages})
-
 
 # %% Macro
 """

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Script version of Steam videogames platform project, using pandas for data
+treatment.
 """
 
 
@@ -27,7 +28,7 @@ df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
 raw_df = pd.DataFrame.from_dict(df_dict)
 # ccu means concurrent users
 raw_df
-import sys; sys.exit()
+
 ##
 # parse release date
 raw_df = raw_df.assign(
@@ -103,7 +104,14 @@ platforms_df = pd.DataFrame(raw_df['platforms'].to_list())
 
 
 ##
-languages = [set(lang.split(', ')) for lang in raw_df['languages']]
+def parse_languages(langs: str) -> set[str]:
+    """
+    Parse language strings into a list of languages.
+    """
+    lang_list = langs.replace('[b]*[/b]', '').replace('\r\n', ',').split(',')
+    return set(l for lang in lang_list if (l:=lang.strip()))
+
+languages = [parse_languages(lang) for lang in raw_df['languages']]
 all_languages = set.union(*languages)
 languages_df = pd.DataFrame.from_dict(
     {lang: [(lang in langs) for langs in languages] for lang in all_languages})
