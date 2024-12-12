@@ -164,6 +164,14 @@ platforms_df = df.select('appid', 'platforms.*') \
 
 # %%
 ##
+
+def parse_languages(langs: str) -> set[str]:
+    """
+    Parse language strings into a list of languages.
+    """
+    lang_list = langs.replace('[b]*[/b]', '').replace('\r\n', ',').split(',')
+    return set(l for lang in lang_list if (l:=lang.strip()))
+
 # TODO replace weird chars
 languages = df.select(
     'appid',
