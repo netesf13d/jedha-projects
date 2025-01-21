@@ -11,7 +11,7 @@ The projects are divided into 8 blocks. Blocks 1 - 5 are required for the CDSD c
 In addition, the two certifications require a "final project" for validation. The two are available [here]() and [here]().
 
 
-## Block 01 - Build and Manage a Data Infrastructure
+## Block 1-01 - Build and Manage a Data Infrastructure
 
 This block is composed of a single project.
 
@@ -20,7 +20,7 @@ This block is composed of a single project.
 Collect data through API call and scraping to produce a database.
 
 
-## Block 02 - Exploratory Data Analysis
+## Block 1-02 - Exploratory Data Analysis
 
 ### Speed Dating
 
@@ -33,7 +33,7 @@ Analyze videogames consumption.
 
 
 
-## Block 03 - Machine Learning
+## Block 1-03 - Machine Learning
 
 ### Conversion rate challenge
 
@@ -50,14 +50,14 @@ Predict weekly sales of Walmart stores.
 Use product descriptions to categorize them and make recommendations.
 
 
-## Block 04 - Deep Learning
+## Block 1-04 - Deep Learning
 
 ### AT&T Spam Detector
 
 Classify SMS texts into spams or hams with NLP.
 
 
-## Block 05 - Deployment
+## Block 1-05 - Deployment
 
 ### Getaround Analysis
 
@@ -65,20 +65,23 @@ Optimize the pricing and deploy a dashboard for a car rental service.
 
 
 
-## Block 06 - Data Governance and Strategy
+## Block 2-01 - Data Governance and Strategy
 
 ### Spotify Data Governance
 
+Design and pilot a Data Governance framework for Spotify.
 
-## Block 07 - AI Data Architecture Design and Deployment
+
+## Block 2-02 - AI Data Architecture Design and Deployment
 
 ### Automatic Fraud Detection
 
 
 
-## Block 08 - Data Pipelines for AI
+
+## Block 2-03 - Data Pipelines for AI
 
 ### Stripe Business Case
 
-
+In this project, we propose a complete data infrastructure for Stripe, an online payment solutions company.
 

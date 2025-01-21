@@ -1,0 +1,77 @@
+// Database structure defined with DBML
+// Docs: https://dbml.dbdiagram.io/docs
+
+Project Stripe_OLTP {
+  database_type: 'PostgreSQL'
+  Note: 'Stripe\'s OLTP system proposal'
+}
+
+
+///// Enums /////
+
+enum currency {
+  USD
+  EUR
+  GBP
+  // set them all
+}
+
+enum payment_method {
+  credit_card
+  // ...
+}
+
+enum device_type {
+  mobile
+  desktop
+  // ...
+}
+
+enum status {
+  successful
+  failed
+  refunded
+}
+
+
+///// Tables /////
+
+Table transactions {
+  transaction_id integer [primary key, unique]
+  merchant_id integer
+  customer_id integer
+  time timestamp
+  transaction_amount float
+  currency currency
+  payment_method payment_method
+  device_type device_type
+  transaction_status status
+  ip_location_latitude float
+  ip_location_longitude float
+}
+
+Table fraud_indicators {
+  transaction_id integer [primary key, unique]
+  fraud_probability float
+  // ...
+}
+
+Table merchants {
+  merchant_id integer [primary key, unique]
+  merchant_name varchar
+  country varchar
+  // ...
+}
+
+Table customers {
+  customer_id integer [primary key, unique]
+  customer_name varchar
+  // ...
+}
+
+
+///// Relationships /////
+
+Ref: transactions.transaction_id > fraud_indicators.transaction_id
+Ref: transactions.merchant_id > merchants.merchant_id
+Ref: transactions.customer_id > customers.customer_id

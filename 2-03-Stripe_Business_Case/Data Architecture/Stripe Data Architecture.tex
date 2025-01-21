@@ -1,0 +1,76 @@
+
+\documentclass[11pt,a4paper,computermodern]{article}
+
+
+\usepackage[
+%	includeheadfoot,
+	width=168mm,
+	top=18mm,
+	bottom=18mm,
+	bindingoffset=4mm
+	]{geometry}
+
+
+
+%%% Typeface packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{fontawesome}
+\usepackage{tabularx}
+
+%%% Graphics packages
+\usepackage{graphicx}
+
+
+
+%%
+
+\usepackage[
+sorting=none,
+backend=bibtex,
+style=nature,
+url=false,        
+doi=false,         
+isbn=false,
+minbibnames=1,  
+maxbibnames=10
+]{biblatex} 
+
+%%
+
+
+
+\title{A Proposal for Stripe's Data Architecture}
+\date{}
+
+
+\begin{document}
+
+\maketitle
+
+\vspace{-10mm}
+
+Stripe is a financial services company which provides payment processing solutions through APIs that web developers can use in their websites or mobile applications. The company processes billions of transactions annually, supporting millions of merchants worldwide.
+
+The sensitive nature of the data managed by Stripe, along with the need of efficient
+
+\section*{Online Transaction Processing Model}
+
+The core of our transactional database is the registry of all financial transactions occurring within Stripe scope. Additional tables contain information about merchants and customers.
+
+
+\section*{Online Analytical Processing Model}
+
+
+
+
+\section*{NoSQL Model}
+
+
+
+\vspace{.0cm}
+\section*{References}
+
+
+
+\end{document}
