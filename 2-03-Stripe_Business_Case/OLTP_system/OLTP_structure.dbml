@@ -3,75 +3,52 @@
 
 Project Stripe_OLTP {
   database_type: 'PostgreSQL'
-  Note: 'Stripe\'s OLTP system proposal'
-}
-
-
-///// Enums /////
-
-enum currency {
-  USD
-  EUR
-  GBP
-  // set them all
-}
-
-enum payment_method {
-  credit_card
-  // ...
-}
-
-enum device_type {
-  mobile
-  desktop
-  // ...
-}
-
-enum status {
-  successful
-  failed
-  refunded
+  Note: 'Stripe\'s OLTP database proposal'
 }
 
 
 ///// Tables /////
 
 Table transactions {
-  transaction_id integer [primary key, unique]
-  merchant_id integer
-  customer_id integer
-  time timestamp
-  transaction_amount float
-  currency currency
-  payment_method payment_method
-  device_type device_type
-  transaction_status status
-  ip_location_latitude float
-  ip_location_longitude float
-}
-
-Table fraud_indicators {
-  transaction_id integer [primary key, unique]
-  fraud_probability float
-  // ...
+  transaction_id bigint [primary key, unique]
+  merchant_id bigint
+  customer_id bigint
+  timestamp datetime
+  amount decimal(10, 2)
+  currency_code char(3) // ISO 4217
+  payment_method varchar(16)
+  payment_status varchar(16)
+  device_type varchar(16)
+  ip_latitude float
+  ip_longitude float
 }
 
 Table merchants {
-  merchant_id integer [primary key, unique]
-  merchant_name varchar
-  country varchar
+  merchant_id bigint [primary key, unique]
+  name varchar(255)
+  iban varchar(34)
+  country_code char(2) // ISO 3166-1 alpha-2
   // ...
 }
 
 Table customers {
-  customer_id integer [primary key, unique]
-  customer_name varchar
+  customer_id bigint [primary key, unique]
+  name varchar(255)
+  iban varchar(34)
+  country_code char(2) // ISO 3166-1 alpha-2
+  // ...
+}
+
+
+Table fraud_indicators {
+  transaction_id bigint [primary key, unique]
+  fraud_probability float
   // ...
 }
 
 
 ///// Relationships /////
 
-Ref: transactions.transaction_id > fraud_indicators.transaction_id
 Ref: transactions.merchant_id > merchants.merchant_id
 Ref: transactions.customer_id > customers.customer_id
+Ref: transactions.transaction_id - fraud_indicators.transaction_id
