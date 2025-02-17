@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Script version of Steam videogames platform project, using pyspark and SQL queries
+for data treatment.
 """
 
 import re
@@ -10,8 +10,8 @@ import sys
 
 # required for python worker connectback
 # also `set PYSPARK_PYTHON=python` ?
-import findspark
-findspark.init()
+# import findspark
+# findspark.init()
 
 
 from pyspark import SparkContext
@@ -20,11 +20,9 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, StringType
 
 sc = SparkContext(appName="steam-videogames-platform-analysis")
-spark = SparkSession.builder.getOrCreate()
+spark = SparkSession.builder.appName('steam-videogames-platform-analysis') \
+                            .getOrCreate()
 
-
-
-import json
 
 import numpy as np
 import pandas as pd
@@ -35,18 +33,43 @@ import matplotlib.dates as mdates
 # %% Loading
 """
 ## <a name="loading"></a> Data loading and preprocessing
+
+The dataset can be found in a public S3 bucket. If direct data loading from S3 URL is not possible,
+the following code uses `boto3` to download the file, then converts the resulting string to RDD before reading.
+```python
+import boto3
+from botocore import UNSIGNED
+from botocore.client import Config
+
+s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+obj = s3.get_object(Bucket='full-stack-bigdata-datasets',
+                    Key='Big_Data/Project_Steam/steam_game_output.json')
+data = obj['Body'].read().decode('utf-8')
+
+# convert to rdd before reading
+rddjson = sc.parallelize([data])
+raw_df = spark.read.json(rddjson)
+```
+
+An alternative way is to download the dataset on the local file system from
+[https://full-stack-bigdata-datasets.s3.amazonaws.com/Big_Data/Project_Steam/steam_game_output.json]
+(https://full-stack-bigdata-datasets.s3.amazonaws.com/Big_Data/Project_Steam/steam_game_output.json).
 """
 
+## direct download from S3
+# raw_df = spark.read.json('s3a://full-stack-bigdata-datasets/Big_Data/Project_Steam/steam_game_output.json')
 
+## from local filesystem
 raw_df = spark.read.json('../steam_game_output.json')
-raw_df.printSchema()
 
+raw_df.printSchema(2)
 
 
 # %%
 
-# TODO cast to int conditionally on bigint
-
+r"""
+### Column parsing and preprocessing
+"""
 
 ## parse release date
 def to_date_(col, formats=('yyyy/MM/d', 'yyyy/MM')):
@@ -66,7 +89,7 @@ To make things simpler, we extract the `'data'` column, for easier access to the
 
 ## extract the 'data' fields as a dataframe
 df = raw_df.select('data.*').alias('*')
-df.drop('tags').printSchema() # drop 'tags' to have a more concise schema 
+df.drop('tags').printSchema() # drop 'tags' to have a more concise schema
 # or with pyspark version > 3.5.0
 # df.printSchema(2)
 
@@ -84,8 +107,8 @@ df.select('required_age').show()
 """
 The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
 In order to preserve such scaling, we estimate the number of owners from the two bounds by taking their *geometric* mean.
-This is problematic for the lowest range (0 - 20000), which we estimate by $\sqrt{20000} \simeq 141}.
-We must keep in mind that this last value probably underrates the actual number of owners.
+This is problematic for the lowest range (0 - 20000), which we estimate by $\sqrt{20000} \simeq 141$.
+We must keep in mind that this last value probably underestimates the actual number of owners.
 """
 
 ##
@@ -99,6 +122,9 @@ df.select('owners_low', 'owners_high', 'owners_est').show()
 
 
 # %%
+"""
+### Construction of intermediate dataframes
+"""
 
 ##
 main_cols = [
@@ -108,8 +134,9 @@ main_cols = [
 ]
 main_df = df.select(*main_cols)
 
+
 ##
-release_dates = df.select('appid', 'release_date')
+release_dates_df = df.select('appid', 'release_date')
 
 ##
 tags_df = df.select('appid', 'tags.*') \
@@ -162,34 +189,42 @@ categories_df = categories_df.select(
 platforms_df = df.select('appid', 'platforms.*') \
                  .alias('*')
 
-# %%
+
 ##
+search = [r'\[b\]\*\[/b\]', '\r\n', ';', ', +']
+replace = ['', ',', ',', ',']
+languages = df['languages']
+for s, r in zip(search, replace):
+    languages = F.regexp_replace(languages, s, r).alias('language')
+languages = F.explode(F.split(languages, ',')).alias('language')
 
-def parse_languages(langs: str) -> set[str]:
-    """
-    Parse language strings into a list of languages.
-    """
-    lang_list = langs.replace('[b]*[/b]', '').replace('\r\n', ',').split(',')
-    return set(l for lang in lang_list if (l:=lang.strip()))
+languages_df = df.select('appid', languages) \
+                 .groupby('appid') \
+                 .pivot('language') \
+                 .count()
 
-# TODO replace weird chars
-languages = df.select(
-    'appid',
-    F.explode(F.split(df['languages'], ', ')).alias('language')
-)
-
-languages_df = languages.groupby('appid') \
-                  .pivot('language') \
-                  .count()
 languages_df = languages_df.select(
     'appid',
     *[F.when(F.col(c).isNull(), False).otherwise(True).alias(c)
-      for c in languages_df.columns if c != 'appid']
+      for c in languages_df.columns if c not in {'', 'appid'}]
 )
 
+languages_df.show(10)
 
 
-sys.exit()
+#%%
+"""
+### Creation of temporary views for SQL querying
+"""
+
+main_df.createOrReplaceTempView('main')
+tags_df.createOrReplaceTempView('tags')
+genres_df.createOrReplaceTempView('genres')
+release_dates_df.createOrReplaceTempView('release_dates')
+categories_df.createOrReplaceTempView('categories')
+platforms_df.createOrReplaceTempView('platforms')
+languages_df.createOrReplaceTempView('languages')
+
 
 # %% Macro
 """
@@ -207,24 +242,41 @@ We begin our study by analyzing the market globally. We will focus on the follow
 There are interesting patterns in game usage, price and revenues which we highlight here.
 """
 
-##
-df_ = main_df.loc[:, ['name', 'owners_est', 'price']]
-df_ = df_.assign(revenues_est=df_['price']*df_['owners_est'])
-print(df_.describe(percentiles=[0.25, 0.5, 0.75, 0.90, 0.99, 0.999]))
+## dataframe to study owners and revenues
+df = spark.sql(
+    """
+    SELECT
+      name,
+      owners_low,
+      owners_est,
+      price,
+      price * owners_low AS revenues_low,
+      price * owners_est AS revenues_est
+    FROM
+      main
+    """
+)
+df.createOrReplaceTempView('df')
+df.describe().show() # no direct SQL query for that
+
+## with databricks
+# display(df)
+
 
 """
 The basic statistics shown here reveal interesting characteristics of the game market.
-- The average game price is below 10$. Actually, 7780 games are free. Such games actually generate a major part of their revenue
+- The average game price is below 10$. Actually, 7780 games are free. Such games actually generate a major part of their revenue from
 in-game microtransactions. This is an important aspect of the video game industry that we will not be able to analyze here.
 - Concerning game owners and revenues, the mean and the median differ by 3 orgers of magnitude. The market is thus extremely inhomogeneous.
 """
 
 
 ##
-df_.sort_values('owners_est', ascending=False).iloc[:20]
+spark.sql("SELECT * FROM df ORDER BY owners_est DESC").show()
 
 ##
-df_.sort_values('revenues_est', ascending=False).iloc[:20]
+spark.sql("SELECT * FROM df ORDER BY revenues_est DESC").show()
+
 
 """
 Among the most popular games, we recognize well known games and franchises (Elden Ring, Grand Theft Auto, The Witcher, etc). We also note that among
@@ -233,71 +285,144 @@ games revenues from Steam's platform. We will not be able to analyze this source
 """
 
 ##
+prices = spark.sql("SELECT price FROM df").toPandas()
+
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(5, 4), dpi=100,
     gridspec_kw={'left': 0.13, 'right': 0.95, 'top': 0.89, 'bottom': 0.14})
 fig1.suptitle('Figure 1: Game prices distribution', x=0.02, ha='left')
 
-ax1.hist(df_['price'], bins = np.linspace(0, 100, 51))
+ax1.hist(prices, bins=np.linspace(0, 100, 51))
 ax1.set_xlim(0, 80)
 ax1.set_ylim(0, 20000)
 ax1.set_yticks(np.linspace(0, 20000, 11), np.arange(0, 21, 2))
 ax1.grid(visible=True)
-ax1.set_xlabel('Price')
+ax1.set_xlabel('Price ($)')
 ax1.set_ylabel('Number of owners (x1000)')
 
 plt.show()
 
 """
-Figure 1 shows the distribution of prices. We recover the fact that game prices are low in general. 
+Figure 1 shows the distribution of prices. We recover the fact that game prices are low in general.
 We note that prices have preferential values: 4.99, 9.99, 14.99, etc.
 """
 
+#%%
 
-##
-owners_distrib = df_['owners_est'].value_counts()
+## Cumulative game owners distribution function
+owners_distrib = spark.sql(
+    """
+    SELECT 
+      owners_low, 
+      count, 
+      SUM (count) OVER (
+        ORDER BY 
+          owners_low DESC
+      ) as compl_cdf
+    FROM 
+      (
+        SELECT 
+          owners_low, 
+          COUNT (owners_low) / (
+            SELECT 
+              COUNT (owners_low) 
+            FROM 
+              df
+          ) AS count 
+        FROM 
+          df 
+        GROUP BY 
+          owners_low
+      ) 
+    ORDER BY 
+      owners_low
+    """
+)
+owners_distrib.show()
 
-##
-tot_owners = df_['owners_est'].sum()
-cum_owners = (df_['owners_est'].sort_values().cumsum() / tot_owners).to_numpy()
-own_frac = np.linspace([1], [0], 201, endpoint=True)
-own_nb_games = len(cum_owners) - np.argmax(cum_owners >= own_frac, axis=-1)
-own_nb_games[0] = 0
 
-##
-bins = np.concatenate([[0], np.logspace(4, 10, 19)])
-revenues_distrib = np.histogram(df_['revenues_est'], bins=bins)[0]
-vals = np.sqrt(bins[:-1] * bins[1:])
-vals[0] = np.sqrt(1e4)
+## Share of total game usage vs number of games sorted by decreasing number of owners
+# here we use our owners estimate
+own_frac_vs_games = spark.sql(
+    """
+    SELECT
+      SUM (owners_est) OVER (
+        ORDER BY 
+          owners_est DESC ROWS UNBOUNDED PRECEDING
+      ) / (
+        SELECT 
+          SUM (owners_est) 
+        FROM
+          df
+      ) as own_frac
+    FROM
+      df
+    ORDER BY 
+      owners_est DESC
+    """
+)
+own_frac_vs_games.show(10)
 
-##
-tot_revenues = df_['revenues_est'].sum()
-cum_revenues = (df_['revenues_est'].sort_values().cumsum() / tot_revenues).to_numpy()
-cum_revenues = cum_revenues[cum_revenues > 0]
-rev_frac = np.linspace([1], [0], 201, endpoint=True)
-rev_nb_games = len(cum_revenues) - np.argmax(cum_revenues >= rev_frac, axis=-1)
-rev_nb_games[0] = 0
+# there is no easy way to do that with SQL
+own_frac = np.linspace(0, 1, 201, endpoint=True)
+own_nb_games = np.sum(own_frac_vs_games.toPandas().to_numpy() < own_frac, axis=0)
+
+
+## Cumulative revenues distribution function
+# again, no easy way to do that with SQL
+revenues_vals = np.logspace(1, 9, 17)
+revenues_cdf = spark.sql("SELECT revenues_low FROM df").toPandas().to_numpy()
+revenues_cdf = np.mean(revenues_cdf >= revenues_vals, axis=0)
+
+
+## Share of total game revenues vs number of games sorted by decreasing revenue
+# here we use our owners estimate to estimate the revenues
+rev_frac_vs_games = spark.sql(
+    """
+    SELECT
+      SUM (revenues_est) OVER (
+        ORDER BY 
+          revenues_est DESC ROWS UNBOUNDED PRECEDING
+      ) / (
+        SELECT 
+          SUM (revenues_est) 
+        FROM
+          df
+      ) as revenues_frac
+    FROM
+      df
+    ORDER BY 
+      revenues_est DESC
+    """
+)
+rev_frac_vs_games.show(10)
+
+# again, no easy way to do that part in SQL          
+rev_frac = np.linspace(0, 1, 201, endpoint=True)
+rev_nb_games = np.sum(rev_frac_vs_games.toPandas().to_numpy() < rev_frac, axis=0)
 
 
 ##
 fig2, axs2 = plt.subplots(
-    nrows=2, ncols=2, figsize=(7, 6), dpi=100,
+    nrows=2, ncols=2, figsize=(7.2, 6), dpi=100,
     gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.9, 'bottom': 0.1,
-                 'wspace': 0.24, 'hspace': 0.36})
+                 'wspace': 0.26, 'hspace': 0.42})
 fig2.suptitle('Figure 2: Distribution of game owners and revenues', x=0.02, ha='left')
 fig2.text(0.5, 0.92, 'Game owners', ha='center', fontsize=11)
 fig2.text(0.5, 0.46, 'Game revenues', ha='center', fontsize=11)
 
 
-axs2[0, 0].plot(owners_distrib.index, owners_distrib.to_numpy(),
+owners_cdf = owners_distrib.toPandas()
+axs2[0, 0].plot(owners_cdf.owners_low, owners_cdf.compl_cdf,
                 marker='o', linestyle='')
 axs2[0, 0].set_xscale('log')
-axs2[0, 0].set_xlim(1e1, 1e10)
+axs2[0, 0].set_xlim(1e2, 1e10)
 axs2[0, 0].set_yscale('log')
-axs2[0, 0].set_ylim(3e-1, 1e5)
+axs2[0, 0].set_ylim(1e-5, 1)
 axs2[0, 0].grid(visible=True)
 axs2[0, 0].set_xlabel('Number of owners')
-axs2[0, 0].set_ylabel('Number of games')
+axs2[0, 0].set_ylabel('Fraction of games')
+axs2[0, 0].set_title('Compl. cumulative distrib.', fontsize=11)
 
 
 axs2[0, 1].plot(own_nb_games, 1-own_frac, marker='', linestyle='-')
@@ -311,14 +436,15 @@ axs2[0, 1].set_xlabel('Number of games')
 axs2[0, 1].set_ylabel('Fraction of total game usage')
 
 
-axs2[1, 0].plot(vals, revenues_distrib, marker='o', linestyle='')
+axs2[1, 0].plot(revenues_vals, revenues_cdf, marker='o', linestyle='')
 axs2[1, 0].set_xscale('log')
 axs2[1, 0].set_xlim(1e1, 1e10)
 axs2[1, 0].set_yscale('log')
-axs2[1, 0].set_ylim(3e-1, 1e5)
+axs2[1, 0].set_ylim(1e-5, 1)
 axs2[1, 0].grid(visible=True)
-axs2[1, 0].set_xlabel('Game revenue')
-axs2[1, 0].set_ylabel('number of games')
+axs2[1, 0].set_xlabel('Game revenue ($)')
+axs2[1, 0].set_ylabel('Fraction of games')
+axs2[1, 0].set_title('Compl. cumulative distrib.', fontsize=11)
 
 
 axs2[1, 1].plot(rev_nb_games, 1-rev_frac, marker='', linestyle='-')
@@ -337,19 +463,24 @@ plt.show()
 
 """
 Figure 2 shows the some characteristics of the distributions of game owners (top) and game revenues (bottom).
-The left panels show the estimated distributions. These were obtained by binning the values in logarithmic ranges
-with the resulting counts positioned at the geometric mean of the bounds. The points at low game owners/game revenues are not good
-estimates: the lowest range (1-20000) in game owners spans many orders of magnitude and does not suit well to a logarithmic representation.
-The right panels show the fraction of total game units downloaded or game revenues as a function of the number of games, sorted by decreasing importance. 
+The left panels show the complementary cumulative distribution functions. A data point represent the fraction of games having larger number of owners/revenues
+than its abscissa. The first data point at ordinate 1 is not visible.
+It corresponds to zero abscissa (more than zero owner/zero revenue), and thus does not appear on the log-log plot.
+The right panels show the fraction of total game units downloaded or game revenues as a function of the number of games, sorted by decreasing importance.
 These results reveal some important characteristics of the game market:
 - The distribution of game owners (and therefore of revenues) is fat tailed.
-Above a certain threshold, the number of games with a $n$ owners is roughly proportional to $p(n) = \frac{A}{n^{1+\alpha}},
+Above a certain threshold, the number of games with a $n$ owners is roughly proportional to $p(n) = \frac{A}{n^{1+\alpha}}$,
 where the exponent $\alpha$ is an empirical parameter of the distribution. The most important consequence is that a very small
 fraction of the games concentrates most of the game usage.
-- The distribution of revenues shows that a large fraction is generated from a minor fraction of the games.
-About half the counted revenues originate from 200 games (less than 0.5 %!). Although we are missing 
-the revenues from microtransactions, advertisement, etc, the market structure is actually well reproduced by the domination of a few superproductions.
+- The distribution of revenues shows that only about 25% of the games seem to produce a revenue. This is of course a strong underestimation:
+we are missing the revenues from microtransactions, advertisement, etc.
+- About 400 games (less than 1 %!) account for half the game downloads. This tendency seems even stronger for the revenues with half of the total revenues
+originating from 200 games (although here we are missing parts of the revenues).
+
+This analysis indicates that the videogames market is actually dominated by a few superproductions.
 """
+
+sys.exit()
 
 # %%
 """
@@ -359,37 +490,76 @@ We now study how the market is shared among game publishers and developers. We f
 of games released. One important metric in the game industry is the number of units sold, which we analyze in second.
 
 
-#### Games producers by games releases
+#### Number of game releases
 """
 
 ##
-publishers = main_df['publisher'].value_counts()
-publishers
+publishers_df = spark.sql(
+    """
+    SELECT 
+      publisher,
+      COUNT (publisher) AS game_releases,
+      SUM (owners_low) AS units_distributed_low 
+    FROM 
+      main 
+    GROUP BY 
+      publisher 
+    ORDER BY 
+      game_releases DESC
+    """
+)
+publishers_df.createOrReplaceTempView('publishers')
+publishers_df.show(15)
+
 
 ##
-developers = main_df['developer'].value_counts()
-developers
+developers_df = spark.sql(
+    """
+    SELECT 
+      developer, 
+      COUNT (developer) AS game_releases,
+      SUM (owners_low) AS units_distributed_low 
+    FROM 
+      main 
+    GROUP BY 
+      developer
+    ORDER BY 
+      game_releases DESC
+    """
+)
+developers_df.createOrReplaceTempView('developers')
+developers_df.show(15)
 
 """
 There are about 30000 publishers/developers. We recognize some well known companies among top publishers
 (SEGA, Square Enix). The developer names are less familiar, but we note the presence of individuals
 (Laush Dmitriy Sergeevich, Artur Smiarowski). These are independent developers, that actually take a large
-part of the released games.
+part of the released games. We also note that releasing a large number of games does not imply that
+a large number of units is distributed.
 """
 
-bins = np.logspace(0, 3, 13)
-vals = np.sqrt(bins[:-1] * bins[1:])
-vals[0] = 1
+## Cumulative distributions of number of game releases for developers and publishers
+vals = np.logspace(0, 3, 13)
 
+pub_releases_cdf = publishers_df.select('game_releases').toPandas().to_numpy()
+pub_releases_cdf = np.sum(pub_releases_cdf >= vals, axis=0)
+
+dev_releases_cdf = developers_df.select('game_releases').toPandas().to_numpy()
+dev_releases_cdf = np.sum(dev_releases_cdf >= vals, axis=0)
+
+
+##
 fig3, ax3 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
-    gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-fig3.suptitle('Figure 3: Distribution of released games', x=0.02, ha='left')
+    gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.88, 'bottom': 0.13})
+fig3.suptitle('Figure 3: Complementary cumulative distribution of released'
+              '\n               games per publisher/developer',
+              x=0.02, ha='left')
 
-ax3.plot(vals, np.histogram(publishers, bins)[0],
-             marker='o', linestyle='', alpha=0.8, label='publishers')
-ax3.plot(vals, np.histogram(developers, bins)[0],
-             marker='o', linestyle='', alpha=0.7, label='developers')
+ax3.plot(vals, pub_releases_cdf,
+         marker='o', linestyle='', alpha=0.8, label='publishers')
+ax3.plot(vals, dev_releases_cdf,
+         marker='o', linestyle='', alpha=0.7, label='developers')
 ax3.set_xscale('log')
 ax3.set_yscale('log')
 ax3.grid(visible=True)
@@ -400,52 +570,54 @@ ax3.legend()
 plt.show()
 
 """
-Figure 3 shows the distribution of games release by publisher/developer. The plotted values were obtained
-in the same way as figure 2: the raw values were binned in logarithmic ranges and positioned at the geometric mean of the bounds.
-Similarly to figure 2, we note that the distribution is fat-tailed. Out of the 30000, more than 20000 developers/publishers released only one game.
+Figure 3 shows the complementary cumulative distribution of games release by publisher/developer.
+The interpretation is the same as in figure 2: we represent the number of publshers having more than $x$ games published.
+Similarly to game usage, we note that the distribution is fat-tailed. Out of the 30000, more than 20000 developers/publishers released only one game.
 Only a dozen released more than 100 games.
 """
 
+#%%
 """
-#### Games producers by units owned
+#### Games units distributed
 
-We consider the total number of games sold by (or downloaded from) a publisher/developer.
+We consider here the total number of games sold by (or downloaded from) a publisher/developer.
 """
 
 ##
-publishers_by_owners = main_df.loc[:, ['publisher', 'owners_est']] \
-                              .groupby('publisher') \
-                              .sum() \
-                              .sort_values('owners_est', ascending=False)
-publishers_by_owners
+spark.sql("SELECT * FROM publishers ORDER BY units_distributed_low DESC").show(15)
+
 
 ##
-developers_by_owners = main_df.loc[:, ['developer', 'owners_est']] \
-                              .groupby('developer') \
-                              .sum() \
-                              .sort_values('owners_est', ascending=False)
-developers_by_owners
+spark.sql("SELECT * FROM developers ORDER BY units_distributed_low DESC").show(15)
 
 """
-Here we sort the publishers/developers by number of owners of their games.
+We sort the publishers/developers by number of owners of their games (number of units distributed).
 The top names are all well known companies. The inhomogeneity in terms of owner base is large,
 ranging over 7 orders of magnitude. This is a combined effect: the largest companies also attract the largest public.
 """
 
+## Cumulative distributions of number of game releases for developers and publishers
+vals = np.logspace(3, 9, 19)
+
+pub_distribs_cdf = publishers_df.select('units_distributed_low').toPandas().to_numpy()
+pub_distribs_cdf = np.sum(pub_distribs_cdf >= vals, axis=0)
+
+dev_distribs_cdf = developers_df.select('units_distributed_low').toPandas().to_numpy()
+dev_distribs_cdf = np.sum(dev_distribs_cdf >= vals, axis=0)
+
 
 ## plot
-bins = np.concatenate([[1, 10000], np.logspace(4, 9, 16)])
-vals = np.sqrt(bins[:-1] * bins[1:])
-
 fig4, ax4 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
-    gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.89, 'bottom': 0.14})
-fig4.suptitle('Figure 4: Distribution of owned games', x=0.02, ha='left')
+    gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.88, 'bottom': 0.13})
+fig4.suptitle('Figure 4: Complementary cumulative distribution of game units'
+              '\n               distributed per publisher/developer',
+              x=0.02, ha='left')
 
-ax4.plot(vals, np.histogram(publishers_by_owners, bins)[0],
-             marker='o', linestyle='', alpha=0.8, label='publishers')
-ax4.plot(vals, np.histogram(developers_by_owners, bins)[0],
-             marker='o', linestyle='', alpha=0.7, label='developpers')
+ax4.plot(vals, pub_distribs_cdf,
+         marker='o', linestyle='', alpha=0.8, label='publishers')
+ax4.plot(vals, dev_distribs_cdf,
+         marker='o', linestyle='', alpha=0.7, label='developpers')
 ax4.set_xscale('log')
 ax4.set_yscale('log')
 ax4.grid(visible=True)
@@ -460,7 +632,7 @@ Figure 4 shows the distribution of owned games by publisher/developer. The posit
 As expected, we recover a fat-tailed distribution, with a number of units owned that spreads over 7 orders of magnitude. Some companies having "sold" close to 1 billion games in total.
 """
 
-# %% 
+# %%
 """
 ### Evolution of game releases
 
@@ -471,6 +643,8 @@ In this section, we study it through the evolution of game releases.
 A better indication of the market health would be the evolution of the number of players,
 which is not available in this dataset.
 """
+
+sys.exit()
 
 ##
 release_df = pd.DataFrame({'nb_releases': np.ones(len(release_dates))},
@@ -648,7 +822,7 @@ Action and adventure are the most popular genres. Independent games also take
 a significant market share.
 """
 
-## 
+##
 genre_release_df = genres_df.set_index(release_dates)
 genre_releases_per_month = genre_release_df.resample('MS').sum()
 cumulative_genre_releases = genre_releases_per_month.cumsum()
@@ -800,7 +974,7 @@ These games are played by many players and generate the largest revenues. This m
 quite general and occurs accross the whole entertainment inductry (music, movies, series, etc).
 - About half publishers/developers released only one game. These are independent people or very small companies.
 Similarly to the revenues, the game release-by-company distribution is fat tailed,
-with only about 10 companies having released more than 100 games. 
+with only about 10 companies having released more than 100 games.
 - This structure translates to the distribution of the company's customer base. The amplitude of variation here is even larger,
 considering that games released by large comanies also have more players.
 - The game releases seem stable since early 2020 with about 700-800 monthly releases.
