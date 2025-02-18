@@ -104,7 +104,7 @@ df = df.withColumn(
 )
 df.select('required_age').show()
 
-"""
+r"""
 The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
 In order to preserve such scaling, we estimate the number of owners from the two bounds by taking their *geometric* mean.
 This is problematic for the lowest range (0 - 20000), which we estimate by $\sqrt{20000} \simeq 141$.
@@ -152,7 +152,7 @@ genres_df = genres.groupby('appid') \
                   .count()
 genres_df = genres_df.select(
     'appid',
-    *[F.when(F.col(c).isNull(), False).otherwise(True).alias(c)
+    *[F.when(F.col(c).isNull(), 0).otherwise(1).alias(c)
       for c in genres_df.columns if c != 'appid']
 )
 
@@ -205,8 +205,12 @@ languages_df = df.select('appid', languages) \
 
 languages_df = languages_df.select(
     'appid',
-    *[F.when(F.col(c).isNull(), False).otherwise(True).alias(c)
-      for c in languages_df.columns if c not in {'', 'appid'}]
+    *[F.when(F.col(c).isNull(), 0).otherwise(1).alias(c)
+      for c in languages_df.columns if c not in {'', 'appid'}],
+)
+languages_df = languages_df.withColumn(
+    'total',
+    sum([F.col(c) for c in languages_df.columns if c not in {'', 'appid'}])
 )
 
 languages_df.show(10)
@@ -480,7 +484,6 @@ originating from 200 games (although here we are missing parts of the revenues).
 This analysis indicates that the videogames market is actually dominated by a few superproductions.
 """
 
-sys.exit()
 
 # %%
 """
@@ -644,25 +647,38 @@ A better indication of the market health would be the evolution of the number of
 which is not available in this dataset.
 """
 
-sys.exit()
+##
+game_releases_df = spark.sql(
+    """
+    SELECT
+      TRUNC(release_date, "month") as date,
+      COUNT (*) AS nb_releases,
+      SUM (COUNT (*)) OVER (
+        ORDER BY TRUNC(release_date, "month")
+        ROWS BETWEEN UNBOUNDED PRECEDING 
+        AND CURRENT ROW
+      ) AS cum_releases 
+    FROM 
+      release_dates 
+    WHERE 
+      release_date IS NOT NULL 
+    GROUP BY 
+      TRUNC(release_date, "month") 
+    """
+)
+game_releases_df.show()
+
 
 ##
-release_df = pd.DataFrame({'nb_releases': np.ones(len(release_dates))},
-                          index=release_dates)
-release_df
-
-##
-releases_per_month = release_df.resample('MS').sum()
-cumulative_releases = releases_per_month.cumsum()
+game_releases = game_releases_df.toPandas().astype({'date': 'datetime64[s]'})
 
 
-##
 fig5, axs5 = plt.subplots(
     nrows=1, ncols=2, figsize=(7, 3.5), dpi=100,
     gridspec_kw={'left': 0.09, 'right': 0.97, 'top': 0.89, 'bottom': 0.14, 'wspace': 0.24})
 fig5.suptitle('Figure 5: Evolution of game releases', x=0.02, ha='left')
 
-axs5[0].plot(releases_per_month.index, releases_per_month,
+axs5[0].plot(game_releases.date, game_releases.nb_releases,
              marker='', linestyle='-')
 axs5[0].set_xlim(12410, 19730)
 axs5[0].xaxis.set_major_locator(mdates.YearLocator(4))
@@ -672,7 +688,7 @@ axs5[0].set_xlabel('Date')
 axs5[0].set_ylabel('Monthly game releases')
 
 
-axs5[1].plot(cumulative_releases.index, cumulative_releases,
+axs5[1].plot(game_releases.date, game_releases.cum_releases,
              marker='', linestyle='-')
 axs5[1].set_xlim(12410, 19730)
 axs5[1].xaxis.set_major_locator(mdates.YearLocator(4))
@@ -695,7 +711,6 @@ The number of releases is stable between 700 and 800 since then.
 """
 
 
-
 # %%
 """
 ### General game availability
@@ -705,18 +720,30 @@ about the target audience for a new game. We focus here on age restrictions and 
 """
 
 ##
-main_df['required_age'].value_counts()
+restricted_age_games = spark.sql(
+    """
+    SELECT
+      name,
+      owners_est
+    FROM 
+      main
+    WHERE 
+      required_age > 15
+    ORDER BY 
+      owners_low DESC
+    """
+)
+restricted_age_games.show()
+
 
 ##
-df_ = main_df.loc[main_df['required_age'] > 15, ['name', 'owners_est']] \
-    .sort_values('owners_est', ascending=False)
-df_.head(20)
-
-##
+restricted_owners_est = restricted_age_games.select('owners_est').groupBy().sum().collect()[0][0]
+tot_owners_est = main_df.select('owners_est').groupBy().sum().collect()[0][0]
 print("Estimated number of age-restricted games (16+ yo) sold:",
-      f"{df_['owners_est'].sum()/1e6:.0f} M")
+      f"{restricted_owners_est/1e6:.0f} M")
 print("Estimated market share of age-restricted games:",
-      f"{100 * df_['owners_est'].sum() / main_df['owners_est'].sum():.4} %")
+      f"{100 * restricted_owners_est / tot_owners_est:.4} %")
+
 
 """
 Although most games have no age requirements, some superproductions do have an age limit.
@@ -725,19 +752,40 @@ Producing an age-restricted game has both advantages and disadvantages. On the o
 is mechanically reduced. On the other hand, it allows producers to introduce more features and mechanics in their games.
 """
 
-##
-languages_df.sum().sort_values(ascending=False).head(20)
+
+## Could not figure a way to do that with SQL
+languages_df.toPandas().iloc[:, 2:] \
+            .sum() \
+            .sort_values(ascending=False) \
+            .head(20)
+
 
 ##
-df_ = main_df.loc[languages_df.sum(axis=1)>10, ['name', 'owners_est']]
-df_.sort_values('owners_est', ascending=False).head(20)
+languages_availability = spark.sql(
+    """
+    SELECT
+      main.name,
+      main.owners_est,
+      languages.total AS languages_available
+    FROM
+      main
+    INNER JOIN
+      languages ON main.appid = languages.appid
+    WHERE
+      languages.total > 10
+    ORDER BY 
+      main.owners_est DESC
+    """
+)
+languages_availability.show()
+
 
 ##
+lang_owners_est = languages_availability.select('owners_est').groupBy().sum().collect()[0][0]
 print("Estimated number of games sold available in 10+ languages:",
-      f"{df_['owners_est'].sum()/1e6:.0f} M")
+      f"{lang_owners_est/1e6:.0f} M")
 print("Estimated market share of games available in 10+ languages:",
-      f"{100 * df_['owners_est'].sum() / main_df['owners_est'].sum():.4} %")
-df_['owners_est'].sum()
+      f"{100 * lang_owners_est /tot_owners_est:.4} %")
 
 
 """
@@ -762,47 +810,98 @@ We now analyze the market from the games genres perspective.
 """
 
 ##
-genres_df.sum().sort_values(ascending=False)
+genres_df.toPandas().iloc[:, 1:].sum().sort_values(ascending=False)
 
 """
 Most games are from independent developers/publishers (`'Indie'` genre). This is expected since those games are
 in general faster to produce, and their development is acessible to many people.
-THe most proeminent genres are the action-adventure games. Casual games, aiming at a broad
+The most proeminent genres are the action-adventure games. Casual games, aiming at a broad
 public rather than the hobbyist player, are also proeminent. This is explained by the fact
 those, like independent games, are smaller and thus faster to produce.
 """
 
-##
-grades = main_df['positive'] / (main_df['positive'] + main_df['negative'])
-weights = (main_df['positive'] + main_df['negative']).apply(np.sqrt)
+## prepare the dataframe with SQL
+genres_grades_df = spark.sql(
+    """
+    SELECT
+      main.positive / SQRT(main.positive + main.negative) AS weighted_grade,
+      SQRT(main.positive + main.negative) AS weight,
+      genres.*
+    FROM
+      main
+    JOIN
+      genres ON main.appid = genres.appid
+    """
+)
 
+## data processing must be done with Pandas
+genres_grades_df = genres_grades_df.toPandas()
 genre_grades = {}
-for genre_name, genre in genres_df.items():
-    w = weights.loc[genre]
-    genre_grades[genre_name] = (grades.loc[genre] * w).sum() / w.sum()
+for genre in genres_grades_df.columns[3:]:
+    df_ = genres_grades_df.loc[genres_grades_df[genre] == 1, ['weighted_grade', 'weight']]
+    genre_grades[genre] = df_['weighted_grade'].sum() / df_['weight'].sum()
+
 grades_df = pd.Series(genre_grades, name='grade')
 grades_df.sort_values(ascending=False)
 
+
 """
-All genres receive generally positive reviews.
+We compute the genres grades by averaging the number of positive reviews, weighted with the number of reviews for each game. All genres receive generally positive reviews.
 """
 
-##
-def genres_by_developer(developer: str)-> pd.DataFrame:
-    df_ = genres_df[main_df['developer'] == developer]
-    return df_.sum()
-
-def genres_by_publisher(publisher: str)-> pd.DataFrame:
-    df_ = genres_df[main_df['publisher'] == publisher]
-    return df_.sum()
 
 ##
-genres_by_publisher('Valve')
-genres_by_publisher('Ubisoft')
+def genres_by_publishers(publishers: list[str])-> pd.DataFrame:
+    """
+    Numbers of games released in each genre category for the given publishers.
+    """
+    where = '\n OR '.join(f"main.publisher == '{pub}'" for pub in publishers)
+    df_ = spark.sql(
+        f"""
+        SELECT
+          main.publisher,
+          genres.*
+        FROM
+          genres
+        JOIN
+          main on genres.appid = main.appid
+        WHERE
+          {where}
+        """
+    )
+    # genres get an ugly name when aggregating in pyspark
+    df_ = df_.drop('appid').toPandas()
+    return df_.groupby('publisher').sum().T
+
+
+def genres_by_developers(developers: list[str])-> pd.DataFrame:
+    """
+    Numbers of games released in each genre category for the given developers.
+    """
+    where = '\n OR '.join(f"main.developer == '{pub}'" for pub in developers)
+    df_ = spark.sql(
+        f"""
+        SELECT
+          main.developer,
+          genres.*
+        FROM
+          genres
+        JOIN
+          main on genres.appid = main.appid
+        WHERE
+          {where}
+        """
+    )
+    # genres get an ugly name when aggregating in pyspark
+    df_ = df_.drop('appid').toPandas()
+    return df_.groupby('developer').sum().T
+
 
 ##
-genres_by_developer('CAPCOM Co., Ltd.')
-genres_by_developer('Bethesda Game Studios')
+genres_by_publishers(['Valve', 'Ubisoft'])
+
+##
+genres_by_developers(['CAPCOM Co., Ltd.', 'Bethesda Game Studios'])
 
 """
 We can see that some publishers are specialized in some genres. For instance, Valve published
@@ -810,7 +909,8 @@ almost exclusively action games. Ubisoft, on the other hand, is more diversified
 also specialize in some game genres. Bethesda produces mainly RPGs, while Capcom delelops action-adventure games.
 """
 
-##
+#%%
+## !!!
 genre_owners = {}
 for genre_name, genre in genres_df.items():
     genre_owners[genre_name] = main_df.loc[genre, 'owners_est'].sum()
@@ -883,10 +983,10 @@ by focusing on the importance of the different platform available: Windows, Mac 
 """
 
 ##
-platforms_df.sum()
+platforms_df.toPandas().iloc[:, 1:].sum().sort_values(ascending=False)
 
 ##
-platforms_df.sum() / len(platforms_df)
+platforms_df.toPandas().iloc[:, 1:].mean().sort_values(ascending=False)
 
 
 """
@@ -894,7 +994,7 @@ Almost all games are available on Windows, while only 23% and 15% of the games a
 This makes Windows a mandatory platform for computer games.
 """
 
-##
+## !!!
 df_ = main_df.loc[:, ['owners_est']*3].set_axis(platforms_df.columns, axis=1)
 df_ = df_.mask(~platforms_df.to_numpy(), other=0.).sum()
 df_

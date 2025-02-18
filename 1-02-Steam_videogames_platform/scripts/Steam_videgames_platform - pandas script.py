@@ -4,7 +4,7 @@ Script version of Steam videogames platform project, using pandas for data
 treatment.
 """
 
-
+import sys
 import json
 
 import numpy as np
@@ -516,7 +516,6 @@ print("Estimated number of games sold available in 10+ languages:",
       f"{df_['owners_est'].sum()/1e6:.0f} M")
 print("Estimated market share of games available in 10+ languages:",
       f"{100 * df_['owners_est'].sum() / main_df['owners_est'].sum():.4} %")
-df_['owners_est'].sum()
 
 
 """
@@ -546,7 +545,7 @@ genres_df.sum().sort_values(ascending=False)
 """
 Most games are from independent developers/publishers (`'Indie'` genre). This is expected since those games are
 in general faster to produce, and their development is acessible to many people.
-THe most proeminent genres are the action-adventure games. Casual games, aiming at a broad
+The most proeminent genres are the action-adventure games. Casual games, aiming at a broad
 public rather than the hobbyist player, are also proeminent. This is explained by the fact
 those, like independent games, are smaller and thus faster to produce.
 """
@@ -563,25 +562,32 @@ grades_df = pd.Series(genre_grades, name='grade')
 grades_df.sort_values(ascending=False)
 
 """
-All genres receive generally positive reviews.
+We compute the genres grades by averaging the number of positive reviews, weighted with the number of reviews for each game. All genres receive generally positive reviews.
 """
 
-##
-def genres_by_developer(developer: str)-> pd.DataFrame:
-    df_ = genres_df[main_df['developer'] == developer]
-    return df_.sum()
-
-def genres_by_publisher(publisher: str)-> pd.DataFrame:
-    df_ = genres_df[main_df['publisher'] == publisher]
-    return df_.sum()
 
 ##
-genres_by_publisher('Valve')
-genres_by_publisher('Ubisoft')
+def genres_by_developers(developers: list[str])-> pd.DataFrame:
+    """
+    Numbers of games released in each genre category for the given publishers.
+    """
+    df_ = genres_df.assign(developer=main_df['developer'])
+    df_ = df_[df_['developer'].apply(lambda x: x in developers)]
+    return df_.groupby('developer').sum().T
+
+def genres_by_publishers(publishers: list[str])-> pd.DataFrame:
+    """
+    Numbers of games released in each genre category for the given developers.
+    """
+    df_ = genres_df.assign(publisher=main_df['publisher'])
+    df_ = df_[df_['publisher'].apply(lambda x: x in publishers)]
+    return df_.groupby('publisher').sum().T
 
 ##
-genres_by_developer('CAPCOM Co., Ltd.')
-genres_by_developer('Bethesda Game Studios')
+genres_by_publishers(['Valve', 'Ubisoft'])
+
+##
+genres_by_developers(['Bethesda Game Studios', 'CAPCOM Co., Ltd.'])
 
 """
 We can see that some publishers are specialized in some genres. For instance, Valve published
@@ -665,7 +671,7 @@ by focusing on the importance of the different platform available: Windows, Mac 
 platforms_df.sum()
 
 ##
-platforms_df.sum() / len(platforms_df)
+platforms_df.mean()
 
 
 """
