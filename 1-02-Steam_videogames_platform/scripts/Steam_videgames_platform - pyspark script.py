@@ -16,6 +16,7 @@ import sys
 
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
+from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, StringType
 
@@ -316,29 +317,29 @@ We note that prices have preferential values: 4.99, 9.99, 14.99, etc.
 ## Cumulative game owners distribution function
 owners_distrib = spark.sql(
     """
-    SELECT 
-      owners_low, 
-      count, 
+    SELECT
+      owners_low,
+      count,
       SUM (count) OVER (
-        ORDER BY 
+        ORDER BY
           owners_low DESC
       ) as compl_cdf
-    FROM 
+    FROM
       (
-        SELECT 
-          owners_low, 
+        SELECT
+          owners_low,
           COUNT (owners_low) / (
-            SELECT 
-              COUNT (owners_low) 
-            FROM 
+            SELECT
+              COUNT (owners_low)
+            FROM
               df
-          ) AS count 
-        FROM 
-          df 
-        GROUP BY 
+          ) AS count
+        FROM
+          df
+        GROUP BY
           owners_low
-      ) 
-    ORDER BY 
+      )
+    ORDER BY
       owners_low
     """
 )
@@ -351,17 +352,17 @@ own_frac_vs_games = spark.sql(
     """
     SELECT
       SUM (owners_est) OVER (
-        ORDER BY 
+        ORDER BY
           owners_est DESC ROWS UNBOUNDED PRECEDING
       ) / (
-        SELECT 
-          SUM (owners_est) 
+        SELECT
+          SUM (owners_est)
         FROM
           df
       ) as own_frac
     FROM
       df
-    ORDER BY 
+    ORDER BY
       owners_est DESC
     """
 )
@@ -385,23 +386,23 @@ rev_frac_vs_games = spark.sql(
     """
     SELECT
       SUM (revenues_est) OVER (
-        ORDER BY 
+        ORDER BY
           revenues_est DESC ROWS UNBOUNDED PRECEDING
       ) / (
-        SELECT 
-          SUM (revenues_est) 
+        SELECT
+          SUM (revenues_est)
         FROM
           df
       ) as revenues_frac
     FROM
       df
-    ORDER BY 
+    ORDER BY
       revenues_est DESC
     """
 )
 rev_frac_vs_games.show(10)
 
-# again, no easy way to do that part in SQL          
+# again, no easy way to do that part in SQL
 rev_frac = np.linspace(0, 1, 201, endpoint=True)
 rev_nb_games = np.sum(rev_frac_vs_games.toPandas().to_numpy() < rev_frac, axis=0)
 
@@ -499,15 +500,15 @@ of games released. One important metric in the game industry is the number of un
 ##
 publishers_df = spark.sql(
     """
-    SELECT 
+    SELECT
       publisher,
       COUNT (publisher) AS game_releases,
-      SUM (owners_low) AS units_distributed_low 
-    FROM 
-      main 
-    GROUP BY 
-      publisher 
-    ORDER BY 
+      SUM (owners_low) AS units_distributed_low
+    FROM
+      main
+    GROUP BY
+      publisher
+    ORDER BY
       game_releases DESC
     """
 )
@@ -518,15 +519,15 @@ publishers_df.show(15)
 ##
 developers_df = spark.sql(
     """
-    SELECT 
-      developer, 
+    SELECT
+      developer,
       COUNT (developer) AS game_releases,
-      SUM (owners_low) AS units_distributed_low 
-    FROM 
-      main 
-    GROUP BY 
+      SUM (owners_low) AS units_distributed_low
+    FROM
+      main
+    GROUP BY
       developer
-    ORDER BY 
+    ORDER BY
       game_releases DESC
     """
 )
@@ -647,7 +648,7 @@ A better indication of the market health would be the evolution of the number of
 which is not available in this dataset.
 """
 
-##
+## Monthly game releases
 game_releases_df = spark.sql(
     """
     SELECT
@@ -655,15 +656,15 @@ game_releases_df = spark.sql(
       COUNT (*) AS nb_releases,
       SUM (COUNT (*)) OVER (
         ORDER BY TRUNC(release_date, "month")
-        ROWS BETWEEN UNBOUNDED PRECEDING 
+        ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
-      ) AS cum_releases 
-    FROM 
-      release_dates 
-    WHERE 
-      release_date IS NOT NULL 
-    GROUP BY 
-      TRUNC(release_date, "month") 
+      ) AS cum_releases
+    FROM
+      release_dates
+    WHERE
+      release_date IS NOT NULL
+    GROUP BY
+      TRUNC(release_date, "month")
     """
 )
 game_releases_df.show()
@@ -719,17 +720,17 @@ We conclude this section by analyzing games availability on the platform. This s
 about the target audience for a new game. We focus here on age restrictions and language availabilty.
 """
 
-##
+## 16yo+ restricted games
 restricted_age_games = spark.sql(
     """
     SELECT
       name,
       owners_est
-    FROM 
+    FROM
       main
-    WHERE 
+    WHERE
       required_age > 15
-    ORDER BY 
+    ORDER BY
       owners_low DESC
     """
 )
@@ -760,7 +761,7 @@ languages_df.toPandas().iloc[:, 2:] \
             .head(20)
 
 
-##
+## game availability in terms of languages
 languages_availability = spark.sql(
     """
     SELECT
@@ -773,7 +774,7 @@ languages_availability = spark.sql(
       languages ON main.appid = languages.appid
     WHERE
       languages.total > 10
-    ORDER BY 
+    ORDER BY
       main.owners_est DESC
     """
 )
@@ -818,15 +819,18 @@ in general faster to produce, and their development is acessible to many people.
 The most proeminent genres are the action-adventure games. Casual games, aiming at a broad
 public rather than the hobbyist player, are also proeminent. This is explained by the fact
 those, like independent games, are smaller and thus faster to produce.
+It is also important to note that a game can have multiple genres: `'Action'` and `'Adventure'` often go together,
+and `'Indie'` is not a genre *per se*.
 """
 
+## average grade for each genre
 ## prepare the dataframe with SQL
 genres_grades_df = spark.sql(
     """
     SELECT
+      genres.*,
       main.positive / SQRT(main.positive + main.negative) AS weighted_grade,
-      SQRT(main.positive + main.negative) AS weight,
-      genres.*
+      SQRT(main.positive + main.negative) AS weight
     FROM
       main
     JOIN
@@ -837,7 +841,7 @@ genres_grades_df = spark.sql(
 ## data processing must be done with Pandas
 genres_grades_df = genres_grades_df.toPandas()
 genre_grades = {}
-for genre in genres_grades_df.columns[3:]:
+for genre in genres_grades_df.columns[1:-2]:
     df_ = genres_grades_df.loc[genres_grades_df[genre] == 1, ['weighted_grade', 'weight']]
     genre_grades[genre] = df_['weighted_grade'].sum() / df_['weight'].sum()
 
@@ -859,8 +863,8 @@ def genres_by_publishers(publishers: list[str])-> pd.DataFrame:
     df_ = spark.sql(
         f"""
         SELECT
-          main.publisher,
-          genres.*
+          genres.*,
+          main.publisher
         FROM
           genres
         JOIN
@@ -882,8 +886,8 @@ def genres_by_developers(developers: list[str])-> pd.DataFrame:
     df_ = spark.sql(
         f"""
         SELECT
-          main.developer,
-          genres.*
+          genres.*,
+          main.developer
         FROM
           genres
         JOIN
@@ -910,38 +914,78 @@ also specialize in some game genres. Bethesda produces mainly RPGs, while Capcom
 """
 
 #%%
-## !!!
+
+## estimated number of units distributed for each genre
+genres_owners_df = spark.sql(
+    """
+    SELECT
+      genres.*,
+      main.owners_est AS owners_est
+    FROM
+      main
+    JOIN
+      genres ON main.appid = genres.appid
+    """
+)
+
+## data processing must be done with Pandas
+genres_owners_df = genres_owners_df.toPandas()
 genre_owners = {}
-for genre_name, genre in genres_df.items():
-    genre_owners[genre_name] = main_df.loc[genre, 'owners_est'].sum()
-genre_owners_df = pd.Series(genre_owners, name='grade')
-genre_owners_df.sort_values(ascending=False)
+for genre in genres_owners_df.columns[1:-1]:
+    df_ = genres_owners_df.loc[genres_owners_df[genre] == 1, ['owners_est']]
+    genre_owners[genre] = df_['owners_est'].sum()
+
+owners_df = pd.Series(genre_owners, name='grade')
+owners_df.sort_values(ascending=False)
+
 
 """
-Action and adventure are the most popular genres. Independent games also take
-a significant market share.
+Action and adventure are the most popular genres. Independent games also take a significant market share.
 """
+
+
+## Evolution of game releases by genre
+genre_releases_df = release_dates_df.join(genres_df, 'appid') \
+    .where(F.col('release_date').isNotNull()) \
+    .select(F.trunc('release_date', 'month').alias('date'),
+            *[F.col(c) for c in genres_df.columns if c != 'appid']) \
+    .groupBy('date').sum() \
+    .sort('date', ascending=True) \
+    .toDF('date', *[c for c in genres_df.columns if c != 'appid'])
+
+## Cumulative monthly releases
+cumsum_window = Window.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+genre_releases_cumsum_df = genre_releases_df.select(
+    'date',
+    *[F.sum(c).over(cumsum_window).alias(c)
+      for c in genre_releases_df.columns if c != 'date'])
+
+genre_releases_df = genre_releases_df.toPandas().astype({'date': 'datetime64[s]'})
+genre_releases_cumsum_df = genre_releases_cumsum_df.toPandas().astype({'date': 'datetime64[s]'})
 
 ##
-genre_release_df = genres_df.set_index(release_dates)
-genre_releases_per_month = genre_release_df.resample('MS').sum()
-cumulative_genre_releases = genre_releases_per_month.cumsum()
+genre_releases_df
+
+##
+genre_releases_cumsum_df
+
 
 ##
 COLORS = [
     '#7e1e9c', '#15b01a', '#0343df', '#ff81c0', '#653700', '#e50000',
     '#95d0fc', '#029386', '#f97306', '#96f97b', '#c20078', '#ffff14',
-    '#75bbfd', '#929591', '#0cff0c', '#bf77f6', '#9a0eea', '#033500',
-    '#06c2ac', '#c79fef', '#00035b', '#d1b26f', '#00ffff', '#06470c',
+    '#75bbfd', '#0cff0c', '#bf77f6', '#9a0eea', '#033500', '#06c2ac',
+    '#c79fef', '#00035b', '#d1b26f', '#00ffff', '#06470c', '#929591',
     ]
 
 fig6, axs6 = plt.subplots(
     nrows=1, ncols=2, figsize=(8, 5), dpi=100,
-    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.57, 'bottom': 0.1, 'wspace': 0.25})
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.59, 'bottom': 0.1, 'wspace': 0.25})
 fig6.suptitle('Figure 6: Evolution of game genre releases', x=0.02, ha='left')
 
-polys = axs6[0].stackplot(genre_releases_per_month.index, genre_releases_per_month.T,
-                          colors=COLORS)
+polys = axs6[0].stackplot(
+    genre_releases_df['date'], genre_releases_df.iloc[:, 1:].T,
+    colors=COLORS)
 axs6[0].set_xlim(12410, 19730)
 axs6[0].xaxis.set_major_locator(mdates.YearLocator(4))
 axs6[0].set_ylim(0, 2500)
@@ -951,8 +995,9 @@ axs6[0].set_xlabel('Date')
 axs6[0].set_ylabel('Monthly releases (x 1000)')
 
 
-axs6[1].stackplot(cumulative_genre_releases.index, cumulative_genre_releases.T,
-                  baseline='zero', colors=COLORS)
+axs6[1].stackplot(
+    genre_releases_cumsum_df['date'], genre_releases_cumsum_df.iloc[:, 1:].T,
+    baseline='zero', colors=COLORS)
 axs6[1].set_xlim(12410, 19730)
 axs6[1].xaxis.set_major_locator(mdates.YearLocator(4))
 axs6[1].set_ylim(0, 160000)
@@ -961,8 +1006,8 @@ axs6[1].grid(visible=True)
 axs6[1].set_xlabel('Date')
 axs6[1].set_ylabel('Cumulative releases (x 1000)')
 
-fig6.legend(handles=polys, labels=genre_release_df.columns.to_list(),
-            ncols=4, loc=(0.02, 0.59))
+fig6.legend(handles=polys, labels=genre_releases_df.columns[1:].to_list(),
+            ncols=4, loc=(0.06, 0.62), fontsize=9)
 
 plt.show()
 
@@ -982,10 +1027,10 @@ but this may not be worth the extra costs (eg licences and software adaptation).
 by focusing on the importance of the different platform available: Windows, Mac and Linux.
 """
 
-##
+## number of games available on each platform
 platforms_df.toPandas().iloc[:, 1:].sum().sort_values(ascending=False)
 
-##
+## fraction of games available on each platform
 platforms_df.toPandas().iloc[:, 1:].mean().sort_values(ascending=False)
 
 
@@ -994,35 +1039,58 @@ Almost all games are available on Windows, while only 23% and 15% of the games a
 This makes Windows a mandatory platform for computer games.
 """
 
-## !!!
-df_ = main_df.loc[:, ['owners_est']*3].set_axis(platforms_df.columns, axis=1)
-df_ = df_.mask(~platforms_df.to_numpy(), other=0.).sum()
-df_
 
-##
-df_ / main_df['owners_est'].sum()
+## platform availability in terms of games owners
+## Using pyspark/SQL for this computation is affordable due to the limited number of platforms
+owner_platform_availability = {}
+tot_owners = main_df.select(F.sum('owners_est')).collect()[0][0]
+for platform in platforms_df.columns[1:]:
+    df_ = spark.sql(
+        f"""
+        SELECT
+          SUM(main.owners_est) AS {platform}
+        FROM
+          main
+        JOIN
+          platforms ON main.appid = platforms.appid
+        WHERE
+          platforms.{platform} IS TRUE
+        """
+    )
+    owner_platform_availability[platform] = [df_.collect()[0][0]/tot_owners]
+pd.DataFrame(owner_platform_availability, index=['availability'])
+
 
 """
 Although only 15/23% of the games are available to Linux and Mac users, the availability rises to 33/41%
-in terms of downloaded games. This means that popular games tend to be available on Mac and Linux.
+in terms of distributed games. This means that popular games tend to be available on Mac and Linux.
 """
 
-##
-genre_availability = {}
-for platform, mask in platforms_df.items():
-    genre_availability[platform] = genres_df.loc[mask].sum()
-genre_availability_df = pd.DataFrame(genre_availability)
-idx = genre_availability_df.sum(axis=1).sort_values(ascending=False).index
-genre_availability_df.loc[idx]
+#%%
+## platform availability in terms of game genres
+genre_names = genres_df.columns[1:]
+tot_genres = np.array(genres_df.select(*[F.sum(c) for c in genres_df.columns if c != 'appid']).collect()[0])
+genre_platform_availability = {}
+for platform in platforms_df.columns[1:]:
+    df_ = genres_df.join(platforms_df, 'appid') \
+                   .where(F.col(platform) == True) \
+                   .select(*[F.sum(c) for c in genres_df.columns if c != 'appid'])
+    genre_platform_availability[platform] = list(df_.collect()[0])
+
+genre_availability_df = pd.DataFrame(genre_platform_availability, index=genre_names)
+genre_availability_df = genre_availability_df.iloc[np.argsort(tot_genres)[::-1], :]
+genre_availability_df
 
 ##
-(genre_availability_df / genres_df.sum().to_numpy()[:, None]).loc[idx]
+genre_availability_df.div(np.sort(tot_genres)[::-1], axis=0)
 
 """
 Independent and strategy games have a larger availability on Mac and Linux platforms than average.
 """
 
-##
+#%%
+# !!!
+## Evolution of game releases by platform
 platform_release_df = platforms_df.set_index(release_dates)
 platform_releases_per_month = platform_release_df.resample('MS').sum()
 cumulative_platform_releases = platform_releases_per_month.cumsum()

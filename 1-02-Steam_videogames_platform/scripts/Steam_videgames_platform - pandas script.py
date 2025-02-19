@@ -548,9 +548,11 @@ in general faster to produce, and their development is acessible to many people.
 The most proeminent genres are the action-adventure games. Casual games, aiming at a broad
 public rather than the hobbyist player, are also proeminent. This is explained by the fact
 those, like independent games, are smaller and thus faster to produce.
+It is also important to note that a game can have multiple genres: `'Action'` and `'Adventure'` often go together,
+and `'Indie'` is not a genre *per se*.
 """
 
-##
+## average grade for each genre
 grades = main_df['positive'] / (main_df['positive'] + main_df['negative'])
 weights = (main_df['positive'] + main_df['negative']).apply(np.sqrt)
 
@@ -622,7 +624,7 @@ COLORS = [
 
 fig6, axs6 = plt.subplots(
     nrows=1, ncols=2, figsize=(8, 5), dpi=100,
-    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.57, 'bottom': 0.1, 'wspace': 0.25})
+    gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.59, 'bottom': 0.1, 'wspace': 0.25})
 fig6.suptitle('Figure 6: Evolution of game genre releases', x=0.02, ha='left')
 
 polys = axs6[0].stackplot(genre_releases_per_month.index, genre_releases_per_month.T,
@@ -647,7 +649,7 @@ axs6[1].set_xlabel('Date')
 axs6[1].set_ylabel('Cumulative releases (x 1000)')
 
 fig6.legend(handles=polys, labels=genre_release_df.columns.to_list(),
-            ncols=4, loc=(0.02, 0.59))
+            ncols=4, loc=(0.04, 0.62), fontsize=9)
 
 plt.show()
 
@@ -667,10 +669,10 @@ but this may not be worth the extra costs (eg licences and software adaptation).
 by focusing on the importance of the different platform available: Windows, Mac and Linux.
 """
 
-##
+## number of games available on each platform
 platforms_df.sum()
 
-##
+## fraction of games available on each platform
 platforms_df.mean()
 
 
@@ -679,20 +681,18 @@ Almost all games are available on Windows, while only 23% and 15% of the games a
 This makes Windows a mandatory platform for computer games.
 """
 
-##
+## platform availability in terms of games owners
 df_ = main_df.loc[:, ['owners_est']*3].set_axis(platforms_df.columns, axis=1)
 df_ = df_.mask(~platforms_df.to_numpy(), other=0.).sum()
-df_
 
-##
 df_ / main_df['owners_est'].sum()
 
 """
 Although only 15/23% of the games are available to Linux and Mac users, the availability rises to 33/41%
-in terms of downloaded games. This means that popular games tend to be available on Mac and Linux.
+in terms of distributed games. This means that popular games tend to be available on Mac and Linux.
 """
 
-##
+## platform availability in terms of game genres
 genre_availability = {}
 for platform, mask in platforms_df.items():
     genre_availability[platform] = genres_df.loc[mask].sum()
@@ -707,7 +707,7 @@ genre_availability_df.loc[idx]
 Independent and strategy games have a larger availability on Mac and Linux platforms than average.
 """
 
-##
+## Evolution of game releases by platform
 platform_release_df = platforms_df.set_index(release_dates)
 platform_releases_per_month = platform_release_df.resample('MS').sum()
 cumulative_platform_releases = platform_releases_per_month.cumsum()
