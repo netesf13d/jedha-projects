@@ -16,8 +16,8 @@ import sys
 
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
-from pyspark.sql import Window
 from pyspark.sql import functions as F
+from pyspark.sql import Window
 from pyspark.sql.types import ArrayType, StringType
 
 sc = SparkContext(appName="steam-videogames-platform-analysis")
@@ -401,6 +401,12 @@ rev_frac_vs_games = spark.sql(
     """
 )
 rev_frac_vs_games.show(10)
+
+"""
+This table represents the cumulative fraction of total estimated revenues from the games generating
+the most revenues (again, without taking into account the microtransactions).
+We can see that 10 (0.02 % of total games !) games account for 11 % of the total revenues.
+"""
 
 # again, no easy way to do that part in SQL
 rev_frac = np.linspace(0, 1, 201, endpoint=True)
@@ -1089,8 +1095,9 @@ Independent and strategy games have a larger availability on Mac and Linux platf
 """
 
 #%%
-# !!!
+
 ## Monthly game releases
+## Here we can select the column 'linux', 'mac', 'windows' manually
 platform_releases_df = spark.sql(
     """
     SELECT
@@ -1137,10 +1144,6 @@ cum_platform_monthly_releases = platform_releases_df \
     .toPandas().astype({'date': 'datetime64[s]'}) \
     .set_index('date')
 
-# ## Evolution of game releases by platform
-# platform_release_df = platforms_df.set_index(release_dates)
-# platform_releases_per_month = platform_release_df.resample('MS').sum()
-# cumulative_platform_releases = platform_releases_per_month.cumsum()
 
 ##
 fig7, axs7 = plt.subplots(
@@ -1156,8 +1159,6 @@ axs7[0].set_yticks(np.linspace(0, 1200, 7))
 axs7[0].grid(visible=True)
 axs7[0].set_xlabel('Date')
 axs7[0].set_ylabel('Monthly game releases (x 1000)')
-
-
 
 axs7[1].stackplot(cum_platform_monthly_releases.index, cum_platform_monthly_releases.T)
 axs7[1].set_xlim(12410, 19730)

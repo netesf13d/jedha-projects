@@ -1,3 +1,0 @@
-# Getaround Analysis
-
-Nice

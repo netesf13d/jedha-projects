@@ -727,8 +727,6 @@ axs7[0].grid(visible=True)
 axs7[0].set_xlabel('Date')
 axs7[0].set_ylabel('Monthly game releases (x 1000)')
 
-
-
 axs7[1].stackplot(cumulative_platform_releases.index, cumulative_platform_releases.T)
 axs7[1].set_xlim(12410, 19730)
 axs7[1].xaxis.set_major_locator(mdates.YearLocator(4))

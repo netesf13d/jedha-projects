@@ -13,9 +13,10 @@ The dataset is composed from games available in the catalog of Steam's platform.
 This project repository is structured as follows.
 - The Jupyter notebook `Steam_videogames_platform.ipynb` presents the results of our study. This is the main deliverable for the certification.
 - The directory `scripts` contains the exploratory data analysis as python scripts. There are 2 scripts, one using `pandas` for data analysis, the other using `pyspark`.
+- The file `requirements.txt` gives the list of the project dependencies. 
 - The directory `presentation` contains the slideshow for the exam, in both `odp` and `pdf` formats. 
 
 
 ## Notes
 
-I tried to rely as much as possible on SQL queries and pyspark API for data analysis. This was for the purpose of learning the language/API. As a consequence, the resulting code is not the most concise and elegant nor the fastest (for such a small dataset).
+For the purpose of learning, I tried to rely as much as possible on SQL queries and pyspark API for data analysis. As a consequence, the resulting code is not the most concise and elegant nor the fastest (for such a small dataset).
