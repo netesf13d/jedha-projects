@@ -5,7 +5,7 @@ This project is an application of deep learning to the treatment of textual data
 - build a simple and easily interpretable model (here a linear regression), and assess its performance;
 - try to improve it.
 
-The dataset originally comes from a Kaggle competition organized by Walmart. The original version can be found [here](https://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/data). The dataset used in this project is the same, without the stores information nor the features labeled `MarkDown*`.
+The dataset can be found [here](https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset).
 
 
 ## Structure of the project

@@ -4,7 +4,6 @@ Script version of Steam videogames platform project, using pandas for data
 treatment.
 """
 
-import sys
 import json
 
 import numpy as np

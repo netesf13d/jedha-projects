@@ -1,6 +1,6 @@
 # Plan your trip with Kayak
 
-This project consists in the contruction of a small application displaying weather information and available hotels in some selected places. The project revolves mainly around the Extract-Transform-Load process. It implements the standard techniques used for ETL:
+This project consists in the contruction of a small application displaying weather information and available hotels in some selected places. It revolves mainly around the Extract-Transform-Load process, and applies the standard techniques used for ETL:
 - API calls for the collection of geographic coordinates and weather information;
 - Web scraping to get information on available hotels;
 - Data transfer to a data lake;

@@ -4,21 +4,10 @@ Script version of Steam videogames platform project, using pyspark and SQL queri
 for data treatment.
 """
 
-import re
-import sys
-
-
-# required for python worker connectback
-# also `set PYSPARK_PYTHON=python` ?
-# import findspark
-# findspark.init()
-
-
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql import Window
-from pyspark.sql.types import ArrayType, StringType
 
 sc = SparkContext(appName="steam-videogames-platform-analysis")
 spark = SparkSession.builder.appName('steam-videogames-platform-analysis') \
@@ -970,7 +959,7 @@ genre_releases_df = genre_releases_df.toPandas().astype({'date': 'datetime64[s]'
 genre_releases_cumsum_df = genre_releases_cumsum_df.toPandas().astype({'date': 'datetime64[s]'})
 
 ##
-genre_releases_df
+genre_releases_df.show()
 
 ##
 genre_releases_cumsum_df
@@ -1121,15 +1110,15 @@ platform_releases_df = spark.sql(
         AND CURRENT ROW
       ) AS cum_windows
     FROM
-      d.release_dates AS d
+      release_dates AS d
     JOIN
-      platforms ON d.release_dates.appid = platforms.appid
+      platforms ON d.appid = platforms.appid
     WHERE
       d.release_date IS NOT NULL
     GROUP BY
       TRUNC(d.release_date, "month")
     ORDER BY
-      TRUNC(d.release_date, "month")
+      date
     """
 )
 platform_releases_df.show()
