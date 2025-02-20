@@ -655,8 +655,8 @@ game_releases_df = spark.sql(
       TRUNC(release_date, "month") as date,
       COUNT (*) AS nb_releases,
       SUM (COUNT (*)) OVER (
-        ORDER BY TRUNC(release_date, "month")
-        ROWS BETWEEN UNBOUNDED PRECEDING
+        ORDER BY 
+          TRUNC(release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
         AND CURRENT ROW
       ) AS cum_releases
     FROM
@@ -1066,7 +1066,7 @@ Although only 15/23% of the games are available to Linux and Mac users, the avai
 in terms of distributed games. This means that popular games tend to be available on Mac and Linux.
 """
 
-#%%
+
 ## platform availability in terms of game genres
 genre_names = genres_df.columns[1:]
 tot_genres = np.array(genres_df.select(*[F.sum(c) for c in genres_df.columns if c != 'appid']).collect()[0])
@@ -1090,10 +1090,57 @@ Independent and strategy games have a larger availability on Mac and Linux platf
 
 #%%
 # !!!
-## Evolution of game releases by platform
-platform_release_df = platforms_df.set_index(release_dates)
-platform_releases_per_month = platform_release_df.resample('MS').sum()
-cumulative_platform_releases = platform_releases_per_month.cumsum()
+## Monthly game releases
+platform_releases_df = spark.sql(
+    """
+    SELECT
+      TRUNC(d.release_date, "month") as date,
+      SUM (CAST(platforms.linux AS INTEGER)) AS linux,
+      SUM (CAST(platforms.mac AS INTEGER)) AS mac,
+      SUM (CAST(platforms.windows AS INTEGER)) AS windows,
+      SUM (SUM (CAST(platforms.linux AS INTEGER))) OVER (
+        ORDER BY 
+          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        AND CURRENT ROW
+      ) AS cum_linux,
+      SUM (SUM (CAST(platforms.mac AS INTEGER))) OVER (
+        ORDER BY 
+          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        AND CURRENT ROW
+      ) AS cum_mac,
+      SUM (SUM (CAST(platforms.windows AS INTEGER))) OVER (
+        ORDER BY 
+          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        AND CURRENT ROW
+      ) AS cum_windows
+    FROM
+      d.release_dates AS d
+    JOIN
+      platforms ON d.release_dates.appid = platforms.appid
+    WHERE
+      d.release_date IS NOT NULL
+    GROUP BY
+      TRUNC(d.release_date, "month")
+    ORDER BY
+      TRUNC(d.release_date, "month")
+    """
+)
+platform_releases_df.show()
+
+##
+platform_monthly_releases = platform_releases_df \
+    .select('date', 'linux', 'mac', 'windows') \
+    .toPandas().astype({'date': 'datetime64[s]'}) \
+    .set_index('date')
+cum_platform_monthly_releases = platform_releases_df \
+    .select('date', 'cum_linux', 'cum_mac', 'cum_windows') \
+    .toPandas().astype({'date': 'datetime64[s]'}) \
+    .set_index('date')
+
+# ## Evolution of game releases by platform
+# platform_release_df = platforms_df.set_index(release_dates)
+# platform_releases_per_month = platform_release_df.resample('MS').sum()
+# cumulative_platform_releases = platform_releases_per_month.cumsum()
 
 ##
 fig7, axs7 = plt.subplots(
@@ -1101,7 +1148,7 @@ fig7, axs7 = plt.subplots(
     gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.83, 'bottom': 0.13, 'wspace': 0.25})
 fig7.suptitle('Figure 7: Evolution of game releases in different platforms', x=0.02, ha='left')
 
-polys = axs7[0].stackplot(platform_releases_per_month.index, platform_releases_per_month.T)
+polys = axs7[0].stackplot(platform_monthly_releases.index, platform_monthly_releases.T)
 axs7[0].set_xlim(12410, 19730)
 axs7[0].xaxis.set_major_locator(mdates.YearLocator(4))
 axs7[0].set_ylim(0, 1200)
@@ -1112,7 +1159,7 @@ axs7[0].set_ylabel('Monthly game releases (x 1000)')
 
 
 
-axs7[1].stackplot(cumulative_platform_releases.index, cumulative_platform_releases.T)
+axs7[1].stackplot(cum_platform_monthly_releases.index, cum_platform_monthly_releases.T)
 axs7[1].set_xlim(12410, 19730)
 axs7[1].xaxis.set_major_locator(mdates.YearLocator(4))
 axs7[1].set_ylim(0, 80000)
@@ -1121,7 +1168,7 @@ axs7[1].grid(visible=True)
 axs7[1].set_xlabel('Date')
 axs7[1].set_ylabel('Cumulative game releases (x 1000)')
 
-fig7.legend(handles=polys, labels=platform_release_df.columns.to_list(),
+fig7.legend(handles=polys, labels=platform_monthly_releases.columns.to_list(),
             ncols=3, loc=(0.3, 0.86))
 
 plt.show()
