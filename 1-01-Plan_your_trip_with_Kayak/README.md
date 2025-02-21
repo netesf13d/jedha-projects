@@ -25,3 +25,6 @@ Here is the list of the technologies used throughout this project:
 - Web scaping is done using [Selenium](https://www.selenium.dev/) WebDriver.
 - The SQL database is provided by [Neon](https://console.neon.tech), with PostgreSQL as the nanagement system. The database is driven with [`psycopg`](https://www.psycopg.org/).
 - The data lake provider is [AWS](https://aws.amazon.com/s3/), driven with [`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
+
+
+- OpenStreetMap

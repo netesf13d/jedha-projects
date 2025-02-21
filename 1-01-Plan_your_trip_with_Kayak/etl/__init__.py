@@ -8,7 +8,8 @@ Data management engine. Provides the following functionality:
 - Data transfert to AWS RDS database
 """
 
-from .api_mgmt import *
-from .s3_mgmt import *
-from .rds_mgmt import *
+from .api_mgmt import get_coords, get_weather_forecast
+#from .scraping_mgmt import *
+#from .s3_mgmt import *
+#from .db_mgmt import *
 

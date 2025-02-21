@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 This module implements web scraping utilities for the project. The functions
@@ -8,12 +7,30 @@ implemented are:
 - ``: get information about hotels in the location surroundings
 """
 
-import asyncio
-import warnings
 
-import requests
-import scrapy
+import sys
+import os
+import re
+import unicodedata
+import argparse
+import time
+import json
+import csv
+from pathlib import Path
 
+
+from bs4 import BeautifulSoup as bs
+from PIL import Image
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+# from selenium.webdriver.chrome.options import Options
+
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('disable-notifications')
+
+
+webd_path = '../chromedriver_118.exe'
 
 
 # =============================================================================
@@ -34,15 +51,15 @@ params = {
 
 
 
-class BookingSpider(scrapy.Spider):
-    name = "hotels_info"
+# class BookingSpider(scrapy.Spider):
+#     name = "hotels_info"
     
-    def start_requests(self):
-        pass
+#     def start_requests(self):
+#         pass
         
     
-    def parse():
-        pass
+#     def parse():
+#         pass
 
 
 url = """
@@ -52,4 +69,3 @@ https://www.booking.com/searchresults.en-gb.html?ss=94250%2C+France&ssne=Paris&s
 url2 = """
 https://www.booking.com/searchresults.en-gb.html?src=searchresults&dest_type=landmark&latitude=48.2494853&longitude=7.3444831&ac_position=0&ac_click_type=g&ac_langcode=en-gb&ac_suggestion_list_length=100&search_selected=true&checkin=2024-10-18&checkout=2024-10-25&group_adults=2&no_rooms=1&group_children=0#map_opened
 """
-

@@ -32,6 +32,7 @@ CREATE TABLE transactions.time {
 
 CREATE TABLE transactions.merchants (
   merchant_id BIGINT PRIMARY KEY
+  merchant_name VARCHAR(255)
   country_code Char(2) FOREIGN KEY -- ISO 3166-1 alpha-2
   -- ...
 );

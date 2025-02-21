@@ -14,7 +14,7 @@ import requests
 
 
 # =============================================================================
-# 
+# Get location information
 # =============================================================================
 
 def get_coords(location: dict[str, str], **kwargs)-> dict[str, float]:
@@ -51,18 +51,25 @@ def get_coords(location: dict[str, str], **kwargs)-> dict[str, float]:
     params = kwargs | location | {'format': 'geojson'}
     r = requests.get("https://nominatim.openstreetmap.org/search",
                      params=params)
-    match r.status_code:
-        case 200:
-            results = r.json()['features']
-            if not results:
-                msg = f"Queried location {location} dit not return any result"
-                warnings.warn(msg)
-                return {'lat': float('nan'), 'lon': float('nan')}
-            return _filter_results(results)
-        case 403:
-            raise ValueError("403: access blocked")
-        case _:
-            raise ValueError(f"problem: {r.content()}")
+    r.raise_for_status()
+    results = r.json()['features']
+    if not results:
+        msg = f"Queried location {location} dit not return any result"
+        warnings.warn(msg)
+        return {'lat': float('nan'), 'lon': float('nan')}
+    return _filter_results(results)
+    # match r.status_code:
+    #     case 200:
+    #         results = r.json()['features']
+    #         if not results:
+    #             msg = f"Queried location {location} dit not return any result"
+    #             warnings.warn(msg)
+    #             return {'lat': float('nan'), 'lon': float('nan')}
+    #         return _filter_results(results)
+    #     case 403:
+    #         raise ValueError("403: access blocked")
+    #     case _:
+    #         raise ValueError(f"problem: {r.content()}")
     
 
 def _filter_results(results: list[dict])-> tuple[float, float]:
@@ -83,6 +90,11 @@ def _filter_results(results: list[dict])-> tuple[float, float]:
     coords = results[0]['geometry']['coordinates']
     return {'lat': coords[1], 'lon': coords[0]}
         
+
+# =============================================================================
+# 
+# =============================================================================
+
 
 def get_weather(api_call: str,
                 coords: dict[str, float],
@@ -180,7 +192,8 @@ def get_weather(api_call: str,
    'geometry': {'type': 'Point', 'coordinates': [7.3454923, 48.2495226]}}]}
 """
 
-params = {'q': "Paris, France"} | {'format': 'geojson'}
+params = {'q': "Paris"} | {'format': 'geojson'}
 r = requests.get("https://nominatim.openstreetmap.org/search",
+                 headers={'User-agent': 'Mozilla/5.0'},
                  params=params)
 print(r)

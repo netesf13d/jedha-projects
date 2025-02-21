@@ -1,115 +1,154 @@
 # -*- coding: utf-8 -*-
 """
-API call to fetch data from open-meteo.
+API calls to get geocoding and weather forecast.
+- `get_coords` fetches the geocoding of named places. We use
+  [Nominatim API](https://nominatim.org/).
+- `get_weather_forecast` fetches weather forecast at the givzen coordinates.
+  We use [Open-Meteo API](https://open-meteo.com/en/docs) to get weather
+  forecast information.
 """
 
-from datetime import datetime, UTC
-from zoneinfo import ZoneInfo
+import warnings
 
-import pandas as pd
-import requests
+from requests.sessions import Session
 from requests import RequestException
 
+USER_AGENT = 'Mozilla/5.0'
 
-
-latitude, longitude = 43.330556, 5.354166
-
-features = [
-    'time',
-    'temperature_2m (°C)',
-    'relative_humidity_2m (%)',
-    'dew_point_2m (°C)',
-    'apparent_temperature (°C)',
-    'precipitation (mm)',
-    'rain (mm)',
-    'snowfall (cm)',
-    'snow_depth (m)',
-    'weather_code (wmo code)',
-    'pressure_msl (hPa)',
-    'surface_pressure (hPa)',
-    'cloud_cover (%)',
-    'cloud_cover_low (%)',
-    'cloud_cover_mid (%)',
-    'cloud_cover_high (%)',
-    'et0_fao_evapotranspiration (mm)',
-    'vapour_pressure_deficit (kPa)',
-    'wind_speed_10m (km/h)',
-    'wind_speed_100m (km/h)',
-    'wind_direction_10m (°)',
-    'wind_direction_100m (°)',
-    'wind_gusts_10m (km/h)',
-    'soil_temperature_0_to_7cm (°C)',
-    'soil_temperature_7_to_28cm (°C)',
-    'soil_temperature_28_to_100cm (°C)',
-    'soil_temperature_100_to_255cm (°C)',
-    'soil_moisture_0_to_7cm (m³/m³)',
-    'soil_moisture_7_to_28cm (m³/m³)',
-    'soil_moisture_28_to_100cm (m³/m³)',
-    'soil_moisture_100_to_255cm (m³/m³)'
-]
-
-hourly_req = [f.split()[0] for f in features[1:]]
-
+DAILY_WEATHER = ['temperature_2m_max',
+                 'temperature_2m_min',
+                 'sunshine_duration',
+                 'precipitation_sum']
 
 
 # =============================================================================
-# 
+# Geocoding information
 # =============================================================================
 
-def _from_archive(start_date: str, end_date: str)-> dict:
+def get_coords(session: Session,
+               location: str, **kwargs)-> dict[str, float]:
     """
-    Fetch meteo data from archive. Works up to the last 2 days.
+    Get the geographic coordinates of a selected location using
+    [Nominatim API](https://nominatim.org/).
+    
+    Parameters
+    ----------
+    session : Session
+        HTTP session. Used to persist some behavior such as retry.
+    location : str
+        Location to look for geocoding.
+    kwargs : str
+        Additional arguments passed to Nominatim API.
+        
+    Returns
+    -------
+    dict[str, float]
+        The {'lat': latitude, 'lon': longitude} of the location.
+    
+    Examples
+    --------
+    >>> import requests
+    >>> s = requests.Session()
+    >>> get_coords('Bayeux, France')
+    {'lat': 49.2764624, 'lon': -0.7024738} # may also raise HTTPError
+    >>> get_coords('idontknow, abcdefgh')
+    {'lat': nan, 'lon': nan} # may also raise HTTPError
     """
-    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = kwargs | {'q': location, 'format': 'geojson'}
+    r = session.get("https://nominatim.openstreetmap.org/search",
+                     headers={'User-agent': USER_AGENT},
+                     params=params)
+    r.raise_for_status()
+    results = r.json()['features']
+    if not results:
+        msg = f"Queried location {location} dit not return any result"
+        warnings.warn(msg)
+        return {'lat': float('nan'), 'lon': float('nan')}
+    return _filter_results(results)
+    
+
+def _filter_results(results: list[dict])-> tuple[float, float]:
+    """
+    Filter multiple location results returned by a request to nominatim to get
+    the most relevant.
+    """
+    favorite_address_types = [
+        'city',
+        'town',
+    ]
+    for address_type in favorite_address_types:
+        for res in results:
+            if (res['type'] == 'administrative'
+                and res['addresstype'] == address_type):
+                return tuple(res['geometry']['coordinates'])
+    # default to the first result
+    coords = results[0]['geometry']['coordinates']
+    return {'latitude': coords[1], 'longitude': coords[0]}
+
+
+# =============================================================================
+# Weather forecast
+# =============================================================================
+
+def get_weather_forecast(session: Session,
+                         latitude: float, longitude: float,
+                         daily_data: list[str] = DAILY_WEATHER,
+                         )-> dict:
+    """
+    Get weather forecast at the requested geographic coordinates using
+    [Open-Meteo](https://open-meteo.com/en/docs).
+    
+    Parameters
+    ----------
+    session : Session
+        HTTP session. Used to persist some behavior such as retry.
+    latitude, longitude : float
+        Geographic coordinates.
+    daily_data : list[str]
+        Daily weather variables to fetch.
+        See https://open-meteo.com/en/docs for detailed information.
+
+    Returns
+    -------
+    dict
+        Weather information.
+        
+    Examples
+    --------
+    >>> import requests
+    >>> s = requests.Session()
+    >>> coords = {'longitude': -0.7024738, 'latitude': 49.2764624} # Bayeux
+    >>> get_weather_forecast(s, **coords)
+    {'latitude': 49.28,
+     'longitude': -0.70000005,
+     'generationtime_ms': 0.21529197692871094,
+     'utc_offset_seconds': 3600,
+     'timezone': 'Europe/Paris',
+     'timezone_abbreviation': 'GMT+1',
+     'elevation': 49.0,
+     'daily_units': {'time': 'iso8601',
+     'temperature_2m_max': '°C',
+     'temperature_2m_min': '°C',
+     'sunshine_duration': 's',
+     'precipitation_sum': 'mm'},
+     'daily': {'time': ['2025-02-21', ..., '2025-03-08'],
+     'temperature_2m_max': [15.1,..., 8.5],
+     'temperature_2m_min': [11.5,..., 4.2],
+     'sunshine_duration': [2452.24, ..., 37531.61],
+     'precipitation_sum': [1.5, ... 0.0]}}
+    """
+    url = 'https://api.open-meteo.com/v1/forecast'
     params = {
-       	"latitude": latitude,
-       	"longitude": longitude,
-        "start_date": start_date,
-       	"end_date": end_date,
-       	"hourly": hourly_req,
+       	'latitude': latitude,
+       	'longitude': longitude,
+        'daily': daily_data,
+        # 'hourly': hourly_data,
+        'timezone': 'auto',
+        'forecast_days': 16,
     }
-    r = requests.get(url, params=params)
+    r = session.get(url, params=params)
     r.raise_for_status()
     data = r.json()
     if 'error' in data:
         raise RequestException(data['reason'])
     return data
-
-
-def _from_forecast():
-    """
-    Fetch meteo data from forecast.
-    """
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-       	"latitude": latitude,
-       	"longitude": longitude,
-       	"hourly": hourly_req,
-         "past_days": 2,
-    }
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-    data = r.json()
-    if 'error' in data:
-        raise RequestException(data['reason'])
-    return data
-
-
-def fetch_update(last: datetime)-> pd.DataFrame:
-    """
-    
-    """
-    now = datetime.now(tz=UTC)
-    # recent data from forecast
-    data = _from_forecast()
-    df = pd.DataFrame(data['hourly']).set_index('time')
-    df = df.loc[df.index < now.isoformat()]
-    # old data fro archive
-    if (now - last).days >= 2:
-        data = _from_archive(now.date().isoformat(), now.date.isoformat())
-        df_ = pd.DataFrame(data['hourly']).setindex('time')
-        df_ = df_.dropna(how='all', axis=0)
-        df = df.update(df_)
-    
-    return df.sort_index()
-

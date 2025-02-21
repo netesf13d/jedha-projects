@@ -38,6 +38,7 @@ Table transaction_time {
 
 Table merchants {
   merchant_id bigint [primary key]
+  merchant_name varchar(255)
   country_code char(2) // ISO 3166-1 2-letter
   // ...
 }
