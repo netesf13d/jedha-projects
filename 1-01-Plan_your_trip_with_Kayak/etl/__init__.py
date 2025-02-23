@@ -14,6 +14,6 @@ from .scraping_mgmt import (
   scroll_down, scroll_to_bottom, load_more_results,
   scrape_hotel_info, scrape_hotel_urls, scrape_from_searchpage,
 )
-#from .s3_mgmt import *
+# from .s3_mgmt import download_file
 from .db_mgmt import (Base, Location, Hotel, WeatherIndicator)
 
