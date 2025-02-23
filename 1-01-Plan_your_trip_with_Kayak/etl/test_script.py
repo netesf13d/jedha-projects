@@ -34,7 +34,6 @@ conn = psycopg2.connect(
     sslrootcert='/path/to/your/root.crt'
 )
 
-#postgresql://neondb_owner:npg_iHcMxKe47qCt@ep-black-mode-a20862xc-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
 
 
 

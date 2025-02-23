@@ -16,6 +16,7 @@ import boto3
 import numpy as np
 import pandas as pd
 
+region = "eu-west-3"
 
 # =============================================================================
 # 

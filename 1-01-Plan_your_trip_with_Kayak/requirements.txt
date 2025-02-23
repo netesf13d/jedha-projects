@@ -1,2 +1,4 @@
-numpy==1.25
-selenium>=4.31
+
+numpy>=1.25
+selenium>=4.29.0
+sqlalchemy>=2.0

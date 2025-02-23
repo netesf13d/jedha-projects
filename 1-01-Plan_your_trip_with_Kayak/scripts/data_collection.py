@@ -33,7 +33,7 @@ s.mount('https://', HTTPAdapter(max_retries=retries))
 
 # Load locations of interest
 with open("../data/places.csv", 'rt', encoding='utf-8') as f:
-    reader = csv.reader(f, delimiter=',')
+    reader = csv.reader(f, delimiter=';')
     next(reader, None) # remove header
     places = [row for row in reader]
 
@@ -52,7 +52,7 @@ for i, loc in enumerate(places, start=1):
 locations_cols = ['location_id', 'place', 'country', 'latitude', 'longitude']
 with open('../data/locations.csv', 'wt', encoding='utf-8', newline='') as f:
     writer = csv.writer(f, delimiter=';')
-    writer.writeheader(locations_cols)
+    writer.writerow(locations_cols)
     for i, coords in coordinates:
         writer.writerow([i] + [coords[col] for col in locations_cols[1:]])
 
@@ -74,7 +74,7 @@ weather_cols = [
 ]
 with open('../data/weather_indicators.csv', 'wt', encoding='utf-8', newline='') as f:
     writer = csv.writer(f, delimiter=';')
-    writer.writeheader(weather_cols)
+    writer.writerow(weather_cols)
     for i, forecast in weather_forecast.items():
         forecast = forecast['daily']
         row = [i, forecast['time'][0],
@@ -109,7 +109,7 @@ driver.implicitly_wait(1)
 
 # Load locations of interest
 with open("../data/locations.csv", 'rt', encoding='utf-8') as f:
-    reader = csv.reader(f, delimiter=',')
+    reader = csv.reader(f, delimiter=';')
     next(reader, None) # remove header
     locations = [row for row in reader]
 
@@ -119,6 +119,7 @@ search_urls = {loc[0]: ('https://www.booking.com/searchresults.en-gb.html?'
 
 for i, search_url in search_urls.items():
     hotel_infos = {i: scrape_from_searchpage(driver, search_url, limit=30)} # scrape on search
+    # save to temp in case a problem occurs
     save_to_json(f'../data/temp/hotels/{i}.json', hotel_infos)
 
 driver.quit()
@@ -162,33 +163,35 @@ driver.quit()
 ```
 """
 
-#%%
-# =============================================================================
-# Format into csv file and transfer to S3 bucket
-# =============================================================================
-
+## load temporary saved files
 hotels_list = []
-root, _, files = next(os.walk('../data/temp/hotels/'))
+root, _, files = next(os.walk('../data/hotels/'))
 for file in files:
     with open(root + file, 'rt', encoding='utf-8') as f:
         hotels_list.append(json.load(f))
 
-
+# transform and save csv
 hotels_cols = ['hotel_id', 'location_id', 'url', 'name',
                'description', 'rating', 'georating']
 hotel_id = 1
 hotels_data = []
 for hotels in hotels_list:
-    loc_id, hotels = next(iter(hotels.values()))
+    loc_id, hotels = next(iter(hotels.items()))
     for h in hotels:
         entry = [hotel_id, loc_id] + [h[col] for col in hotels_cols[2:]]
+        hotels_data.append(entry)
         hotel_id += 1
 
 with open('../data/hotels.csv', 'wt', encoding='utf-8', newline='') as f:
     writer = csv.writer(f, delimiter=';')
-    writer.writeheader(hotels_cols)
+    writer.writerow(hotels_cols)
     for row in hotels_data:
         writer.writerow(row)
+
+
+# =============================================================================
+# Format into csv file and transfer to S3 bucket
+# =============================================================================
 
 
 
