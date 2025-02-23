@@ -1,0 +1,45 @@
+// Database structure defined with DBML
+// Docs: https://dbml.dbdiagram.io/docs
+
+Project Kayak_db {
+  database_type: 'PostgreSQL'
+  Note: 'Kayak project database'
+}
+
+
+///// Tables /////
+
+Table locations {
+  location_id bigint [primary key]
+  name varchar(255)
+  country varchar(255)
+  latitude float
+  longitude float
+}
+
+
+Table weather_indicators {
+  location_id bigint [primary key] 
+  start_date date
+  min_temperature_C float
+  max_temperature_C float
+  sunshine_duration_h float
+  precipitation_sum_mm float
+}
+
+
+Table hotels {
+  hotel_id bigint [primary key]
+  location_id bigint
+  url varchar
+  name varchar
+  desription varchar
+  rating decimal(3,1)
+  georating decimal(3,1)
+}
+
+
+///// Relationships /////
+
+Ref: locations.location_id > weather_indicators.location_id
+Ref: locations.location_id < hotels.location_id

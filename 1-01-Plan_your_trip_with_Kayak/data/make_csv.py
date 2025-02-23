@@ -43,7 +43,7 @@ locations = ["Mont Saint Michel",
 "La Rochelle"]
 
 
-with open("./locations.csv", 'wt', encoding='utf-8') as f:
+with open("./places.csv", 'wt', encoding='utf-8') as f:
     f.write("place,country\n")
     for loc in locations:
         f.write(f"{loc},France\n")

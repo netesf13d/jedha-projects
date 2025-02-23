@@ -50,9 +50,9 @@ def get_coords(session: Session,
     >>> import requests
     >>> s = requests.Session()
     >>> get_coords('Bayeux, France')
-    {'lat': 49.2764624, 'lon': -0.7024738} # may also raise HTTPError
+    {'latitude': 49.2764624, 'longitude': -0.7024738} # may also raise HTTPError
     >>> get_coords('idontknow, abcdefgh')
-    {'lat': nan, 'lon': nan} # may also raise HTTPError
+    {'latitude': nan, 'longitude': nan} # may also raise HTTPError
     """
     params = kwargs | {'q': location, 'format': 'geojson'}
     r = session.get("https://nominatim.openstreetmap.org/search",
