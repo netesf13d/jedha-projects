@@ -765,8 +765,7 @@ languages_availability = spark.sql(
       languages.total AS languages_available
     FROM
       main
-    INNER JOIN
-      languages ON main.appid = languages.appid
+      INNER JOIN languages ON main.appid = languages.appid
     WHERE
       languages.total > 10
     ORDER BY
@@ -828,8 +827,7 @@ genres_grades_df = spark.sql(
       SQRT(main.positive + main.negative) AS weight
     FROM
       main
-    JOIN
-      genres ON main.appid = genres.appid
+      JOIN genres ON main.appid = genres.appid
     """
 )
 
@@ -862,8 +860,7 @@ def genres_by_publishers(publishers: list[str])-> pd.DataFrame:
           main.publisher
         FROM
           genres
-        JOIN
-          main on genres.appid = main.appid
+          JOIN main on genres.appid = main.appid
         WHERE
           {where}
         """
@@ -885,8 +882,7 @@ def genres_by_developers(developers: list[str])-> pd.DataFrame:
           main.developer
         FROM
           genres
-        JOIN
-          main on genres.appid = main.appid
+          JOIN main on genres.appid = main.appid
         WHERE
           {where}
         """
@@ -918,8 +914,7 @@ genres_owners_df = spark.sql(
       main.owners_est AS owners_est
     FROM
       main
-    JOIN
-      genres ON main.appid = genres.appid
+      JOIN genres ON main.appid = genres.appid
     """
 )
 
@@ -1046,8 +1041,7 @@ for platform in platforms_df.columns[1:]:
           SUM(main.owners_est) AS {platform}
         FROM
           main
-        JOIN
-          platforms ON main.appid = platforms.appid
+          JOIN platforms ON main.appid = platforms.appid
         WHERE
           platforms.{platform} IS TRUE
         """
@@ -1111,8 +1105,7 @@ platform_releases_df = spark.sql(
       ) AS cum_windows
     FROM
       release_dates AS d
-    JOIN
-      platforms ON d.appid = platforms.appid
+      JOIN platforms ON d.appid = platforms.appid
     WHERE
       d.release_date IS NOT NULL
     GROUP BY

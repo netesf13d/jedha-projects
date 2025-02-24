@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 API calls to get geocoding and weather forecast.
-- `get_coords` fetches the geocoding of named places. We use
+- `get_coords` fetches the geocoding of named places using
   [Nominatim API](https://nominatim.org/).
 - `get_weather_forecast` fetches weather forecast at the givzen coordinates.
-  We use [Open-Meteo API](https://open-meteo.com/en/docs) to get weather
-  forecast information.
+  Weather forecast information is fetched using 
+  [Open-Meteo API](https://open-meteo.com/en/docs)
 """
 
 import warnings

@@ -1,22 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-
+Convenience functions for web-scaping of booking.com with Selenium.
 """
 
-# import json
-# import os
 import time
 
-# from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
-# from .utils import save_to_json
-
-
-# chrome_options = webdriver.ChromeOptions()
-# chrome_options.add_argument('disable-notifications')
-# webd_path = '../chromedriver_118.exe'
 
 
 # xpaths for properties elements
@@ -30,7 +21,7 @@ searchpage_xpaths = {
     'georating': './/span[@class="a3332d346a"]',
     }
 
-
+# xpath for hotel pages elements
 hotel_xpaths = {
     'hotelchars': '//div[@class="hotelchars"]',
     
@@ -42,7 +33,7 @@ hotel_xpaths = {
     }
 
 # =============================================================================
-# 
+# Functions
 # =============================================================================
 
 def scroll_down(driver, scroll_pause: float = 0.4)-> bool:
@@ -115,8 +106,10 @@ def scrape_hotel_info(driver, hotel_url: str)-> dict[str, str]:
     
     rating = _try_find_element(hotel, hotel_xpaths['rating'])
     rating = None if rating is None else rating.rsplit(' ', 1)[-1]
+    rating = rating.replace(',', '.')
     
     georating = _try_find_element(hotel, hotel_xpaths['georating'])
+    georating = georating.replace(',', '.')
     
     hotel_info = {'hotel_id': hotel_id,
                   'url': hotel_url,
@@ -170,10 +163,12 @@ def scrape_from_searchpage(driver,
         description = _try_find_element(hotel, searchpage_xpaths['description'])
         
         rating = _try_find_element(hotel, searchpage_xpaths['rating'])
-        rating = None if rating is None else rating.rsplit('\n', 1)[-1]
+        if rating is not None:
+            rating = rating.rsplit('\n', 1)[-1].replace(',', '.')
         
         georating = _try_find_element(hotel, searchpage_xpaths['georating'])
-        georating = None if georating is None else georating.rsplit(' ', 1)[-1]
+        if georating is not None:
+            georating = georating.rsplit(' ', 1)[-1].replace(',', '.')
         
         hotel_infos.append({'url': url,
                             'name': name,
@@ -185,18 +180,17 @@ def scrape_from_searchpage(driver,
 
 
 # =============================================================================
-# 
+# The script below scrapes each individual hotel page. This takes a lot of time
+# and the website is likely to catch selenium as a robot and block it.
 # =============================================================================
+
+# import csv
 # from selenium import webdriver
+# from selenium.common.exceptions import StaleElementReferenceException
+# from utils import save_to_json
 
-# coords = [{'latitude': 49.4404591, 'longitude': 1.0939658}, # Rouen
-#           {'latitude': 49.2764624, 'longitude': -0.7024738}]
-
-# search_urls = [('https://www.booking.com/searchresults.en-gb.html?'
-#                 f'latitude={coord["latitude"]}&longitude={coord["longitude"]}')
-#                for coord in coords]
-
-
+# ## setup driver with options to prevent detection
+# ## https://stackoverflow.com/questions/53039551/selenium-webdriver-modifying-navigator-webdriver-flag-to-prevent-selenium-detec/53040904#53040904
 # options = webdriver.ChromeOptions()
 # options.add_argument("--start-maximized")
 # options.add_argument("--disable-blink-features=AutomationControlled")
@@ -211,28 +205,45 @@ def scrape_from_searchpage(driver,
 # driver.implicitly_wait(1)
 
 
-# for search_url in search_urls[:2]:
-#     hotel_infos = scrape_from_searchpage(driver, search_url, limit=5) # scrape on search
+# with open("./data/locations.csv", 'rt', encoding='utf-8') as f:
+#     reader = csv.reader(f, delimiter=';', quoting=csv.QUOTE_STRINGS)
+#     next(reader, None) # remove header
+#     locations = [row for row in reader]
 
-    # driver.get(search_url)
-    # scroll_to_bottom(driver)
+# search_urls = {int(loc[0]): ('https://www.booking.com/searchresults.en-gb.html?'
+#                             f'latitude={loc[3]}&longitude={loc[4]}')
+#                for loc in locations}
+
+# ## open 2 tabs
+# # search tab
+# driver.get('https://www.booking.com')
+# search_window = driver.current_window_handle
+# # hotel description tab
+# driver.switch_to.new_window('tab')
+# driver.get('https://www.booking.com')
+# hotel_window = driver.current_window_handle
+
+# for i, search_url in search_urls.items():
+#     # get urls of hotel pages
+#     driver.switch_to.window(search_window)
+#     hotel_urls = scrape_hotel_urls(driver, search_url) # scrape on search
+#     hotel_urls = hotel_urls[:30]
     
-    # hotels = driver.find_elements(By.XPATH, searchpage_xpaths['property-card'])
-    
-    # hotel_infos = {}
-    # hotel = hotels[0]
-    # url = hotel.find_element(By.XPATH, searchpage_xpaths['link'])
-    # url = url.get_attribute('href').split('?')[0]
-    
-    # name = hotel.find_element(By.XPATH, searchpage_xpaths['title']).text
-    
-    # description = _try_find_element(hotel, searchpage_xpaths['description'])
-    
-    # rating = _try_find_element(hotel, searchpage_xpaths['rating'])
-    # rating = None if rating is None else rating.rsplit(' ', 1)[-1]
-    
-    # georating = _try_find_element(hotel, searchpage_xpaths['georating'])
-    
-    # save_to_json(f'./data/temp/{hex(hash(search_url))[-16:]}.json',
-    #              hotel_infos)
+#     # scrape hotel pages
+#     driver.switch_to.window(hotel_window)
+#     hotel_infos = []
+#     for url in hotel_urls:
+#         time.sleep(0.5)
+#         try:
+#             hotel_infos.append(scrape_hotel_info(driver, url))
+#         except StaleElementReferenceException:
+#             time.sleep(0.5)
+#             hotel_infos.append(scrape_hotel_info(driver, url))
+
+#     # save intermediate results to json
+#     save_to_json(f'../data/temp/hotels/{i}.json', hotel_infos)
+
+# driver.quit()
+
+
 

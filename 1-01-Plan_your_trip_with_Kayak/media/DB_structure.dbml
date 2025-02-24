@@ -20,7 +20,7 @@ Table locations {
 
 Table weather_indicators {
   location_id bigint [primary key] 
-  start_date date
+  date date
   min_temperature_C float
   max_temperature_C float
   sunshine_duration_h float
