@@ -9,12 +9,27 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from scipy.special import expit, logit
 
+from sklearn.base import clone
+from sklearn.compose import ColumnTransformer
+from sklearn.metrics import (confusion_matrix,
+                             roc_curve,
+                             auc)
+from sklearn.model_selection import (GridSearchCV,
+                                     train_test_split,
+                                     StratifiedKFold,
+                                     TunedThresholdClassifierCV)
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import (OneHotEncoder,
+                                   OrdinalEncoder,
+                                   StandardScaler,
+                                   FunctionTransformer)
 
 
 # %% Loading
 """
-## <a name="loading"></a> Data loading and preprocessing
+## <a id="loading"></a> Data loading and preprocessing
 """
 
 # Load data
@@ -66,9 +81,9 @@ df.loc[:, 'Week'] = df['Date'].dt.isocalendar().week
 
 # %% EDA
 """
-## <a name="eda"></a> Preliminary data analysis
+## <a id="eda"></a> Preliminary data analysis
 
-#### 
+####
 
 We begin by getting insights about the store locations.
 """
@@ -135,7 +150,7 @@ the temperature follows the north hemisphere seasonal variations.
 """
 #### Box plots
 
-We proceed with box plots 
+We proceed with box plots
 """
 
 
@@ -179,7 +194,7 @@ This can be due to christmas / black friday
 
 # %%
 """
-#### Scatter plots 
+#### Scatter plots
 
 We conclude with scatter plots
 """
@@ -244,7 +259,7 @@ during a low-temperature period.
 # %% Data imputation
 
 """
-## <a name="imputation"></a> Mssing data imputation
+## <a id="imputation"></a> Missing data imputation
 
 There are many missing data, we impute missing data with the following strategy.
 We complete a missing entry with data from its corresponding store. In order:
@@ -287,7 +302,7 @@ for _, df_ in df.groupby('Store'):
             y_vals = df_.loc[~mask, tgt].values
             xs = df_.loc[mask, 'Date'].astype('int64').values
             df.loc[idx, tgt] = np.interp(xs, x_vals, y_vals)
-    
+
 # 4. complete holiday flag
 for _, df_ in df.groupby('Store'):
     mask = df_['Holiday_Flag'].isna()
@@ -307,7 +322,18 @@ df.describe()
 
 
 # %% Unregularized linear model
+"""
+## <a id="linreg"></a> Unregularized linear model
 
+There are many missing data, we impute missing data with the following strategy.
+We complete a missing entry with data from its corresponding store. In order:
+1. Complete the `Date` by interpolating in decreasing order of preference, `CPI`, `Temperature`, `Unemployment`, `Fuel_Price`.
+2. Complete `Year`, `Month`, `Week`
+3. Complete `Temperature`, `Fuel_Price`, `CPI` and `Unemployment` by interpolating the values at neighboring dates
+4. Complete the `Holiday_Flag` by the corresponding value if an entry with the same week number exists. Otherwise set it to `0`.
+
+for that purpose, we use the raw dataframe, which contains the observations with missing target.
+"""
 
 
 

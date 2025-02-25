@@ -15,7 +15,7 @@ import matplotlib.dates as mdates
 
 # %% Loading
 """
-## <a name="loading"></a> Data loading and preprocessing
+## <a id="loading"></a> Data loading and preprocessing
 """
 
 ##
@@ -128,7 +128,7 @@ languages_df = pd.DataFrame.from_dict(
 
 # %% Macro
 """
-## <a name="macro"></a> Macro-level analysis
+## <a id="macro"></a> Macro-level analysis
 
 We begin our study by analyzing the market globally. We will focus on the following:
 - Games popularity and revenues
@@ -531,7 +531,7 @@ the availability may be limited to menu translation and subtitles.
 
 # %% Genres
 """
-## <a name="genres"></a> Genres analysis
+## <a id="genres"></a> Genres analysis
 
 Some game genres are more popular than others, or more expensive to develop. Some developers/publishers have more expertise
 in some specific genres. The choice of the genre for a game release must take these factors into account.
@@ -661,7 +661,7 @@ in game releases appear to be balanced between all the major genres. No genre is
 
 # %% Platform
 """
-## <a name="platform"></a> Platform analysis
+## <a id="platform"></a> Platform analysis
 
 The choice of platform availability is important in game production. Being available in different platforms brings more public,
 but this may not be worth the extra costs (eg licences and software adaptation). We therefore conclude our study of the game market
@@ -748,7 +748,7 @@ No platform seems to be taking over the others.
 
 # %% Conclusion
 """
-## <a name="conclusion"></a> Conclusion and perspectives
+## <a id="conclusion"></a> Conclusion and perspectives
 
 We can summarize the results of our study of Steam's game marketplace with the following points:
 - In terms of shares, the market is dominated by a few superproductions from major publisher companies.

@@ -23,7 +23,7 @@ def textstr(data: np.ndarray)-> str:
 
 
 # =============================================================================
-# 
+#
 # =============================================================================
 
 fname = "./Speed+Dating+Data.csv"
@@ -57,7 +57,7 @@ fig1.suptitle('Figure 1: Age, income and SAT scores distribution', x=0.02, ha='l
 for ax in axs1:
     ax.grid(visible=True, linewidth=0.3)
     ax.grid(visible=True, which='minor', linewidth=0.3)
-    
+
 
 axs1[0].set_title("Age distribution")
 axs1[0].hist(subject_df['age'], bins=np.linspace(10, 60, 51))
@@ -130,11 +130,11 @@ We also note the lower number of income entries (asa noted above, this correspon
 ##
 ages, incomes = {}, {}
 for race, df_ in racial_df.groupby('race'):
-    
+
     vals_f = df_.loc[df_['gender'] == 'Female', 'age']
     vals_m = df_.loc[df_['gender'] == 'Male', 'age']
     ages[race] = [vals_f[~np.isnan(vals_f)], vals_m[~np.isnan(vals_m)]]
-    
+
     vals_f = df_.loc[df_['gender'] == 'Female', 'income']
     vals_m = df_.loc[df_['gender'] == 'Male', 'income']
     incomes[race] = [vals_f[~np.isnan(vals_f)], vals_m[~np.isnan(vals_m)]]
@@ -381,7 +381,7 @@ for i, ax in enumerate(axs4[1]):
     ax.text(0.06, 0.83, textstr(lf_diff[:, i]),
             transform=ax.transAxes, fontsize=8,
             bbox={'boxstyle': 'round', 'facecolor': '0.92'})
-    
+
     ax.set_xlim(-19, 19)
     ax.set_ylim(0, 120)
     ax.grid(visible=True, axis='y', linewidth=0.3)
@@ -453,13 +453,13 @@ for i, ax in enumerate(axs5[0]):
     sev_m = sev_attrs[sev_genders==1, i]
     ax.violinplot(sev_f, positions=[-0.5], widths=0.8, showmeans=True)
     ax.violinplot(sev_m, positions=[0.5], widths=0.8, showmeans=True)
-    
+
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(0, 12)
     ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
     ax.grid(visible=True, axis='y', linewidth=0.3)
     ax.set_xlabel(attributes[i], labelpad=3)
-    
+
 axs5[0, 0].tick_params(bottom=False, left=True, labelleft=True)
 axs5[0, 0].set_ylabel('Note')
 axs5[0, 0].set_title("Self-evaluated 'attr*_3' ('How do you think you measure up?')",
@@ -471,13 +471,13 @@ for i, ax in enumerate(axs5[1]):
     pev_m = pev_attrs[pev_genders==1, i]
     ax.violinplot(pev_f, positions=[-0.5], widths=0.8, showmeans=True)
     ax.violinplot(pev_m, positions=[0.5], widths=0.8, showmeans=True)
-    
+
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(0, 12)
     ax.tick_params(bottom=False, labelbottom=False, left=False, labelleft=False)
     ax.grid(visible=True, axis='y', linewidth=0.3)
     ax.set_xlabel(attributes[i], labelpad=3)
-    
+
 axs5[1, 0].tick_params(left=True, labelleft=True)
 axs5[1, 0].set_ylabel('Note')
 axs5[1, 0].set_title("Peer-evaluated 'attr' ('Rate their attributes on a scale of 1-10')",
@@ -497,7 +497,7 @@ for i, ax in enumerate(axs5[2]):
             fontsize=7, bbox={'boxstyle': 'round', 'facecolor': '0.92'})
     ax.text(0.05, 0.03, textstr(evd_m), transform=ax.transAxes,
             fontsize=7, bbox={'boxstyle': 'round', 'facecolor': '0.92'})
-    
+
     ax.set_xlim(-5, 5)
     ax.set_ylim(-170, 170)
     ax.grid(visible=True, axis='both', linewidth=0.3)
@@ -505,7 +505,7 @@ for i, ax in enumerate(axs5[2]):
     ax.set_xticks([-4, -2, 0, 2, 4])
     ax.set_yticks([-100, -50, 0, 50, 100])
     ax.set_xlabel(attributes[i], labelpad=3)
-    
+
 axs5[2, 0].tick_params(left=True, labelleft=True)
 axs5[2, 0].set_ylabel('Counts', labelpad=0)
 axs5[2, 0].set_title("Difference between self evaluation and peer evaluation",
@@ -640,7 +640,7 @@ The interpretation of these observations is unclear.
 
 # %%
 """
-## <a name="dating"></a> Dating results analysis
+## <a id="dating"></a> Dating results analysis
 
 Let us now explore the dating results proper. We will investigate the following:
 - The effect of sharing a racial background on the atch probability
@@ -713,7 +713,7 @@ We note the following:
 """
 
 
-# %% 
+# %%
 """
 ### Effect of interests affinity on match probability
 """
@@ -879,7 +879,7 @@ gd_df['income_o'] = [subject_df.loc[int(pid), 'income'] for pid in gd_df['pid']]
 
 gd_df = gd_df.loc[gd_df['gender']==0]
 age_diff = (gd_df['age'] - gd_df['age_o']).to_numpy() # female - male
-income_diff = (gd_df['income'] - gd_df['income_o']).to_numpy() 
+income_diff = (gd_df['income'] - gd_df['income_o']).to_numpy()
 
 
 ## plot
@@ -983,7 +983,7 @@ for i, ax in enumerate(axs11):
     ax.plot([m_attr_mean[i]]*2, [0, -0.3], color='k', linewidth=0.6)
     ax.text(0.05, 0.03, textstr(m_attr_diff[:, i]), transform=ax.transAxes,
             fontsize=8, bbox={'boxstyle': 'round', 'facecolor': '0.92'})
-    
+
     ax.set_xlim(-10, 10)
     ax.set_xticks(np.arange(-8, 10, 4))
     ax.set_xticks(np.arange(-10, 12, 4), minor=True)
@@ -1073,7 +1073,7 @@ threshold (in economic terms, the marginal cost) increases to attribute a like.
 
 # %% Conclusion
 """
-## <a name="conclusion"></a> Conclusion and perspectives
+## <a id="conclusion"></a> Conclusion and perspectives
 
 Throughout the analysis of this dataset, we revealed soe interesting effects about the heterosexual mating behavior.
 - The tendency for people of both genders to overestimate themselves

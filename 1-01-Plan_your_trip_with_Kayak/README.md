@@ -32,6 +32,8 @@ To run the code, some resources must be created:
 - A [Neon](https://neon.tech) database. In both notebooks `data_collection.ipynb` and `Plan_your_trip_with_Kayak.ipynb`, the variable `NEONDB_ACCESS_KEYS` must be set to the path to a file containing the database connection parameters (host, database, user, password).
 It is recommended to change the file extention of the credentials to `.key` as such files are ignored by Git int this repository.
 
+Finally, the script `data/make_places_csv.py` must be executed to generate the initial csv file containing the places of interest. This is the starting point of the `data_collection.ipynb`notebook.
+
 
 ## Notes
 

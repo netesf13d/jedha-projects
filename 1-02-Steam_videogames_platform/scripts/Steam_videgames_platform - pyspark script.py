@@ -22,7 +22,7 @@ import matplotlib.dates as mdates
 
 # %% Loading
 """
-## <a name="loading"></a> Data loading and preprocessing
+## <a id="loading"></a> Data loading and preprocessing
 
 The dataset can be found in a public S3 bucket. If direct data loading from S3 URL is not possible,
 the following code uses `boto3` to download the file, then converts the resulting string to RDD before reading.
@@ -222,7 +222,7 @@ languages_df.createOrReplaceTempView('languages')
 
 # %% Macro
 """
-## <a name="macro"></a> Macro-level analysis
+## <a id="macro"></a> Macro-level analysis
 
 We begin our study by analyzing the market globally. We will focus on the following:
 - Games popularity and revenues
@@ -650,8 +650,8 @@ game_releases_df = spark.sql(
       TRUNC(release_date, "month") as date,
       COUNT (*) AS nb_releases,
       SUM (COUNT (*)) OVER (
-        ORDER BY 
-          TRUNC(release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        ORDER BY
+          TRUNC(release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_releases
     FROM
@@ -797,7 +797,7 @@ the availability may be limited to menu translation and subtitles.
 
 # %% Genres
 """
-## <a name="genres"></a> Genres analysis
+## <a id="genres"></a> Genres analysis
 
 Some game genres are more popular than others, or more expensive to develop. Some developers/publishers have more expertise
 in some specific genres. The choice of the genre for a game release must take these factors into account.
@@ -1010,7 +1010,7 @@ in game releases appear to be balanced between all the major genres. No genre is
 
 # %% Platform
 """
-## <a name="platform"></a> Platform analysis
+## <a id="platform"></a> Platform analysis
 
 The choice of platform availability is important in game production. Being available in different platforms brings more public,
 but this may not be worth the extra costs (eg licences and software adaptation). We therefore conclude our study of the game market
@@ -1089,18 +1089,18 @@ platform_releases_df = spark.sql(
       SUM (CAST(platforms.mac AS INTEGER)) AS mac,
       SUM (CAST(platforms.windows AS INTEGER)) AS windows,
       SUM (SUM (CAST(platforms.linux AS INTEGER))) OVER (
-        ORDER BY 
-          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        ORDER BY
+          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_linux,
       SUM (SUM (CAST(platforms.mac AS INTEGER))) OVER (
-        ORDER BY 
-          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        ORDER BY
+          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_mac,
       SUM (SUM (CAST(platforms.windows AS INTEGER))) OVER (
-        ORDER BY 
-          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING 
+        ORDER BY
+          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_windows
     FROM
@@ -1164,7 +1164,7 @@ No platform seems to be taking over the others.
 
 # %% Conclusion
 """
-## <a name="conclusion"></a> Conclusion and perspectives
+## <a id="conclusion"></a> Conclusion and perspectives
 
 We can summarize the results of our study of Steam's game marketplace with the following points:
 - In terms of shares, the market is dominated by a few superproductions from major publisher companies.
