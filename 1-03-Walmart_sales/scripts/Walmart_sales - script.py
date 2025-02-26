@@ -3,32 +3,23 @@
 Script version of the Walmart sales project.
 """
 
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from scipy.special import expit, logit
-
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (mean_squared_error,
-                             root_mean_squared_error,
                              r2_score,
                              mean_absolute_error,
                              mean_absolute_percentage_error)
-from sklearn.model_selection import (GridSearchCV,
-                                     train_test_split,
-                                     KFold,
-                                     StratifiedKFold,
-                                     TunedThresholdClassifierCV)
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder,
-                                   OrdinalEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
-from sklearn.linear_model import LinearRegression, lasso_path, Lasso
+from sklearn.linear_model import LinearRegression, Lasso
 
 
 # %% Loading
@@ -55,9 +46,8 @@ Are considered as outliers those features values which lie more than 3 standard 
 num_features = ['Temperature', 'Fuel_Price', 'CPI', 'Unemployment']
 means = df_desc.loc['mean', num_features]
 stds = df_desc.loc['std', num_features]
-a = pd.concat([means - 3*stds, df_desc.loc[['min', 'max'], num_features].T, means + 3*stds],
-              axis=1)
-print(a)
+pd.concat([means - 3*stds, df_desc.loc[['min', 'max'], num_features].T, means + 3*stds],
+          axis=1)
 
 """
 The lower bound for outlier exclusion is indicated as the column `0`, while the upper bound is the column `1`.
@@ -84,8 +74,9 @@ df.loc[:, 'Week'] = df['Date'].dt.isocalendar().week
 
 
 # %% EDA
+# !!!
 """
-## <a id="eda"></a> Preliminary data analysis
+## <a id="eda"></a> Exploratory data analysis
 
 ####
 
@@ -130,9 +121,6 @@ axs1[0].grid(visible=True, linewidth=0.2)
 
 axs1[1].set_xticks(np.arange(1, 13, 1))
 axs1[1].set_xlabel('Month')
-# axs1[1].set_ylim(0, 100)
-# axs1[1].set_yticks(np.arange(10, 100, 20), minor=True)
-# axs1[1].set_ylabel('Temperature (°F)', labelpad=2)
 axs1[1].grid(visible=True, linewidth=0.3)
 axs1[1].grid(visible=True, which='minor', linewidth=0.2)
 
@@ -151,12 +139,12 @@ the temperature follows the north hemisphere seasonal variations.
 """
 
 # %%
+#!!!
 """
 #### Box plots
 
 We proceed with box plots
 """
-
 
 fig2, axs2 = plt.subplots(
     nrows=1, ncols=2, sharey=True, figsize=(7.4, 4.), dpi=200,
@@ -189,14 +177,15 @@ axs2[1].grid(visible=True, linewidth=0.3)
 
 plt.show()
 
+# !!!
 """
-
 For some stores, there are some events in which the weekly sales are about 10-20% higher
 than the rest of the time.
 This can be due to christmas / black friday
 """
 
 # %%
+# !!!
 """
 #### Scatter plots
 
@@ -204,7 +193,6 @@ We conclude with scatter plots
 """
 
 features = ['Date', 'Week', 'Temperature', 'Fuel_Price', 'CPI', 'Unemployment']
-
 
 
 fig3, axs3 = plt.subplots(
@@ -274,7 +262,7 @@ We complete a missing entry with data from its corresponding store. In order:
 
 for that purpose, we use the raw dataframe, which contains the observations with missing target.
 """
-# 1. complete the dates
+## 1. complete the dates
 gdf = raw_df.groupby('Store')
 targets = ['CPI', 'Temperature', 'Unemployment', 'Fuel_Price']
 miss_date = df.loc[df['Date'].isna()]
@@ -291,12 +279,12 @@ for i, row in miss_date.iterrows():
     # impute missing value
     df.loc[i, 'Date'] = pd.Timestamp(y).round('7D') + pd.Timedelta('1D')
 
-# 2. complete year, month, week
+## 2. complete year, month, week
 df.loc[:, 'Year'] = df['Date'].dt.year
 df.loc[:, 'Month'] = df['Date'].dt.month
 df.loc[:, 'Week'] = df['Date'].dt.isocalendar().week
 
-# 3. complete the rest
+## 3. complete the rest
 for _, df_ in df.groupby('Store'):
     for tgt in targets:
         mask = df_[tgt].isna()
@@ -307,7 +295,7 @@ for _, df_ in df.groupby('Store'):
             xs = df_.loc[mask, 'Date'].astype('int64').values
             df.loc[idx, tgt] = np.interp(xs, x_vals, y_vals)
 
-# 4. complete holiday flag
+## 4. complete holiday flag
 for _, df_ in df.groupby('Store'):
     mask = df_['Holiday_Flag'].isna()
     idx = df_.loc[mask].index
@@ -381,6 +369,7 @@ This is the value of the squared error loss at the model optimum.
 - The mean absolute percentage error (MAPE), which measures the relative prediction accuracy.
 """
 
+##### Some utililties #####
 ## setup evaluation metrics
 def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
     """
@@ -397,7 +386,7 @@ def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
 ## setup dataframe to hold the results
 metric_names = ['MSE ($^2)', 'RMSE ($)', 'R2', 'MAE ($)', 'MAPE (%)']
 index = pd.MultiIndex.from_product(
-    [('linear regression', 'lasso regression'), ('train', 'test')],
+    [('unregularized', 'lasso'), ('train', 'test')],
     names=['model', 'eval. set'])
 evaluation_df = pd.DataFrame(
     np.full((4, 5), np.nan), index=index, columns=metric_names)
@@ -405,15 +394,14 @@ evaluation_df = pd.DataFrame(
 
 ## evaluate of train set
 y_pred_tr = linreg_model.predict(X_tr)
-evaluation_df.loc[('linear regression', 'train')] = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[0] = eval_metrics(y_tr, y_pred_tr)
 
 ## evaluate on test set
 y_pred_test = linreg_model.predict(X_test)
-evaluation_df.loc[('linear regression', 'test')] = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[1] = eval_metrics(y_test, y_pred_test)
 
 ##
-evaluation_df.loc['linear regression']
-
+evaluation_df.loc['unregularized']
 
 """
 The performance of our simple model is quite good, with a typical prediction error of 100k$, or 10 %,
@@ -432,16 +420,16 @@ the redundancy in the categorical encoding.
 
 # recover feature names
 col_preproc = linreg_model['column_preprocessing']
-features = [feature_name.split('__')[1]
-            for feature_name in col_preproc.get_feature_names_out()]
+features = ['intercept']
+features += [feature_name.split('__')[1]
+             for feature_name in col_preproc.get_feature_names_out()]
 
 # get coefficients
 intercept = linreg_model['regressor'].intercept_
-coefs = linreg_model['regressor'].coef_
+coef_vals = np.concatenate([[intercept], linreg_model['regressor'].coef_])
 
 
-print(f'{"intercept":<12} : {intercept:>12.2f}')
-for feature, coef in zip(features, coefs):
+for feature, coef in zip(features, coef_vals):
     print(f'{feature:<12} : {coef:>12.2f}')
 
 """
@@ -463,20 +451,19 @@ This is already a very good modelization of our data (see figure 2).
 
 
 # %% Regularized linear model
-"""
-## <a id="ridge_linreg"></a> Regularized linear model
+r"""
+## <a id="lasso_linreg"></a> Lasso-regularized linear model
 
-As we have seen, some features of the model are not very relevant. We may therefore introduce regularization
-to get rid of potentially irrelevant variables. In this section we will do so with Lasso, or L1 regularization,
+As we have seen, some features of the model seem to have low relevance. We may therefore introduce regularization
+to get rid of potentially irrelevant ones. In this section we will do so with Lasso, or L1 regularization,
 which has the advantage of enforcing coefficients sparsity.
 
 
 ### Model construction and parameter optimization
 
-In order to get insights on the variable selection process of Lasso, we will compute a regularization path.
-Cross validation is difficult here
-Can't keep use gridsearch cause we want the params
-
+In order to get insights on the regularization process, we fit models for different values
+of the regularization parameter $\alpha$. We record the regression coefficients and the
+relevant metrics for each value. The metrics are evaluated using 10-fold cross-validation.
 """
 
 # No need to drop one-hot vector in column preprocessing
@@ -522,7 +509,7 @@ best_alpha = alphas[np.argmin(metrics[4])]
 ##
 fig4, axs4 = plt.subplots(
     nrows=1, ncols=3, sharex=True, sharey=False, figsize=(9, 3.6), dpi=200,
-    gridspec_kw={'left': 0.07, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.28})
+    gridspec_kw={'left': 0.07, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
 fig4.suptitle("Figure 4: Metrics vs the regularization parameter",
               x=0.02, ha='left')
 
@@ -535,39 +522,49 @@ axs4[0].axvline(best_alpha, color='k', linewidth=0.6)
 
 axs4[0].set_xscale('log')
 axs4[0].set_xlim(1e-1, 1e5)
+axs4[0].set_xticks(np.logspace(-1, 5, 7))
+axs4[0].set_xticks(
+    np.concatenate([np.linspace(10**i, 10**(i+1), 10) for i in range(-1, 5)]),
+    minor=True)
 axs4[0].set_xlabel('regularization parameter')
 axs4[0].set_ylim(0, 8e5)
 axs4[0].set_yticks(np.linspace(0, 8e5, 9),
                    [f'{i:.1f}' for i in np.linspace(0, 0.8, 9)])
-axs4[0].set_ylabel('Prediction error (M$)')
-axs4[0].grid(visible=True, linewidth=0.2)
-
+axs4[0].set_ylabel('Error (M$)')
+axs4[0].grid(visible=True, linewidth=0.3)
+axs4[0].grid(visible=True, which='minor', linewidth=0.2)
 axs4[0].legend(loc=(0.015, 0.81))
 
 # R-squared
-axs4[1].plot(alphas, metrics[2], color='C2')
+axs4[1].plot(alphas, metrics[2], color='C2', label='R-squared')
 axs4[1].axvline(best_alpha, color='k', linewidth=0.6)
 
-axs4[1].set_xscale('log')
 axs4[1].set_xlabel('regularization parameter')
 axs4[1].set_ylim(0, 1)
-axs4[1].set_ylabel('R-squared', labelpad=2)
 axs4[1].grid(visible=True, linewidth=0.3)
 axs4[1].grid(visible=True, which='minor', linewidth=0.2)
+axs4[1].legend(loc=(0.015, 0.81))
 
 # MAPE
-axs4[2].plot(alphas, metrics[4], color='C3')
+axs4[2].plot(alphas, metrics[4], color='C3', label='MAPE')
 axs4[2].axvline(best_alpha, color='k', linewidth=0.6)
 
-axs4[2].set_xscale('log')
 axs4[2].set_xlabel('regularization parameter')
 axs4[2].set_ylim(0.7e0, 2e1)
-axs4[2].set_ylabel('MAPE', labelpad=2)
 axs4[2].grid(visible=True, linewidth=0.3)
 axs4[2].grid(visible=True, which='minor', linewidth=0.2)
+axs4[2].legend(loc=(0.015, 0.89))
 
 
 plt.show()
+
+r"""
+Figure 4 presents plots of our selected metrics as a function of the regularization parameter $\alpha$.
+We note that their values are stable up to about $\alpha \simeq 2000$, after which the performance of
+the model collapses. In particular, the mean absolute percentage error decreases by about 1% before
+exploding. This gives us a neat criterion to select $\alpha$: we choose the value at which the MAPE
+is minimal.
+"""
 
 
 #%%
@@ -578,7 +575,6 @@ fig5, ax5 = plt.subplots(
 fig5.suptitle("Figure 5: Regression coefficients vs regularization parameter",
               x=0.02, ha='left')
 
-
 for i in range(20):
     store_line, = ax5.plot(alphas, coefs[i], color='0.2', linewidth=0.3)
 
@@ -586,31 +582,36 @@ handles, labels = [store_line], ['Store_*'] # only one
 for i in range(20, 28):
     line, = ax5.plot(alphas, coefs[i], color=COLORS[i-19])
     handles.append(line)
-    labels.append(features[i-1])
+    labels.append(features[i])
 
 ax5.axvline(best_alpha, color='k', linewidth=0.6)
 
 ax5.set_xscale('log')
 ax5.set_xlim(1e-1, 1e5)
-ax5.set_xlabel('Regularization parameter')
+ax5.set_xlabel(r'Regularization parameter $\alpha$')
 ax5.set_ylim(-1e6, 1e6)
 ax5.set_ylabel('Regression coefficient value')
 ax5.grid(visible=True, linewidth=0.2)
-
-
 
 fig5.legend(handles=handles, labels=labels,
             ncols=3, loc=(0.25, 0.79), alignment='center')
 
 plt.show()
 
+"""
+We show in figure 5 the evolution of the regression coefficients as a function of $\alpha$.
+As expected, they decrease as the regularization becomes stronger and actually start to collapse at $\alpha \sim 10^4$.
+We note that the `'Store_*'` coefficients (thin solid black lines) retain their value longer than other coefficients,
+which indicate that these are more important for the model. At our selected $\alpha$ (black vertical line),
+we see that the other coefficients (colored lines) have almost vanished.
+"""
+
 
 #%%
 """
 ### Evaluation of the model
 
-
-
+We finally evaluate the model as we did for the unregularized model. 
 """
 
 ## train
@@ -618,36 +619,59 @@ lasso_model['regressor'].alpha = best_alpha
 lasso_model.fit(X_tr, y_tr)
 
 
-
 ## evaluate of train set
 y_pred_tr = lasso_model.predict(X_tr)
-evaluation_df.loc[('lasso regression', 'train')] = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[2] = eval_metrics(y_tr, y_pred_tr)
 
 ## evaluate on test set
 y_pred_test = lasso_model.predict(X_test)
-evaluation_df.loc[('lasso regression', 'test')] = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[3] = eval_metrics(y_test, y_pred_test)
 
 ##
-evaluation_df.loc['lasso regression']
+evaluation_df.loc['lasso']
+
 
 """
-MAE/MAPE are the same as 
-
+The metrics are again very similar for both train and test sets, and are of the same
+order as the values of the unregularized model.
 """
 
+# recover feature names
+col_preproc = lasso_model['column_preprocessing']
+features = ['intercept']
+features += [feature_name.split('__')[1]
+             for feature_name in col_preproc.get_feature_names_out()]
+
+# get coefficients
+intercept = lasso_model['regressor'].intercept_
+coef_vals = np.concatenate([[intercept], lasso_model['regressor'].coef_])
+
+
+for feature, coef in zip(features, coef_vals):
+    print(f'{feature:<12} : {coef:>12.2f}')
+
+"""
+The lasso model has 4 coefficients set to zero. We note that most non-`Store_<i>` values decreased,
+except `Temperature` and `Unemployment`. These retained a value similar to that of the unregularized model,
+which hints at their likely significance. Their effect is neverless small.
+"""
 
 
 # %% Conclusion
-
 """
 ## <a id="conclusion"></a> Conclusion
 
-We conclude by comparing our results for both unregularized and regularized linear regressions.
-
+We conclude by comparing the results for both unregularized and regularized linear regressions.
 """
 
+evaluation_df
 
-evaluation_df.loc['lasso regression']
+
+"""
+The values are actually very similar for both models. The regularized model has 4 coefficients out of 28 set to zero,
+which makes it slightly simpler yet clearly not sparse. It must be stressed out however that this gain was not free:
+it came with an additional computational cost.
+"""
 
 
 

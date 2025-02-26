@@ -19,7 +19,7 @@ import spacy
 
 # %% Loading
 """
-## <a name="loading"></a> Data loading and preprocessing
+## <a id="loading"></a> Data loading and preprocessing
 """
 
 # Load data
@@ -65,7 +65,7 @@ represent frequent messages for which making a classification error should be pe
 # %% EDA
 
 """
-## <a name="eda"></a> Preliminary data analysis
+## <a id="eda"></a> Preliminary data analysis
 
 The messages are quite complex, mixing  uppercase, lowercase, puctuation, alphanumeric and other exotic characters.
 Training a model to the data would certainly require some form of text normalization. However, this might cause a loss
@@ -197,7 +197,7 @@ will perform very well.
 
 # %% logreg
 """
-## <a name="logreg"></a> Benchmarking with a logistic regression
+## <a id="logreg"></a> Benchmarking with a logistic regression
 
 We set up a simple logistic regression here as a benchmark for comparison with more advanced deep learning methods.
 """
@@ -278,10 +278,10 @@ print_metrics(confusion_matrix(y_test, lr_model.predict(X_test)))
 Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve this score.
 """
 
-# %% test preprocessing
+# %% text preprocessing
 
 """
-## <a name="text_preprocessing"></a> Text preprocessing
+## <a id="text_preprocessing"></a> Text preprocessing
 
 Most of the messages are written in [SMS language](https://en.wikipedia.org/wiki/SMS_language) with inconsistent style.
 A blind tokenization of the words would produce different tokens for words that have essentially the same meaning.
@@ -376,7 +376,7 @@ data = norm_msgs.to_numpy()
 
 # %% 
 """
-## <a name="model1"></a> A first model
+## <a id="model1"></a> A first model
 
 
 #### Step 1
