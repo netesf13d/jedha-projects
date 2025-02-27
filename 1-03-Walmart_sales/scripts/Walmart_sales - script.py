@@ -74,13 +74,17 @@ df.loc[:, 'Week'] = df['Date'].dt.isocalendar().week
 
 
 # %% EDA
-# !!!
 """
 ## <a id="eda"></a> Exploratory data analysis
 
-####
+The dataset has few enough features to permit the exploration of their relationship.
 
-We begin by getting insights about the store locations.
+
+### Time variation and seasonality
+
+we begin by getting insights about seasonality effet and time variation of some features.
+Our two features of interest here are the consumer price index (CPI) and the temperature,
+which indirectly provide information about the store locations.
 """
 
 COLORS = [
@@ -105,7 +109,7 @@ for istore, store_df in df.groupby('Store'):
 
     # temperature vs month
     gdf = store_df.groupby('Month').mean()
-    axs1[1].plot(gdf.index, gdf['Fuel_Price'], color=COLORS[istore],
+    axs1[1].plot(gdf.index, gdf['Temperature'], color=COLORS[istore],
                  marker='o', markersize=5, linestyle='')
 
     # legend handles and labels
@@ -121,6 +125,9 @@ axs1[0].grid(visible=True, linewidth=0.2)
 
 axs1[1].set_xticks(np.arange(1, 13, 1))
 axs1[1].set_xlabel('Month')
+axs1[1].set_ylim(0, 100)
+axs1[1].set_yticks(np.arange(10, 100, 20), minor=True)
+axs1[1].set_ylabel('Temperature (F)', labelpad=2)
 axs1[1].grid(visible=True, linewidth=0.3)
 axs1[1].grid(visible=True, which='minor', linewidth=0.2)
 
@@ -133,17 +140,15 @@ plt.show()
 We show on the left panel of figure 1 the time dependence of the consumer price index for each store.
 The observed slow increase over time is due to inflation. We can clearly split the stores into 3 groups
 based on the range of CPI values : those probably correspond to stores located in different regions of the world.
-
 The right panels shows the monthly average of the temperature (right panel). For each store,
 the temperature follows the north hemisphere seasonal variations.
 """
 
 # %%
-#!!!
 """
-#### Box plots
+### Weekly sales marginal distributions vs categorical variables
 
-We proceed with box plots
+We now study the marginal distributions of weekly sales for the categorical variables.
 """
 
 fig2, axs2 = plt.subplots(
@@ -177,19 +182,21 @@ axs2[1].grid(visible=True, linewidth=0.3)
 
 plt.show()
 
-# !!!
 """
-For some stores, there are some events in which the weekly sales are about 10-20% higher
-than the rest of the time.
-This can be due to christmas / black friday
+Figure 2 presents violin plots of the marginal distributions of weekly sales for each categrical variable of the dataset.
+The left panel compares the distributions during and outside holidays. Holiday sales seem to have less variation than worked days sales.
+However, this might be due to an imbalance in the two categories: the ratio of worked days to holidays is more than 10.
+We also note the presence of high sales outliers during worked days. They can be due to events such as black friday.
+The right panel shows the sales distributions for each store. The sales are highly dependent on the store. One of the
+factors that could influence this is the store size (an information not available in the dataset).
 """
 
 # %%
-# !!!
 """
-#### Scatter plots
+### Weekly sales marginal distributions vs continuous variables
 
-We conclude with scatter plots
+We conclude the EDA section by getting insights about the marginal distribution of weekly sales
+for each continuous variable. of the dataset.
 """
 
 features = ['Date', 'Week', 'Temperature', 'Fuel_Price', 'CPI', 'Unemployment']
