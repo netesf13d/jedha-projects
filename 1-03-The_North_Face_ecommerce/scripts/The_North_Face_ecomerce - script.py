@@ -5,10 +5,10 @@ Script version of the North Face ecommerce project.
 
 import csv
 import re
-from collections import Counter
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import spacy
 import wordcloud
 
@@ -17,11 +17,10 @@ from sklearn.cluster import DBSCAN, HDBSCAN
 from sklearn.manifold import TSNE
 from sklearn.decomposition import TruncatedSVD
 
-# from spacy.lang.en.stop_words import STOP_WORDS
-# from spacy.tokens.doc import Doc
 
 
 # %% Loading and preprocessing
+# !!!
 """
 ## <a id="loading"></a> Data loading and preprocessing
 
@@ -34,9 +33,8 @@ with open('../sample-data.csv', 'rt', encoding='utf-8') as f:
     next(reader, None) # remove header
     data = [row for row in reader]
 
-description_id = [row[0] for row in data]
+description_id = [int(row[0]) for row in data]
 descriptions = [row[1] for row in data]
-
 
 ## remove HTML tags
 descriptions = [re.sub(r'<[a-z/]+>', ' ', d) for d in descriptions]
@@ -54,6 +52,7 @@ corpus = np.array(corpus, dtype=object)
 
 
 #%% TF-IDF
+# !!!
 """
 ### Construction of the TF-IDF matrix
 
@@ -67,24 +66,14 @@ tfidf = TfidfTransformer(norm='l2').fit_transform(word_counts)
 
 
 #%%
+# !!!
 """
 ### A first wordcloud
 
 """
-
-
-# def create_wordcloud(corpus: list[str])-> np.ndarray:
-#     """
-#     !!! re-doc
-#     Return a numpy array representing a wordcloud of the array.
-#     """
-#     word_count = Counter(corpus)
-#     wc = wordcloud.WordCloud(width=1000, height=500, min_font_size=14,
-#                              colormap='rainbow', random_state=1234)
-#     wc = wc.generate_from_frequencies(word_count)
-#     return wc.to_array()
     
-def create_wordcloud(text: str, **kwargs)-> np.ndarray:
+def create_wordcloud(text_or_freqs: str | dict[str, float],
+                     **kwargs)-> np.ndarray:
     """
     !!! re-doc
     Return a numpy array representing a wordcloud of the array.
@@ -93,10 +82,16 @@ def create_wordcloud(text: str, **kwargs)-> np.ndarray:
                 'colormap': 'gist_rainbow', 'collocations': False,
                 'random_state': 1234}    
     wc = wordcloud.WordCloud(**(defaults | kwargs))
-    wc = wc.generate(text)
+    if isinstance(text_or_freqs, str):
+        wc = wc.generate(text_or_freqs)
+    elif isinstance(text_or_freqs, dict):
+        wc = wc.generate_from_frequencies(text_or_freqs)
+    else:
+        raise TypeError('`text_or_freqs` must be of type `str` or `dict`')
     return wc.to_array()
 
 
+##
 wc_arr = create_wordcloud(' '.join(corpus))
 xy_ratio = wc_arr.shape[0] / wc_arr.shape[1]
 
@@ -108,8 +103,14 @@ wc_ax1.imshow(wc_arr, interpolation='bilinear')
 
 plt.show()
 
+#!!!
+"""
+
+"""
+
 
 # %% clustering
+#!!!
 """
 ## <a id="clustering"></a> Descriptions clustering
 
@@ -178,7 +179,7 @@ axs1[0, 1].set_title('Number of outliers')
 
 plt.show()
 
-
+# !!!
 """
 Figure 1 is so nice
 
@@ -194,6 +195,7 @@ for i, j in zip(valid_min_samples_idx, valid_eps_idx):
     print(f'min_samples = {min_samples_vals[i]} ; eps = {eps_vals[j]:<5.2f}',
           f'==>  {nb_clusters[i, j]:>2} clusters, {nb_outliers[i, j]:>2} outliers')
 
+# !!!
 """
 We retrain the configuration with 9 clusters and 7 outliers.
 """
@@ -213,6 +215,7 @@ print(np.unique(dbc_labels, return_counts=True)[1])
 
 
 #%%
+# !!!
 """
 ### Clustering with HDBSCAN
 
@@ -232,6 +235,7 @@ print(np.unique(hdbc_labels, return_counts=True)[1])
 
 
 #%%
+# !!!
 """
 ### Displaying the results
 
@@ -311,6 +315,7 @@ fig2.legend(handles=handles, labels=labels,
 
 plt.show()
 
+# !!!
 """
 
 There is no cluster 13 on HDBSCAN
@@ -319,115 +324,159 @@ There is no cluster 13 on HDBSCAN
 
 
 #%%
-
+# !!!
 """
-We can also display wordclouds associated to the various clusters.
+We can also display word clouds associated to the various clusters.
 """
 
+mask = np.full((500, 1000), 0x0, dtype=int)
+mask[420:, :120] = 0xff
+
+clusters_wc = []
+for k in range(-1, nb_dbc):
+    text = ' '.join(corpus[np.nonzero(dbc_labels == k)])
+    wc = create_wordcloud(text, min_font_size=20, mask=mask)
+    clusters_wc.append(wc)
+cluster_names = [f'{i}' for i in range(-1, nb_dbc)]
+
+
+# %%
 
 fig3, axs3 = plt.subplots(
-    nrows=1, ncols=2, sharey=True, figsize=(7, 8), dpi=100,
-    gridspec_kw={'left': 0.09, 'right': 0.96, 'top': 0.83, 'bottom': 0.065,
-                 'wspace': 0.10, 'hspace': 0.3})
+    nrows=8, ncols=2, sharey=True, figsize=(5, 10.4), dpi=100,
+    gridspec_kw={'left': 0.03, 'right': 0.97, 'top': 0.97, 'bottom': 0.01,
+                 'wspace': 0.06, 'hspace': 0.1})
 fig3.suptitle("Figure 3: nice wordclouds",
               x=0.02, y=0.99, ha='left')
 
 
 for k, ax in enumerate(axs3.ravel()):
-    idx = np.nonzero(hdbc_labels == k)[0]
-    text = ' '.join(corpus[i] for i in idx)
-    ax.imshow(create_wordcloud(text, min_font_size=20),
-              interpolation='bilinear')
     ax.axis('off')
-    ax.set_title(f'cluster {k}')
-
+    ax.imshow(clusters_wc[k], interpolation='bilinear')
+    ax.text(0.05, 0.05, cluster_names[k], color='w',
+            fontsize=10, fontweight='bold', ha='center',
+            transform=ax.transAxes)
 
 plt.show()
 
-
+# !!!
+"""
+Figure 3
+"""
 
 
 # %% recommender system
+# !!!
 """
 ## <a id="recommendation"></a> Recommender system
 
 """
 
-labels = hdbc_labels
-id_to_cluster = {id_: labels[i] for i, id_ in enumerate(description_id)}
-
-# def find_similar_items(item_id: int, n_items: int=5):
-    
-#     if item_id not in id_to_cluster:
-#         raise KeyError(f'no item with id={item_id}')
-    
-#     cluster_idx = np.nonzero(labels == id_to_cluster[item_id])[0]
-    
-#     i0 = description_id.index(item_id)
-#     similarities = [np.dot(tfidf[i0], tfidf[i]) for i in cluster_idx]
-    
-#     # indices most similar items sorted by decreasing similarity
-#     best_items_idx = cluster_idx[np.argsort(similarities)[0][::-1]]
-    
-#     return corpus[best_items_idx[1:1+n_items]]
+descriptions_df = pd.DataFrame({'description': descriptions}, index=description_id)
 
 
-def find_similar_items(item_id: int, n_items: int=5):
+def find_similar_items(item_id: int, n_items: int = 5)-> pd.DataFrame:
     
-    if item_id not in description_id:
+    if item_id not in descriptions_df.index:
         raise KeyError(f'no item with id={item_id}')
-    
-    # cluster_idx = np.nonzero(labels == id_to_cluster[item_id])[0]
     
     i0 = description_id.index(item_id)
     similarities = (tfidf @ tfidf[i0].T).toarray().ravel()
     
     # indices most similar items sorted by decreasing similarity
-    best_items_idx = np.argsort(similarities)[0][::-1]
+    best_items_idx = np.argsort(similarities)[::-1]
     
-    return [descriptions[i] for i in best_items_idx[:n_items]]
+    return descriptions_df.iloc[best_items_idx[1:n_items+1], 0]
 
 
+## 
+descriptions_df.loc[1, 'description']
+
+##
+find_similar_items(1, n_items=3)
+
+# !!!
+"""
+
+"""
 
 
-# %% topic modeling
+# %% topic modeling 
 """
 ## <a id="topic"></a> Topic modeling
 
+topics are sorted by decreasing imporance in the corpus.
 """
 
-svd = TruncatedSVD(n_components=5, n_iter=7, random_state=42)
+## compute only the 10 most important topics
+svd = TruncatedSVD(n_components=10, random_state=1234)
 svd = svd.fit(tfidf)
+
+topics = svd.components_
+
+
+## 
+topic_decomp_df = pd.DataFrame(
+    tfidf @ topics.T, index=description_id,
+    columns=[f'topic {i}' for i in range(1, 11)])
 
 
 # %%
+"""
+Let us visualize the topics
+"""
+
+## Positive coefficients wordclouds
+topics_pos = [dict(zip(vocab[topic > 0], topic[topic > 0]))
+              for topic in topics]
+topic_wordclouds_pos = [create_wordcloud(t, min_font_size=25) if t else None
+                        for t in topics_pos]
+
+## Negative coefficients wordclouds
+topics_neg = [dict(zip(vocab[topic < 0], topic[topic < 0]))
+              for topic in topics]
+topic_wordclouds_neg = [create_wordcloud(t, min_font_size=25) if t else None
+                        for t in topics_neg]
+
+
+#%%
 
 fig4, axs4 = plt.subplots(
-    nrows=1, ncols=2, sharey=True, figsize=(7, 8), dpi=100,
-    gridspec_kw={'left': 0.09, 'right': 0.96, 'top': 0.83, 'bottom': 0.065,
-                 'wspace': 0.10, 'hspace': 0.3})
-fig4.suptitle("Figure 4: Even nicer wordclouds",
+    nrows=5, ncols=2, sharey=True, figsize=(5.5, 7.5), dpi=100,
+    gridspec_kw={'left': 0.06, 'right': 0.97, 'top': 0.95, 'bottom': 0.04,
+                 'wspace': 0.05, 'hspace': 0.1})
+fig4.suptitle("Figure 4: Even nicer wordclouds", fontweight='normal',
               x=0.02, y=0.99, ha='left')
 
+axs4[-1, 0].text(0.5, -0.14, 'Positive component', fontsize=11, fontweight='bold',
+                transform=axs4[-1, 0].transAxes, ha='center', va='center')
+axs4[-1, 1].text(0.5, -0.14, 'Negative component', fontsize=11, fontweight='bold',
+                transform=axs4[-1, 1].transAxes, ha='center', va='center')
 
-for k, ax in enumerate(axs4.ravel()):
-    idx = np.nonzero(hdbc_labels == k)[0]
-    text = ' '.join(corpus[i] for i in idx)
-    ax.imshow(create_wordcloud(text, min_font_size=20),
-              interpolation='bilinear')
-    ax.axis('off')
-    ax.set_title(f'cluster {k}')
-
+for k, axs in enumerate(axs4):
+    axs[0].axis('off')
+    axs[1].axis('off')
+    axs[0].text(-0.06, 0.5, f'Topic {k+1}', fontsize=11, fontweight='bold',
+                transform=axs[0].transAxes, ha='center', va='center', rotation=90)
+    
+    if topic_wordclouds_pos[k] is not None:
+        axs[0].imshow(topic_wordclouds_pos[k], interpolation='bilinear')
+    if topic_wordclouds_neg[k] is not None:
+        axs[1].imshow(topic_wordclouds_neg[k], interpolation='bilinear')
 
 plt.show()
 
+"""
+Figure 4
+"""
 
 
 # %% Conclusion
 
 """
-## <a id="topic"></a> Conclusion
+## <a id="conclusion"></a> Conclusion
 
+Should split the descriptions
 """
 
 
