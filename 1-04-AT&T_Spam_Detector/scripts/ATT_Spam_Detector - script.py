@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Script for the AT&T spam detector project
+Script for the AT&T spam detector project.
 """
 
 
@@ -17,45 +17,69 @@ import matplotlib.pyplot as plt
 import spacy
 
 
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+
 # %% Loading
-"""
+r'''
 ## <a id="loading"></a> Data loading and preprocessing
+
+The dataset consists of 5574 entries, many of which have issues. Here is a non-exhaustive list:
+- The file doesn't decode as `UTF-8`. It must be decoded as `latin-1` or `mac-roman`.
+- Some rows are ill-formed (eg line 101 of the csv: `ham""",,,`)
+- Most rows have trailing commas
+- Some messages are anclosed in (possibly many) double quote characters
+- Single and double quotes are escaped with backslashes
+- Some spurious characters are present (eg `å` characters that systematically prepend pound symbols `£`)
+
+Fortunately, the original version of the dataset can be found
+[here](https://archive.ics.uci.edu/dataset/228/sms+spam+collection). Its entries are much cleaner
+than those of our dataset. We can use them as a comparison to setup the cleaning and processing for our dataset:
+- Strip the trailing commas
+- Completely remove the double quotes `"`
+- Convert backslashes + single quote `\'` into single quote `'`
+- Convert backslashes `\` into double quotes `"`
+- Remove the spurious characters `å`
+
+The implementation of this pipeline is given below.
+'''
+
+# ########## Loading and preprocessing the project dataset ##########
+# with open('../spam.csv', 'rt', encoding='latin-1') as f:
+#     f.readline() # remove header
+#     raw_data = [row.strip().split(',', 1) for row in f.readlines()]
+
+# ## set target
+# is_spam = np.array([True if row[0] == 'spam' else False for row in raw_data])
+
+# ## process and clean messages
+# messages = [row[1].strip(',') \
+#                   .replace('"', '') \
+#                   .replace("\\'", "'") \
+#                   .replace('\\', '"') \
+#                   .replace('å', '')
+#             for row in raw_data]
+
+
+"""
+However, some encoding issues persist with some problematic characters still present in messages.
+To proceed with the project we will rather use this original dataset as the starting point.
 """
 
-# Load data
-df = pd.read_csv('./spam.csv', encoding='mac-roman')
+########## Loading and preprocessing the original dataset ##########
+with open('../SMSSpamCollection', 'rt', encoding='utf-8') as f:
+    raw_data = [row.strip().split('\t', 1) for row in f.readlines()]
 
-##
+is_spam = np.array([True if row[0] == 'spam' else False for row in raw_data])
+messages = np.array([row[1] for row in raw_data], dtype=object)
+
+df = pd.DataFrame({'message': messages, 'is_spam': is_spam})
 df.describe()
 
-"""
-The dataset consists of 5572 observations, and has 5 columns. Of these columns, only the first two
-are named while the others are not.
-"""
-
-df.loc[~df.iloc[:, 4].isna()]
-
-"""
-Visual inspection on notepad++ shows that the unamed columns and the trailing comas are there because
-they act both as a delimiter of the CSV file and as a character in some messages.
-This is highlighted in the following screen captures.
-"""
-
-# replace NaNs with the empty string
-df = df.replace(float('nan'), '')
-
-# concatenate columns >= 1 to get the messages
-# convert target to a boolean series
-df = pd.DataFrame.from_dict({'message': df.iloc[:, 1:].apply(''.join, axis=1),
-                             'is_spam': df.iloc[:, 0] == 'spam'})
-
-"""
-Some of the files entries have enclosing quotes (eg the first one, see the picture above), while others do not (eg, the second one).
-Our preprocessing removed them. It is not clear whether those are relevant to the dataset, but in the remaining we will assume they are not.
-"""
-
-##
-df.describe()
 
 """
 Our dataset seems to have duplicates. We choose not to remove them, they certainly
@@ -72,14 +96,15 @@ Training a model to the data would certainly require some form of text normaliza
 of information.
 
 To get some insights about what makes a message a spam and make visualizations, we will reduce the messages to a few descriptive quantities:
-- The length of the message, `msg_len`;
-- The number of capitallized characters, `chr_caps`;
-- The number of digit characters in the message, `chr_digit`;
-- The number of punctuation characters in the message, `chr_punct`;
-- The length of the longest character string (split by whitespaces), `max_wd_len`;
-- The number of some money-related words and characters `'$'`, `'£'`, `'€'`, `'cash'`, `'free'`, `'price'` and `'prize'`, `lex_money`.
-The presence of these tokens indicates that the message semantics lies in the lexical field of money
-(after all, spamming is about getting money from people). We could also consider adding words related to the lexical field of sex.
+- `msg_len`, the length of the message;
+- `chr_caps`, the number of capitallized characters;
+- `chr_digit`, the number of digit characters in the message;
+- `chr_punct`, the number of punctuation characters in the message;
+- `max_wd_len`, he length of the longest character string (split by whitespaces);
+- `lex_money`, the number of some money-related words and characters: `'$'`, `'£'`, `'€'`, `'cash'`, `'free'`, `'price'` and `'prize'`.
+The presence of these tokens indicates that the message talks about money (after all, spamming is about getting money from people).
+We could also consider adding words related to the lexical field of sex.
+- `caps_first`, the number of 
 # - The number of (casefolded) `'cash'` strings, `wd_cash`;
 # - The number of (casefolded) `'free'` strings, `wd_free`;
 
@@ -116,7 +141,7 @@ def build_features(msgs: pd.DataFrame)-> pd.DataFrame:
         'chr_digit': msgs.apply(lambda s: sum(c.isdigit() for c in s)),
         'chr_punct': msgs.apply(lambda s: sum(c in punctuation for c in s)),
         'max_wd_len': msgs.apply(lambda s: max(len(x) for x in s.split(' '))),
-        'lex_money': count_tokens(msgs, ['\$', '£', '€', 'free', 'cash', 'price', 'prize']),
+        'lex_money': count_tokens(msgs, [r'\$', '£', '€', 'free', 'cash', 'price', 'prize']),
         'caps_first': msgs.apply(count_first_caps)
         # 'chr_curr': msgs.apply(lambda x: sum(c in '$£€' for c in x)),
         # 'wd_cash': msgs_cf.apply(lambda x: len(re.findall(r'cash', x))),
@@ -125,6 +150,7 @@ def build_features(msgs: pd.DataFrame)-> pd.DataFrame:
     return pd.DataFrame.from_dict(data)
  
 
+## Prepare dataset from extracted features
 df_ = df.drop_duplicates()
 X = build_features(df_['message'])
 y = df_['is_spam']
@@ -132,11 +158,11 @@ y = df_['is_spam']
 
 ##
 X_spam = X.loc[y]
-X_spam.describe()
+X_spam.describe().applymap(lambda x: f"{x:.2f}")
 
 ##
 X_ham = X.loc[~y]
-X_ham.describe()
+X_ham.describe().applymap(lambda x: f"{x:.2f}")
 
 
 """
@@ -149,14 +175,19 @@ spams do not have any.
 overlap between the two categories in this case.
 """
 
+
 v1, v2 = 'chr_digit', 'max_wd_len'
+
+##
 count_ham = X_ham.loc[:, [v1, v2]].value_counts()
 x_ham, y_ham = count_ham.index.to_frame().to_numpy().T
 
+##
 count_spam = X_spam.loc[:, [v1, v2]].value_counts()
 x_spam, y_spam = count_spam.index.to_frame().to_numpy().T
 
 
+##
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.5, 4.8), dpi=200,
     gridspec_kw={'left': 0.12, 'right': 0.92, 'top': 0.9, 'bottom': 0.10}
@@ -173,10 +204,10 @@ sc_spam = ax1.scatter(x_spam, y_spam, count_spam+2,
 
 ax1.set_xlim(-2, 50)
 ax1.set_xticks(np.arange(5, 50, 5), minor=True)
-ax1.set_xlabel('Number of digits')
+ax1.set_xlabel('Number of digits `chr_digits`')
 
 ax1.set_ylim(-0.5, 60)
-ax1.set_ylabel('Max word length', labelpad=7)
+ax1.set_ylabel('Max word length `max_wd_len`', labelpad=7)
 
 ax1.grid(visible=True, which='major', linewidth=0.2)
 ax1.grid(visible=True, which='minor', linewidth=0.1)
@@ -202,11 +233,6 @@ will perform very well.
 We set up a simple logistic regression here as a benchmark for comparison with more advanced deep learning methods.
 """
 
-from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 
 def print_metrics(cm: np.ndarray,
                   print_cm: bool = True,
@@ -424,7 +450,7 @@ for i in range(k, 0, -1):
     print()
 
 
-
+sys.exit()
 
 # %%
 
@@ -487,5 +513,18 @@ Do:
 
 
 
+# %% Conclusion
+"""
+## <a id="conclusion"></a> Conclusion and perspectives
 
+The intertwining of semantic fields within descriptions makes the clustering difficult.
+Our clustering yielded many outliers along with one large cluster containing about 40% of observations.
+This indicates that we were not able to properly factor out the various properties of garments.
+
+Ideally we would like to factor a garment according to its type (shirt, bra, ...),
+its fabric material (cotton, polyester, ...) and some additional elements (pockets, zipper, ...).
+Such result could possibly be obtained with more data. Another approach would be to split the
+descriptions into different parts (eg the item name, its description, the fabric composition)
+and apply clustering to each.
+"""
 
