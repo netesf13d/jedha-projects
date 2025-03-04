@@ -1,9 +1,11 @@
 # The North Face ecommerce
 
-This project is an application of unsupervised machine learning.
+This project is an application of unsupervised machine learning. The goal is to clusterize an e-commerce product catalog and extract its semantic content. Our study is structured as follows:
+- Identify groups of products that have similar descriptions.
+- Design a simple recommendation algorithm to find similar items.
+- Identify the main topics present in product descriptions.
 
-
-The dataset originally comes from a Kaggle competition organized by Walmart. The original version can be found [here](https://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/data). The dataset used in this project is the same, without the stores information nor the features labeled `MarkDown*`.
+The dataset is composed of 500 items descriptions, and can be found [here](https://www.kaggle.com/datasets/cclark/product-item-data). The descriptions contain some spurious HTML elements, and were probably scraped from a website.
 
 
 ## Structure of the project

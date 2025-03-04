@@ -104,9 +104,7 @@ To get some insights about what makes a message a spam and make visualizations, 
 - `lex_money`, the number of some money-related words and characters: `'$'`, `'£'`, `'€'`, `'cash'`, `'free'`, `'price'` and `'prize'`.
 The presence of these tokens indicates that the message talks about money (after all, spamming is about getting money from people).
 We could also consider adding words related to the lexical field of sex.
-- `caps_first`, the number of 
-# - The number of (casefolded) `'cash'` strings, `wd_cash`;
-# - The number of (casefolded) `'free'` strings, `wd_free`;
+- `caps_first`, the number of consecutive capitallized characters at the beginning of the message.
 
 For the purpose of data visualization, we remove the duplicates in the dataset.
 """
@@ -143,9 +141,6 @@ def build_features(msgs: pd.DataFrame)-> pd.DataFrame:
         'max_wd_len': msgs.apply(lambda s: max(len(x) for x in s.split(' '))),
         'lex_money': count_tokens(msgs, [r'\$', '£', '€', 'free', 'cash', 'price', 'prize']),
         'caps_first': msgs.apply(count_first_caps)
-        # 'chr_curr': msgs.apply(lambda x: sum(c in '$£€' for c in x)),
-        # 'wd_cash': msgs_cf.apply(lambda x: len(re.findall(r'cash', x))),
-        # 'wd_free': msgs_cf.apply(lambda x: len(re.findall(r'free', x))),
         }
     return pd.DataFrame.from_dict(data)
  
@@ -178,11 +173,11 @@ overlap between the two categories in this case.
 
 v1, v2 = 'chr_digit', 'max_wd_len'
 
-##
+## number of hams with given values of `v1` and `v2`
 count_ham = X_ham.loc[:, [v1, v2]].value_counts()
 x_ham, y_ham = count_ham.index.to_frame().to_numpy().T
 
-##
+## number of spams with given values of `v1` and `v2`
 count_spam = X_spam.loc[:, [v1, v2]].value_counts()
 x_spam, y_spam = count_spam.index.to_frame().to_numpy().T
 

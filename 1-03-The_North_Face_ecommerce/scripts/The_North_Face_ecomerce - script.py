@@ -32,6 +32,7 @@ The corpus is prepared by performing the following transformations to each descr
 - remove numbers,
 - remove stop words,
 - normalize to lowercase
+
 We use the lightweight english model `en_core_web_md` to lemmatize and select words.
 The model can be downloaded with `python -m spacy download en_core_web_sm`.
 
@@ -446,17 +447,26 @@ which word cloud is dominated by `'pocket'`. It certainly represents garments wi
 """
 
 # %% recommender system
-# !!!
 """
 ## <a id="recommend"></a> Recommender system
 
+As an application of the usage of TF-IDF vectors, we design a simple recommender system.
+The idea is very simple: for a selected item, we compute the cosine similarity between its TF-IDF vector
+and and those of other products and return the best matches.
 
+We could limit our search within the cluster of the selected item for an improved computational efficiency. However, this
+would increase the complexity of our algorithm (need deal with the outliers), with a possible loss of performance
+due to the imperfect clustering. We thus favor our simple approach, implemented below.
 """
 
+## Encapsulate the descriptions in a DataFrame
 descriptions_df = pd.DataFrame({'description': descriptions}, index=description_id)
 
 def find_similar_items(item_id: int, n_items: int = 5)-> pd.DataFrame:
-    
+    """
+    A simple algorithm to find the `n_items` most similar products to a
+    selected item `item_id`.
+    """
     if item_id not in descriptions_df.index:
         raise KeyError(f'no item with id={item_id}')
     
@@ -465,7 +475,7 @@ def find_similar_items(item_id: int, n_items: int = 5)-> pd.DataFrame:
     
     # indices most similar items sorted by decreasing similarity
     best_items_idx = np.argsort(similarities)[::-1]
-    
+    # index 0 is the selected product itself
     return descriptions_df.iloc[best_items_idx[1:n_items+1], 0]
 
 
@@ -473,21 +483,23 @@ def find_similar_items(item_id: int, n_items: int = 5)-> pd.DataFrame:
 descriptions_df.loc[1, 'description']
 
 ##
-find_similar_items(1, n_items=3)
+find_similar_items(1, n_items=5)
 
-# !!!
 """
-
+We selected the first item in the list: `'Active classic boxers'`, and requested for the 5 most similar products.
+our recommender system returned a list of boxers and briefs, all of which belong to the same category: underwears.
 """
 
 
 # %% topic modeling 
-#!!!
 """
 ## <a id="topic"></a> Topic modeling
 
-
-topics are sorted by decreasing imporance in the corpus.
+We conclude with topic extraction from the descriptions. We do so using
+truncated singular value decomposition (SVD). This method allows us to recover
+the vectors that give the most important contribution to the whole TF-IDF matrix.
+These vectors actually represent the latent topics of our corpus. Truncated SVD yield them
+sorted by decreasing imporance in the corpus.
 """
 
 ## compute only the 10 most important topics
@@ -501,15 +513,18 @@ topics = svd.components_
 topic_decomp_df = pd.DataFrame(
     tfidf @ topics.T, index=description_id,
     columns=[f'topic {i}' for i in range(1, 11)])
+topic_decomp_df
 
 
-# %%
-#!!!
 """
-Let us visualize the topics
-
-Each vector is represented as two word clouds. The 
-Since the vectors contain both positive and negative components, w
+This dataframe represents the decomposition of items descriptions with respect to the 10 main topics.
+Unfortunately, this array of numbers does not permit to get an immediate intuitive idea of the topics content.
+We thus favor visualizing directly the topics extracted by SVD. Rather than representing the topics as abstract points
+on a graph, we prefer to visualize the words they refer to. Word clouds are perfectly suited for this purpose.
+However, contrary to TF-IDF vectors, SVD vectors have both positive and negative components. We therefore
+create word clouds for both positive and negative components. These are made by interpreting the absolute value
+of the vector coefficients as word frequencies. We could have also used the squared coefficients as word frequencies,
+but in practice this only suppresses words from the resulting cloud.
 """
 
 ## Positive coefficients wordclouds
