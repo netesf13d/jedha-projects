@@ -1,0 +1,51 @@
+<style type="text/css">
+#T_ob table {
+  width: 80%;
+}
+#T_ob th {
+  padding-left: 10px;
+  padding-right: 20px;
+  text-align: right;
+}
+#T_ob  td {
+  padding-left: 10px;
+  padding-right: 20px;
+  text-align: right;
+}
+#T_ob .row{depth} {
+  border-bottom: 1px solid silver;
+}
+#T_ob th {
+  font-weight: normal;
+}
+#T_ob tbody {
+  font-weight: bold;
+}
+#T_ob .ask_price {
+  color: red;
+}
+#T_ob .bid_price {
+  color: green;
+}
+</style>
+<table id="T_ob">
+  <thead>
+    <tr>
+      <th class="col_heading level0 col0" >PRICE</th>
+      <th class="col_heading level0 col1" >QUANTITY ({asset1})</th>
+      <th class="col_heading level0 col2" >VOLUME ({asset2})</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ask">
+      <td class="data row0 col0 ask_price" >{ap}</td>
+      <td class="data row0 col1 ask_qty1" >{aq1}</td>
+      <td class="data row0 col2 ask_qty2" >{aq2}</td>
+    </tr>
+    <tr class="bid">
+      <td class="data row1 col0 bid_price" >{bp}</td>
+      <td class="data row1 col1 bid_qty1" >{bq1}</td>
+      <td class="data row1 col2 bid_qty2" >{bq2}</td>
+    </tr>
+  </tbody>
+</table>

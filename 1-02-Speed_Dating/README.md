@@ -14,3 +14,10 @@ This project repository is structured as follows.
 - The directory `scripts` contains the exploratory data analysis as a python script.
 - The file `requirements.txt` gives the list of the project dependencies. 
 - The directory `presentation` contains the slideshow for the exam, in both `odp` and `pdf` formats.
+
+
+## Usage
+
+To setup the Python environment:
+- With `pip`, run `pip install -r requirements.txt`
+- Using `conda`, run `conda create --name <env_name> --file requirements.txt`

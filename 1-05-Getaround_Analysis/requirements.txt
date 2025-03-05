@@ -1,7 +1,8 @@
 python >= 3.12
+fastapi == 
+ucicorn[standard] == 
 matplotlib == 3.10
 numpy == 2.2
 pandas == 2.2
 scikit-learn == 1.6
-spacy == 3.8
-wordcloud == 1.9
+streamlit == 

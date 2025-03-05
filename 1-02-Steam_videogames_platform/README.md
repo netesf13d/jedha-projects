@@ -17,6 +17,13 @@ This project repository is structured as follows.
 - The directory `presentation` contains the slideshow for the exam, in both `odp` and `pdf` formats. 
 
 
+## Usage
+
+To setup the Python environment:
+- With `pip`, run `pip install -r requirements.txt`
+- Using `conda`, run `conda create --name <env_name> --file requirements.txt`
+
+
 ## Notes
 
 For the purpose of learning, I tried to rely as much as possible on SQL queries and pyspark API for data analysis. As a consequence, the resulting code is not the most concise and elegant nor the fastest (for such a small dataset).
