@@ -35,6 +35,7 @@ The dataset consists of 5574 entries, many of which have issues. Here is a non-e
 - Some messages are anclosed in (possibly many) double quote characters
 - Single and double quotes are escaped with backslashes
 - Some spurious characters are present (eg `å` characters that systematically prepend pound symbols `£`)
+- The messages contain some HTML escaped characters (eg `'&gt;'` or `'&amp;'`)
 
 Fortunately, the original version of the dataset can be found
 [here](https://archive.ics.uci.edu/dataset/228/sms+spam+collection). Its entries are much cleaner
@@ -44,6 +45,7 @@ than those of our dataset. We can use them as a comparison to setup the cleaning
 - Convert backslashes + single quote `\'` into single quote `'`
 - Convert backslashes `\` into double quotes `"`
 - Remove the spurious characters `å`
+- Replace the HTML entities with their corresponding symbols
 
 The implementation of this pipeline is given below.
 '''
@@ -61,13 +63,19 @@ The implementation of this pipeline is given below.
 #                   .replace('"', '') \
 #                   .replace("\\'", "'") \
 #                   .replace('\\', '"') \
-#                   .replace('å', '')
+#                   .replace('å', '') \
+#                   .replace('&lt;', '<') \
+#                   .replace('&gt;', '>') \
+#                   .replace('&amp;', '&')
 #             for row in raw_data]
 
 
 """
 However, some encoding issues persist with some problematic characters still present in messages.
 To proceed with the project we will rather use this original dataset as the starting point.
+The messages still need some processing:
+- characters in HTML-escaped form are converted to the corresponding symbol
+- The `RIGHT SINGLE QUOTATION MARK` character (`\x92`) is converted into a single quote `'`
 """
 
 ########## Loading and preprocessing the original dataset ##########
@@ -75,14 +83,19 @@ with open('../SMSSpamCollection', 'rt', encoding='utf-8') as f:
     raw_data = [row.strip().split('\t', 1) for row in f.readlines()]
 
 is_spam = np.array([True if row[0] == 'spam' else False for row in raw_data])
-messages = np.array([row[1] for row in raw_data], dtype=object)
+messages = np.array([row[1].replace('&lt;', '<') \
+                           .replace('&gt;', '>') \
+                           .replace('&amp;', '&') \
+                           .replace('\x92', "'")
+     for row in raw_data], dtype=object)
 
 df = pd.DataFrame({'message': messages, 'is_spam': is_spam})
 df.describe()
 
 
 """
-Our dataset seems to have duplicates. We choose not to remove them, they certainly
+Our dataset contains a total of 5574 messages, with 4827 hams (86.6%) and 747 spams (13.4%).
+Some messages are duplicates. We choose not to remove them, they certainly
 represent frequent messages for which making a classification error should be penalized more.
 """
 
@@ -93,9 +106,31 @@ represent frequent messages for which making a classification error should be pe
 
 The messages are quite complex, mixing  uppercase, lowercase, puctuation, alphanumeric and other exotic characters.
 Training a model to the data would certainly require some form of text normalization. However, this might cause a loss
-of information.
+of information. In this section we try to somewhat keep this information and aggregate it in the form of a few descriptive
+to get insight about what makes a message a spam.
 
-To get some insights about what makes a message a spam and make visualizations, we will reduce the messages to a few descriptive quantities:
+An important remark is in order before proceeding with data analysis. Visual inspection of the dataset reveals
+the presence of some tokens specific to ham messages: `<#>`, `<DECIMAL>`, `<TIME>` and `<URL>`
+(they appear as `&lt;*&gt;` in the dataset).
+These were certainly introduced to mask personal information from hams. Although the kind of values that
+`<DECIMAL>`, `<TIME>` and `<URL>` replace is obvious, this is not the case for `<#>`, which seems to be used
+in replacement of any kind of value.
+"""
+
+tokens_df = pd.DataFrame(
+    {'is_spam': df['is_spam'],
+     'count_<#>': df['message'].map(lambda x: x.count('<#>')),
+     'count_<DECIMAL>': df['message'].map(lambda x: x.count('<DECIMAL>')),
+     'count_<TIME>': df['message'].map(lambda x: x.count('<TIME>')),
+     'count_<URL>': df['message'].map(lambda x: x.count('<URL>'))})
+
+tokens_df.groupby('is_spam').sum()
+
+"""
+Indeed, these tokens are specific to hams. There presence, due to human annotations, could introduce
+important biases to an automated detection system if not handled properly.
+
+With this remark in mind, we can move to the characterization of messages using the following descriptive features:
 - `msg_len`, the length of the message;
 - `chr_caps`, the number of capitallized characters;
 - `chr_digit`, the number of digit characters in the message;
@@ -153,11 +188,11 @@ y = df_['is_spam']
 
 ##
 X_spam = X.loc[y]
-X_spam.describe().applymap(lambda x: f"{x:.2f}")
+X_spam.describe().map(lambda x: f"{x:.2f}")
 
 ##
 X_ham = X.loc[~y]
-X_ham.describe().applymap(lambda x: f"{x:.2f}")
+X_ham.describe().map(lambda x: f"{x:.2f}")
 
 
 """
@@ -273,7 +308,7 @@ lr_model = pipeline.fit(X_tr, y_tr)
 feature_names = lr_model['column_preprocessing'].get_feature_names_out()
 coefs = lr_model['classifier'].coef_[0]
 for fn, c in zip(feature_names, coefs):
-    print(f'{fn:<10} : {c: }')
+    print(f'{fn:<10} : {c: .4f}')
 
 
 """
@@ -287,6 +322,10 @@ at the beginning of the message.
 #%%
 """
 ### Model performance
+
+When considering the performance of our model, we must keep in mind that the masking of some
+spam words introduce biases. This is especially the case for the masking of digits, the most important
+feature for the classifiation. The evaluation below thus certainly overestimates the performance. 
 """
 
 print('===== Train set metrics =====')
@@ -298,6 +337,92 @@ print_metrics(confusion_matrix(y_test, lr_model.predict(X_test)))
 """
 Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve this score.
 """
+
+# %% text preprocessing
+
+"""
+## <a id="tfidf-mlp"></a> A first model: Multi-layer perceptron and TF-IDF
+
+The text prepocessing proceeds in 5 steps:
+1. Remove diacritics and casefold the messages.
+2. Lemmatize words. However, we keep stop words and punctuation as valid tokens.
+4. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
+4. Discard the ham-specific token `<#>`.
+3. Finally, replace tokens with low count (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
+
+
+Most of the messages are written in [SMS language](https://en.wikipedia.org/wiki/SMS_language) with inconsistent style.
+Our tokenization will produce different tokens for words that have essentially the same meaning.
+
+
+"""
+
+
+
+
+# TODO add columns
+## step 1 remove diacritics and preprocess
+def strip_diacritics(txt: str)-> str:
+    """
+    Remove all diacritics from words and characters forbidden in filenames.
+    """
+    norm_txt = unicodedata.normalize('NFD', txt)
+    shaved = ''.join(c for c in norm_txt
+                     if not unicodedata.combining(c))
+    return unicodedata.normalize('NFC', shaved)
+
+norm_msgs = df['message'].apply(strip_diacritics).apply(str.casefold)
+norm_msgs.head()
+
+
+sys.exit()
+
+
+## filter words and normalize into lowercase lemmas
+nlp = spacy.load('en_core_web_sm')
+corpus = []
+for desc in descriptions:
+    doc = nlp(desc)
+    doc = ' '.join(wd.lemma_.lower() for wd in doc
+                   if wd.is_alpha and not wd.is_stop)
+    corpus.append(doc)
+corpus = np.array(corpus, dtype=object)
+
+
+
+
+
+sys.exit()
+
+
+vectorizer = CountVectorizer(token_pattern=r'[^\s]+')
+word_counts = vectorizer.fit_transform(corpus)
+
+vocabulary = vectorizer.get_feature_names_out()
+tfidf = TfidfTransformer(norm='l2').fit_transform(word_counts)
+
+
+
+
+
+
+sys.exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # %% text preprocessing
 
@@ -333,6 +458,11 @@ def strip_diacritics(txt: str)-> str:
 norm_msgs = df['message'].apply(strip_diacritics).apply(str.casefold)
 norm_msgs.head()
 
+
+
+
+
+#%%
 
 """
 #### Step 2

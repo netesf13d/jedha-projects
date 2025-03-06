@@ -1,8 +1,8 @@
 # Conversion Rate Challenge
 
-This project consists in 
+This project takes the form of a machine learning challenge similar to those proposed on Kaggle. we are given data relative to user interaction with a website, [datascienceweekly.org](https://www.datascienceweekly.org). The goal is to predict whether a user will subscribe to the newsletter based on features such as the age, country of origin, number of pages visited, etc. The dataset is split between a train set for model construction and a test set for model evaluation, with test targets not accessible to the participants during the challenge. The F1-score is the retained metric for model evaluation on this classification task is the F1-score.
 
-
+The dataset is synthetic. Both train and test sets are provided in this repository to allow for code reproducibility.
 
 
 ## Structure of the project
