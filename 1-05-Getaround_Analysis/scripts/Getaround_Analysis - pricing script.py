@@ -38,6 +38,8 @@ print(df.describe(include='all'))
 """
 The dataset has 4843 rows, which correspond to distinct cars available on the platform.
 
+weird value for mileage
+
 The dataset is split in two parts, with 21310 observations each.
 - The first dataframe, `pp_df`, contains the information that we have *before* a car is rent.
 We will use these features as predictors for our machine learning model
@@ -65,8 +67,16 @@ We should include all the data available in our exploratory data analysis. we bu
 ## <a name="eda"></a> Preliminary data analysis
 
 """
-df['car_type'].value_counts()
+print(df['car_type'].value_counts())
 
+
+print(df['fuel'].value_counts())
+
+
+print(df['paint_color'].value_counts())
+
+
+print(df['model_key'].value_counts())
 
 """
 ### some graphs
@@ -133,6 +143,176 @@ plt.show()
 Figure 1 presents violin plots of car rental price as a function of various car options.
 The presence of an option, such as a GPS or private parking affects the price positively.
 """
+
+# %%
+
+# cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
+bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
+             'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
+             'winter_tires']
+quant_vars = ['mileage', 'engine_power']
+
+df_ = df.loc[:, ['rental_price_per_day'] + quant_vars + bool_vars]
+corr_df = df_.corr().to_numpy()
+
+
+fig2, ax2 = plt.subplots(
+    nrows=1, ncols=1, figsize=(6.2, 5.6), dpi=100,
+    gridspec_kw={'left': 0.14, 'right': 0.9, 'top': 0.76, 'bottom': 0.04, 'wspace': 0.24})
+cax2 = fig2.add_axes((0.88, 0.04, 0.03, 0.72))
+fig2.suptitle("Figure 2: Correlation matrix",
+              x=0.02, ha='left')
+
+
+ax2.set_aspect('equal')
+cmap2 = plt.get_cmap('coolwarm').copy()
+cmap2.set_extremes(under='0.9', over='0.5')
+heatmap = ax2.pcolormesh(corr_df[::-1]*100, cmap=cmap2, vmin=-70, vmax=70,
+                             edgecolors='0.2', linewidth=0.5)
+
+ax2.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+# ax2.tick_params(axis='y', pad=15)
+ticklabels = ['Rental price', 'Mileage', 'Engine power',
+              'Priv. parking', 'GPS', 'Air cond.', 'Automatic car',
+              'Getaround conn.', 'Speed reg.', 'Winter tires']
+ax2.set_xticks(np.linspace(0.5, 9.5, 10), ticklabels, rotation=50, ha='left')
+ax2.set_yticks(np.linspace(9.5, 0.5, 10), ticklabels, rotation=0)
+# ax2.set_yticks(np.linspace(0.5, 5.5, 6), attributes[::-1])
+
+for (i, j), c in np.ndenumerate(corr_df[::-1]*100):
+    ax2.text(j+0.52, i+0.45, f'{c:.1f}', ha='center', va='center', fontsize=9)
+
+# ax2.set_title('Females', fontweight='bold')
+pos = ax2.get_position().bounds
+x, y = pos[0], pos[1] + pos[3]
+
+fig2.colorbar(heatmap, cax=cax2, orientation="vertical", ticklocation="right")
+cax2.set_title('Correlation coef. (%)', y=-3.4)
+
+
+plt.show()
+
+"""
+Figure 2
+The rental price is strongly correlated to the engine power, and in general with
+all additional car options, except the prsence of winter tires. On the other hand,
+a higher mileage reflects into a lower rental price.
+"""
+
+# %%
+
+cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
+
+df_ = df.loc[:, ['rental_price_per_day'] + cat_vars]
+# TODO low_count -> other
+
+fig3, axs3 = plt.subplots(
+    nrows=4, ncols=1, figsize=(7, 8.2), dpi=100,
+    gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.95, 'bottom': 0.06,
+                 'hspace': 0.2})
+fig3.suptitle("Figure 3: ",
+              x=0.02, ha='left')
+
+
+for item, ax in zip(cat_vars, axs3):
+    vdata, categories = [], []
+    for category, gdf in df.loc[:, ['rental_price_per_day', item]].groupby(item):
+        vdata.append(gdf['rental_price_per_day'].to_numpy())
+        categories.append(category)
+    
+    n = len(categories)
+    vplot = ax.violinplot(vdata, positions=np.linspace(0, n-1, n),
+                          widths=0.8, showmeans=True)
+    for elt in vplot['bodies']:
+        elt.set_facecolor('plum')
+    for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
+        vplot[elt].set_edgecolor('plum')
+    ax.set_xticks(np.arange(0, len(categories)), categories, rotation=30, ha='right')
+    ax.set_ylim(0, 450)
+    ax.grid(visible=True, axis='y', linewidth=0.3)
+
+
+fig3.text(0.02, 0.51, 'Rental price ($/day)', rotation=90, fontsize=11,
+          ha='center', va='center')
+    
+
+plt.show()
+
+"""
+Figure 3
+"""
+
+
+# %%
+
+
+rental_price = df['rental_price_per_day'].to_numpy()
+rp_bins = np.linspace(0, 450, 91)
+
+mileage = df['mileage'].to_numpy()
+m_bins = np.linspace(0, 1_050_000, 106)
+
+engine_power = df['engine_power'].to_numpy()
+ep_bins = np.linspace(0, 450, 46)
+
+hist1, *_ = np.histogram2d(rental_price, mileage, bins=[rp_bins, m_bins])
+
+##
+fig4, axs4 = plt.subplots(
+    nrows=1, ncols=2, figsize=(8, 4.2), dpi=100,
+    gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.8, 'bottom': 0.06,
+                 'wspace': 0.25})
+fig4.suptitle("Figure 4: ",
+              x=0.02, ha='left')
+
+cmap4 = plt.get_cmap('hot').copy()
+cmap4.set_extremes(under='0.7', over='0.5')
+# axs4[0].set_aspect('equal')
+
+heatmap = axs4[0].pcolormesh(
+    *np.meshgrid(rp_bins, m_bins, indexing='ij'),
+    np.histogram2d(rental_price, mileage, bins=[rp_bins, m_bins])[0],
+    cmap=cmap4, vmin=0.5, vmax=50)
+axs4[0].set_xlim(0, 450)
+axs4[0].set_xticks(np.arange(50, 500, 100), minor=True)
+# axs4[0].set_ylim(0, 30)
+axs4[0].set_yticks(np.linspace(1e5, 1e6, 10), minor=True)
+
+heatmap = axs4[1].pcolormesh(
+    *np.meshgrid(rp_bins, ep_bins, indexing='ij'),
+    np.histogram2d(rental_price, engine_power, bins=[rp_bins, ep_bins])[0],
+    cmap=cmap4, vmin=0.5, vmax=200)
+axs4[0].set_xlim(0, 450)
+axs4[0].set_xticks(np.arange(50, 500, 100), minor=True)
+# axs4[0].set_ylim(0, 30)
+# axs4[0].set_yticks(np.linspace(1e5, 1e6, 10), minor=True)
+
+# for item, ax in zip(cat_vars, axs4):
+#     vdata, categories = [], []
+#     for category, gdf in df.loc[:, ['rental_price_per_day', item]].groupby(item):
+#         vdata.append(gdf['rental_price_per_day'].to_numpy())
+#         categories.append(category)
+    
+#     n = len(categories)
+#     vplot = ax.violinplot(vdata, positions=np.linspace(0, n-1, n),
+#                           widths=0.6, showmeans=True)
+#     for elt in vplot['bodies']:
+#         elt.set_facecolor('plum')
+#     for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
+#         vplot[elt].set_edgecolor('plum')
+#     ax.set_xticks(np.arange(0, len(categories)), categories, rotation=30, ha='right')
+#     ax.set_ylim(0, 480)
+#     ax.grid(visible=True, axis='y', linewidth=0.3)
+
+
+    
+
+plt.show()
+
+"""
+Figure 4
+"""
+
 
 # %% Ridge
 
@@ -217,9 +397,9 @@ reg = Pipeline(
 )
 
 
-reg.fit(X_tr, y_tr)
+# reg.fit(X_tr, y_tr)
 
-reg['regressor'].cv_results_['param_alpha']
+# reg['regressor'].cv_results_['param_alpha']
 
 # 'mean_test_neg_mean_absolute_error',
 # 'mean_test_neg_mean_absolute_percentage_error',
