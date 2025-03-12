@@ -67,12 +67,36 @@ df_ / df_.T.groupby('checkin_type').sum()
 Higher probability of cancellation when connect
 """
 
-cancelled_checkout_delay = 0
-ended_checkout_delay = 0
+# %%
+
+# cancelled_checkout_delay = 0
+# ended_checkout_delay = 0
+
+# checkout_delay = {}
+# for state, df_ in df.groupby('state'):
+#     checkout_delay[state] = df_.loc[:, ['checkin_type', 'delay_at_checkout_in_minutes']]
 
 checkout_delay = {}
-for state, df_ in df.groupby('state'):
-    checkout_delay[state] = df_.loc[:, ['checkin_type', 'delay_at_checkout_in_minutes']]
+checkout_distrib = {}
+for item, df_ in df.groupby(['checkin_type', 'state']):
+    data = df_['delay_at_checkout_in_minutes'].to_numpy()
+    data = data[~np.isnan(data)]
+    # checkout_delay[item] = data[~np.isnan(data)]
+    print(data)
+    n = len(data)
+    checkout_delay[item] = [
+        np.sum(data > np.logspace([0], [5], 21), axis=1) / n,
+        np.sum(data < -np.logspace([0], [5], 21), axis=1) / n,
+        ]
+    
+    
+    # if state == 'ended':
+    #     checkout_delay[checkin][0] = df_['time_delta_with_previous_rental_in_minutes'].to_numpy()
+    # if state == 'canceled':
+    #     rental_delay[checkin][1] = df_['time_delta_with_previous_rental_in_minutes'].to_numpy()
+
+
+# checkout_distrib = {}
 
 
 
@@ -89,18 +113,19 @@ fig1, axs1 = plt.subplots(
     nrows=1, ncols=2, figsize=(9, 4), dpi=200,
     gridspec_kw={'left': 0.06, 'right': 0.97, 'top': 0.85, 'bottom': 0.13,
                  'wspace': 0.18})
-fig1.suptitle('Figure 1: ', x=0.02, ha='left')
+fig1.suptitle('Figure 1: checkout delay distribution', x=0.02, ha='left')
 
+
+handles = [Patch(facecolor='tab:blue', alpha=1, label='ended'),
+           Patch(facecolor='tab:orange', alpha=1, label='ended')]
 
 axs1[0].set_title("Checkout delay distribution")
 axs1[0].hist(df['delay_at_checkout_in_minutes'], bins=np.linspace(-100, 100, 22))
 axs1[0].grid(visible=True, linewidth=0.3)
 # axs1[0].set_xlim(-15, 735)
-axs1[0].set_xlabel("Checkout delay (years)")
+axs1[0].set_xlabel("Checkout delay (min)")
 axs1[0].set_ylabel('Counts')
-# axs1[0].text(0.575, 0.84, textstr(sufrom mpl_toolkits.axes_grid1 import make_axes_locatablebject_df['age'].to_numpy()),
-#              transform=axs1[0].transAxes, fontsize=9,
-#              bbox={'boxstyle': 'round', 'facecolor': '0.92'})
+
 
 
 axs1[1].set_title("Delay with previous rental")
@@ -134,10 +159,58 @@ plt.show()
 
 # %%
 
+rental_delay = {'mobile': [0, 0], 'connect': [0, 0]}
+for (checkin, state), df_ in df.groupby(['checkin_type', 'state']):
+    if state == 'ended':
+        rental_delay[checkin][0] = df_['time_delta_with_previous_rental_in_minutes'].to_numpy()
+    if state == 'canceled':
+        rental_delay[checkin][1] = df_['time_delta_with_previous_rental_in_minutes'].to_numpy()
 
 
+fig2, axs2 = plt.subplots(
+    nrows=1, ncols=2, figsize=(8, 4), dpi=200,
+    gridspec_kw={'left': 0.06, 'right': 0.97, 'top': 0.85, 'bottom': 0.13,
+                 'wspace': 0.18})
+fig2.suptitle('Figure 2: Distribution of delays with previous rental', x=0.02, ha='left')
+
+handles = [Patch(facecolor='tab:blue', alpha=1, label='ended'),
+           Patch(facecolor='tab:orange', alpha=1, label='canceled')]
+
+axs2[0].set_title("Mobile checkin")
+axs2[0].hist(rental_delay['mobile'], bins=np.linspace(-15, 735, 26),
+             stacked=False, density=False)
+axs2[0].grid(visible=True, linewidth=0.3)
+axs2[0].set_xlim(-15, 735)
+axs2[0].set_xticks(np.linspace(0, 720, 7))
+axs2[0].set_xticks(np.linspace(60, 640, 6), minor=True)
+axs2[0].set_ylim(0, 140)
+axs2[0].set_xlabel("Delay with previous rental (min)")
+axs2[0].legend(handles=handles)
 
 
+axs2[1].set_title("Getaround connect checkin")
+axs2[1].hist(rental_delay['connect'], bins=np.linspace(-15, 735, 26),
+             stacked=False, density=False)
+axs2[1].grid(visible=True, linewidth=0.3)
+axs2[1].set_xlim(-15, 735)
+axs2[1].set_xticks(np.linspace(0, 720, 7))
+axs2[1].set_xticks(np.linspace(60, 640, 6), minor=True)
+axs2[1].set_ylim(0, 140)
+axs2[1].set_xlabel("Delay with previous rental (min)")
+axs2[1].legend(handles=handles)
+
+
+plt.show()
+
+"""
+Figure 2
+"""
+
+# %%
+
+"""
+
+"""
 
 
 
