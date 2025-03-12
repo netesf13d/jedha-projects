@@ -22,6 +22,7 @@ from sklearn.preprocessing import (OneHotEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
 from sklearn.linear_model import LinearRegression, Lasso, Ridge
+from sklearn.svm import SVR
 
 
 # %% Loading
@@ -203,20 +204,23 @@ a higher mileage reflects into a lower rental price.
 
 cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
 
-df_ = df.loc[:, ['rental_price_per_day'] + cat_vars]
-# TODO low_count -> other
+df_ = df.loc[:, cat_vars]
+value_counts = df_.apply(lambda x: x.map(x.value_counts()))
+df_ = pd.concat([df_.mask(value_counts < 30, 'other'),
+                 df['rental_price_per_day']], axis=1)
+
 
 fig3, axs3 = plt.subplots(
-    nrows=4, ncols=1, figsize=(7, 8.2), dpi=100,
+    nrows=4, ncols=1, figsize=(6, 8.8), dpi=100,
     gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.95, 'bottom': 0.06,
-                 'hspace': 0.2})
+                 'hspace': 0.34})
 fig3.suptitle("Figure 3: ",
               x=0.02, ha='left')
 
 
 for item, ax in zip(cat_vars, axs3):
     vdata, categories = [], []
-    for category, gdf in df.loc[:, ['rental_price_per_day', item]].groupby(item):
+    for category, gdf in df_.loc[:, ['rental_price_per_day', item]].groupby(item):
         vdata.append(gdf['rental_price_per_day'].to_numpy())
         categories.append(category)
     
@@ -227,7 +231,8 @@ for item, ax in zip(cat_vars, axs3):
         elt.set_facecolor('plum')
     for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
         vplot[elt].set_edgecolor('plum')
-    ax.set_xticks(np.arange(0, len(categories)), categories, rotation=30, ha='right')
+    ax.set_xticks(np.arange(0, len(categories)), categories, fontsize=10,
+                  rotation=30, ha='right')
     ax.set_ylim(0, 450)
     ax.grid(visible=True, axis='y', linewidth=0.3)
 
@@ -255,57 +260,46 @@ m_bins = np.linspace(0, 1_050_000, 106)
 engine_power = df['engine_power'].to_numpy()
 ep_bins = np.linspace(0, 450, 46)
 
-hist1, *_ = np.histogram2d(rental_price, mileage, bins=[rp_bins, m_bins])
 
 ##
 fig4, axs4 = plt.subplots(
-    nrows=1, ncols=2, figsize=(8, 4.2), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.8, 'bottom': 0.06,
-                 'wspace': 0.25})
+    nrows=1, ncols=2, figsize=(8.8, 4.2), dpi=100,
+    gridspec_kw={'left': 0.07, 'right': 0.89, 'top': 0.88, 'bottom': 0.12,
+                 'wspace': 0.18})
+cax4 = fig4.add_axes((0.915, 0.12, 0.025, 0.76))
 fig4.suptitle("Figure 4: ",
               x=0.02, ha='left')
+
+
 
 cmap4 = plt.get_cmap('hot').copy()
 cmap4.set_extremes(under='0.7', over='0.5')
 # axs4[0].set_aspect('equal')
 
 heatmap = axs4[0].pcolormesh(
-    *np.meshgrid(rp_bins, m_bins, indexing='ij'),
-    np.histogram2d(rental_price, mileage, bins=[rp_bins, m_bins])[0],
+    *np.meshgrid(m_bins, rp_bins, indexing='ij'),
+    np.histogram2d(mileage, rental_price, bins=[m_bins, rp_bins])[0],
     cmap=cmap4, vmin=0.5, vmax=50)
-axs4[0].set_xlim(0, 450)
-axs4[0].set_xticks(np.arange(50, 500, 100), minor=True)
-# axs4[0].set_ylim(0, 30)
-axs4[0].set_yticks(np.linspace(1e5, 1e6, 10), minor=True)
+# axs4[0].set_ylim(0, 450)
+
+axs4[0].set_xticks(np.linspace(1e5, 1e6, 10), minor=True)
+axs4[0].set_xlabel('Mileage', fontsize=11)
+axs4[0].set_yticks(np.arange(50, 500, 100), minor=True)
+axs4[0].set_ylabel('Rental price', fontsize=11)
+axs4[0].set_title('Mileage x Rental price')
 
 heatmap = axs4[1].pcolormesh(
-    *np.meshgrid(rp_bins, ep_bins, indexing='ij'),
-    np.histogram2d(rental_price, engine_power, bins=[rp_bins, ep_bins])[0],
+    *np.meshgrid(ep_bins, rp_bins, indexing='ij'),
+    np.histogram2d(engine_power, rental_price, bins=[ep_bins, rp_bins])[0],
     cmap=cmap4, vmin=0.5, vmax=200)
-axs4[0].set_xlim(0, 450)
-axs4[0].set_xticks(np.arange(50, 500, 100), minor=True)
-# axs4[0].set_ylim(0, 30)
-# axs4[0].set_yticks(np.linspace(1e5, 1e6, 10), minor=True)
+axs4[1].set_xlim(0, 450)
+axs4[1].set_xticks(np.arange(50, 500, 100), minor=True)
+axs4[1].set_xlabel('Engine power', fontsize=11)
+axs4[1].set_title('Engine power x Rental price')
 
-# for item, ax in zip(cat_vars, axs4):
-#     vdata, categories = [], []
-#     for category, gdf in df.loc[:, ['rental_price_per_day', item]].groupby(item):
-#         vdata.append(gdf['rental_price_per_day'].to_numpy())
-#         categories.append(category)
-    
-#     n = len(categories)
-#     vplot = ax.violinplot(vdata, positions=np.linspace(0, n-1, n),
-#                           widths=0.6, showmeans=True)
-#     for elt in vplot['bodies']:
-#         elt.set_facecolor('plum')
-#     for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-#         vplot[elt].set_edgecolor('plum')
-#     ax.set_xticks(np.arange(0, len(categories)), categories, rotation=30, ha='right')
-#     ax.set_ylim(0, 480)
-#     ax.grid(visible=True, axis='y', linewidth=0.3)
-
-
-    
+fig4.colorbar(heatmap, cax=cax4, orientation="vertical", ticklocation="right")
+cax4.set_title('Correlation coef. (%)', y=-3.4)
+cax4.set_yticks(np.linspace(0, 200, 9))
 
 plt.show()
 
@@ -321,6 +315,9 @@ Figure 4
 
 ###
 """
+
+# TODO remove outliers
+
 
 ## data preparation
 y = df['rental_price_per_day']
@@ -338,7 +335,9 @@ bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
              'winter_tires']
 quant_vars = ['mileage', 'engine_power']
 col_preproc = ColumnTransformer(
-    [('cat_ohe', OneHotEncoder(drop=None), cat_vars),
+    [('cat_ohe',
+      OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.01),
+      cat_vars),
      ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
      ('quant_scaler', StandardScaler(), quant_vars)])
 
@@ -397,34 +396,142 @@ reg = Pipeline(
 )
 
 
+reg.fit(X_tr, y_tr)
+
+reg['regressor'].cv_results_['param_alpha']
+
+# %%
+
+cv_res = reg['regressor'].cv_results_
+
+mse = -cv_res['mean_test_neg_mean_squared_error']
+rmse = -cv_res['mean_test_neg_root_mean_squared_error']
+r2 = cv_res['mean_test_r2']
+mae = -cv_res['mean_test_neg_mean_absolute_error']
+mape = -cv_res['mean_test_neg_mean_absolute_percentage_error']
+
+
+fig5, axs5 = plt.subplots(
+    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(9, 3.6), dpi=120,
+    gridspec_kw={'left': 0.07, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
+fig5.suptitle("Figure 5: Metrics vs the regularization parameter",
+              x=0.02, ha='left')
+
+# RMSE and MAE
+axs5[0].plot(alphas, rmse, color='C0',
+             label='Root mean sq. err.')
+axs5[0].plot(alphas, mae, color='C1',
+             label='Mean abs. err')
+# axs5[0].axvline(best_alpha, color='k', linewidth=0.6)
+
+axs5[0].set_xscale('log')
+axs5[0].set_xlim(1e-1, 1e5)
+axs5[0].set_xticks(np.logspace(-1, 5, 7))
+axs5[0].set_xticks(
+    np.concatenate([np.linspace(10**i, 10**(i+1), 10) for i in range(-1, 5)]),
+    minor=True)
+axs5[0].set_xlabel('regularization parameter')
+# axs5[0].set_ylim(0, 8e5)
+# axs5[0].set_yticks(np.linspace(0, 8e5, 9),
+#                    [f'{i:.1f}' for i in np.linspace(0, 0.8, 9)])
+axs5[0].set_ylabel('Error (M$)')
+axs5[0].grid(visible=True, linewidth=0.3)
+axs5[0].grid(visible=True, which='minor', linewidth=0.2)
+axs5[0].legend(loc=(0.015, 0.81))
+
+# R-squared
+axs5[1].plot(alphas, r2, color='C2', label='R-squared')
+# axs5[1].axvline(best_alpha, color='k', linewidth=0.6)
+
+axs5[1].set_xlabel('regularization parameter')
+axs5[1].set_ylim(0, 1)
+axs5[1].grid(visible=True, linewidth=0.3)
+axs5[1].grid(visible=True, which='minor', linewidth=0.2)
+axs5[1].legend(loc=(0.015, 0.81))
+
+# MAPE
+axs5[2].plot(alphas, mape, color='C3', label='MAPE')
+# axs5[2].axvline(best_alpha, color='k', linewidth=0.6)
+
+axs5[2].set_xlabel('regularization parameter')
+# axs5[2].set_ylim(0.7e0, 2e1)
+axs5[2].grid(visible=True, linewidth=0.3)
+axs5[2].grid(visible=True, which='minor', linewidth=0.2)
+axs5[2].legend(loc=(0.015, 0.89))
+
+
+plt.show()
+
+
+# %%
+"""
+### Model evaluation
+
+"""
+
+## train
+ridge_model['regressor'].alpha = 1e2
+ridge_model.fit(X_tr, y_tr)
+
+## evaluate of train set
+y_pred_tr = ridge_model.predict(X_tr)
+evaluation_df.iloc[0] = eval_metrics(y_tr, y_pred_tr)
+
+## evaluate on test set
+y_pred_test = ridge_model.predict(X_test)
+evaluation_df.iloc[1] = eval_metrics(y_test, y_pred_test)
+
+
+evaluation_df.loc['Ridge']
+
+"""
+Niceeee
+"""
+#%%
+"""
+### Model interpretation
+"""
+
+# recover feature names
+col_preproc_ = ridge_model['column_preprocessing']
+features = ['intercept']
+features += [feature_name.split('__')[1].strip('_sklearn')
+             for feature_name in col_preproc_.get_feature_names_out()]
+
+# get coefficients
+intercept = ridge_model['regressor'].intercept_
+coef_vals = np.concatenate([[intercept], ridge_model['regressor'].coef_])
+
+
+for feature, coef in zip(features, coef_vals):
+    print(f'{feature:<24} : {coef:>6.2f}')
+
+
+# %%
+"""
+## <a id="svm"></a> Support vector machine
+
+
+### Model construction and training
+"""
+
+## full pipeline
+svm_model = Pipeline([('column_preprocessing', col_preproc),
+                        ('regressor', SVR())])
+
+scoring = ('neg_mean_squared_error',  'neg_root_mean_squared_error', 'r2',
+           'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error')
+# alphas = np.logspace(-1, 5, 61)
+# reg = Pipeline(
+#     [('column_preprocessing', col_preproc),
+#      ('regressor', GridSearchCV(Ridge(), param_grid={'alpha': alphas},
+#                                 scoring=scoring, refit=False, cv=10))]
+# )
+
+
 # reg.fit(X_tr, y_tr)
 
 # reg['regressor'].cv_results_['param_alpha']
-
-# 'mean_test_neg_mean_absolute_error',
-# 'mean_test_neg_mean_absolute_percentage_error',
-# 'mean_test_neg_mean_squared_error',
-# 'mean_test_neg_root_mean_squared_error',
-# 'mean_test_r2',
-
-
-
-# ## setup cross-validated grid search
-# reg = clone(ridge_model)
-# alphas = np.logspace(-1, 5, 61)
-# cv = KFold(n_splits=10, shuffle=True, random_state=1234)
-
-# ## Run the search
-# metrics = np.zeros((5, len(alphas)))
-# for i, alpha in enumerate(alphas):
-#     reg['regressor'].alpha = alpha
-    
-#     # construct validation predictions vector to compute validation metrics
-#     y_pred_v = np.zeros(len(y_tr), dtype=float)
-#     for itr, ival in cv.split(X_tr, y_tr):
-#         reg.fit(X_tr.iloc[itr], y_tr.iloc[itr])
-#         y_pred_v[ival] = reg.predict(X_tr.iloc[ival])
-#     metrics[:, i] = eval_metrics(y_tr, y_pred_v)
 
 
 """
@@ -432,18 +539,32 @@ reg = Pipeline(
 
 """
 
+## train
+svm_model['regressor'].alpha = 1e2
+svm_model.fit(X_tr, y_tr)
+
+## evaluate of train set
+y_pred_tr = svm_model.predict(X_tr)
+evaluation_df.iloc[2] = eval_metrics(y_tr, y_pred_tr)
+
+## evaluate on test set
+y_pred_test = svm_model.predict(X_test)
+evaluation_df.iloc[3] = eval_metrics(y_test, y_pred_test)
+
+
+evaluation_df.loc['SVM']
 
 
 
+# %%
+"""
+## <a id="conclusion"></a> Conclusion
 
+"""
 
+evaluation_df
 
+"""
 
-
-
-
-
-
-
-
+"""
 

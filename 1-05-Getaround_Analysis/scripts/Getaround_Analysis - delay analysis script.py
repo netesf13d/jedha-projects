@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 # %% Loading
@@ -18,13 +18,8 @@ from matplotlib.patches import Patch
 """
 
 ##
-pp_df = pd.read_csv('../data/get_around_pricing_project.csv')
-pp_df = pp_df.drop('Unnamed: 0', axis=1)
-pp_df
-
-##
-da_df = pd.read_excel('../data/get_around_delay_analysis.xlsx')
-da_df
+df = pd.read_excel('../data/get_around_delay_analysis.xlsx')
+df
 
 """
 The dataset is split in two parts, with 21310 observations each.
@@ -35,9 +30,6 @@ However, we will use it to build target feature to train our ML model.
 
 We should include all the data available in our exploratory data analysis. we build a combined dataframe `eda_df` for this purpose.
 """
-
-eda_df = pd.concat([da_df, pp_df], axis=1)
-eda_df
 
 
 """
@@ -56,23 +48,6 @@ eda_df
 
 """
 
-##
-a = da_df['car_id'].astype(object).describe()
-print(a)
-
-##
-b = da_df.loc[:, ['delay_at_checkout_in_minutes', 'time_delta_with_previous_rental_in_minutes']].describe()
-print(b)
-
-##
-c = da_df.loc[:, ['checkin_type', 'state']].describe()
-print(c)
-
-
-"""
-There are 8143 cars available on the platform
-"""
-
 # %%
 """
 ### some graphs
@@ -81,67 +56,83 @@ There are 8143 cars available on the platform
 - follow the trajectory of a car
 """
 
-cols = ['private_parking_available', 'has_gps', 'has_air_conditioning',
-        'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
-        'winter_tires']
-df_ = eda_df.groupby('car_id').first()
+##
+df_ = df.groupby(['checkin_type', 'state']).count()['car_id']
+df_
+
+##
+df_ / df_.T.groupby('checkin_type').sum()
+
+"""
+Higher probability of cancellation when connect
+"""
+
+cancelled_checkout_delay = 0
+ended_checkout_delay = 0
+
+checkout_delay = {}
+for state, df_ in df.groupby('state'):
+    checkout_delay[state] = df_.loc[:, ['checkin_type', 'delay_at_checkout_in_minutes']]
 
 
-#%%
 
-fig1, ax1 = plt.subplots(
-    nrows=1, ncols=1, figsize=(7, 4.2), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.91, 'bottom': 0.11, 'hspace': 0.08})
-fig1.suptitle("Figure 1: Comparison of rental prices vs various car attributes",
-              x=0.02, ha='left')
+# %%
 
+# cols = ['checkin_type', 'state', 'delay_at_checkout_in_minutes',
+#        'time_delta_with_previous_rental_in_minutes']
 
-vdata, vpos = [], []
-vdata_true, vdata_false = [], []
-for i, item in enumerate(cols):
-    for is_, gdf in pp_df.groupby(item):
-        if is_:
-            vdata_true.append(gdf['rental_price_per_day'].to_numpy())
-        else:
-            vdata_false.append(gdf['rental_price_per_day'].to_numpy())
-
-vplot_false = ax1.violinplot(vdata_false, positions=np.linspace(-0.2, i-0.2, i+1),
-                            widths=0.3, showmeans=True)
-for elt in vplot_false['bodies']:
-    elt.set_facecolor('#1F77B480')
-for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-    vplot_false[elt].set_edgecolor('tab:blue')
-
-vplot_true = ax1.violinplot(vdata_true, positions=np.linspace(0.2, i+0.2, i+1),
-                            widths=0.3, showmeans=True)
-for elt in vplot_true['bodies']:
-    elt.set_facecolor('#FF7F0E80')
-for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-    vplot_true[elt].set_edgecolor('tab:orange')
+# data = df.groupby(['checkin_type', 'state']).count()['car_id'].to_numpy()
 
 
-ax1.set_xlim(-0.5, i+0.5)
-ticks = ['Private\nparking', 'GPS', 'Air\nConditioning', 'Automatic\nCar',
-         'Getaround\nConnect', 'Speed\nRegulator', 'Winter\nTires']
-ax1.set_xticks(np.arange(0, len(ticks)), ticks, rotation=0)
-ax1.set_ylim(0, 480)
-ax1.set_yticks(np.arange(50, 500, 50), minor=True)
-ax1.set_ylabel('Rental price ($/day)', labelpad=5)
-ax1.grid(visible=True, axis='y', linewidth=0.3)
-ax1.grid(visible=True, axis='y', which='minor', linewidth=0.2)
 
-handles = [Patch(facecolor='#1F77B480', edgecolor='k', linewidth=0.5),
-           Patch(facecolor='#FF7F0E80', edgecolor='k', linewidth=0.5)]
-ax1.legend(handles=handles, labels=['False', 'True'], ncols=2)
+fig1, axs1 = plt.subplots(
+    nrows=1, ncols=2, figsize=(9, 4), dpi=200,
+    gridspec_kw={'left': 0.06, 'right': 0.97, 'top': 0.85, 'bottom': 0.13,
+                 'wspace': 0.18})
+fig1.suptitle('Figure 1: ', x=0.02, ha='left')
+
+
+axs1[0].set_title("Checkout delay distribution")
+axs1[0].hist(df['delay_at_checkout_in_minutes'], bins=np.linspace(-100, 100, 22))
+axs1[0].grid(visible=True, linewidth=0.3)
+# axs1[0].set_xlim(-15, 735)
+axs1[0].set_xlabel("Checkout delay (years)")
+axs1[0].set_ylabel('Counts')
+# axs1[0].text(0.575, 0.84, textstr(sufrom mpl_toolkits.axes_grid1 import make_axes_locatablebject_df['age'].to_numpy()),
+#              transform=axs1[0].transAxes, fontsize=9,
+#              bbox={'boxstyle': 'round', 'facecolor': '0.92'})
+
+
+axs1[1].set_title("Delay with previous rental")
+axs1[1].hist(df['time_delta_with_previous_rental_in_minutes'],
+             bins=np.linspace(-15, 735, 26))
+axs1[1].grid(visible=True, linewidth=0.3)
+axs1[1].set_xlim(-15, 735)
+axs1[1].set_xticks(np.linspace(0, 720, 7))
+axs1[1].set_xticks(np.linspace(60, 640, 6), minor=True)
+axs1[1].set_xlabel("Delay with previous rental")
+
+
+# cmap1 = plt.get_cmap('plasma').copy()
+# cmap1.set_extremes(under='0.7', over='0.5')
+# axs1[2].set_aspect('equal')
+
+# heatmap = axs1[2].pcolormesh(data.reshape((2, 2))/np.sum(data), linewidth=0.6,
+#                              edgecolors='0.3', cmap=cmap1, vmin=0, vmax=1)
+# axs1[2].set_xticks([0.5, 1.5], ['cancelled', 'ended'])
+# axs1[2].set_yticks([0.5, 1.5], ['connect', 'mobile'])
+# for (i, j), val in np.ndenumerate(data.reshape((2, 2))):
+#     axs1[2].text(0.5+i, 0.5+j, val, ha='center', va='center')
+
+# div = make_axes_locatable(axs1[2])
+# axs1_cb = div.append_axes('top', size="7%", pad="7%")
+# fig1.add_axes(axs1_cb)
+# fig1.colorbar(heatmap, cax=axs1_cb, orientation="horizontal", ticklocation='top')
 
 plt.show()
 
-"""
-Figure 1 presents violin plots of car rental price as a function of various car options.
-The presence of an option, such as a GPS or private parking affects the price positively.
-"""
 
-# %% ML
+# %%
 
 
 
