@@ -4,56 +4,42 @@
 """
 
 import sys
-from io import BytesIO
-from typing import Any
 
 import requests
-import numpy as np
 
 
 # =============================================================================
 # 
 # =============================================================================
 
-def test(addr: str = 'http://localhost:4000/',
-         tgt: str = 'test',
-         params: dict | None = None)-> Any:
-    params = {} if params is None else params
-    r = requests.get(f'{addr}{tgt}', params=params)
-    print(r)
-    if r.status_code == 200:
-        with np.load(BytesIO(r.content), allow_pickle=False) as f:
-            data = dict(f)
-        return data
-    else:
-        return r
+def probe_api(url: str = 'http://localhost:4000/')-> int:
+    """
+    Probe the API with the test endpoint.
+    """
+    r = requests.get(f'{addr}test')
+    r.raise_for_status()
+    if (res:=r.json()) != 1:
+        raise ValueError(f'invalid value: {res}')
+    return 1
+    
+
+def test_predict(data: list, model: str, url: str = 'http://localhost:4000/'):
+    r = requests.post(f'{addr}predict', data='test')
+    r.raise_for_status()
+    return r.json()
+    if (res:=r.json()) != 1:
+        raise ValueError(f'invalid value: {res}')
+    return 1
 
 
-addr = 'http://localhost:4000/'
-tgt = 'custom_greetings'
-params = {'name': 'bibi'}
 
-# r = requests.get(f'{addr}{tgt}', params=params)
+if __name__ == '__main__':
+    addr = 'http://localhost:4000/'
+    
+    print('Probe API:', bool(probe_api(addr)))
 
-# tgt = 'test'
-# params = "{'message': 'nice,bibi'}"
-# params = {'n': 7} # {'pair': 'ETHBTC', 'since': 1735074259, 'interval': 5}
-# r = requests.get(f'{addr}{tgt}', params=params)
-
-# # print(r.text)
-
-# with np.load(BytesIO(r.content), allow_pickle=False) as f:
-#     data = dict(f)
-# print(data)
-
-
-ohlcvt_params = {'pair': 'ETHUSD', 'since': 1735074259.1, 'interval': 10}
-t1 = test(addr, 'ohlcvt', params=ohlcvt_params)
-
-crash_params = {'pair': 'ETHUSD', 'since': 173507425.1}
-t2 = test(addr, 'crashes', params=crash_params)
-
-crash_prob_params = {'pair': 'ETHUSD', 'since': 1735074259.1, 'interval': 10}
-t3 = test(addr, 'ohlcvt', params=crash_prob_params)
-
+    data = ['Audi', 132979, 112, 'diesel', 'brown', 'estate',
+            True, True, False, False, True, True, True, 117]
+    res = test_predict(data, 'ridge', addr)
+    
 

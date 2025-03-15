@@ -3,14 +3,14 @@
 Script for Getaround project.
 """
 
-from datetime import datetime
+# from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-from sklearn.base import clone
+# from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (mean_squared_error,
                              r2_score,
@@ -21,7 +21,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
-from sklearn.linear_model import LinearRegression, Lasso, Ridge
+from sklearn.linear_model import Ridge
 from sklearn.svm import SVR
 
 
