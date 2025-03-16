@@ -23,7 +23,6 @@ from pydantic import BaseModel
 # from sklearn.svm import SVR
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 # from fastapi.openapi.docs import get_swagger_ui_html
 

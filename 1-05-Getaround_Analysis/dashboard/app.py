@@ -1,14 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-requires
-- orjson
-- httpx
 
 """
 
-# import asyncio
 import json
-import time
 
 # import numpy as np
 import pandas as pd
@@ -16,7 +11,6 @@ import httpx
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-# import yfinance as yf
 
 # from core import (probe_api, ob_template,
 #                   MarketSummary, MarketOrderBook, MarketTrades,
