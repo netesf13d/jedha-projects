@@ -6,10 +6,15 @@ In this project we deploy a small application.
 ## Structure of the project
 
 This project repository is structured as follows.
-- The Jupyter notebook `Walmart_sales.ipynb` presents the results or our study. This is the main deliverable for this project.
-- The directory `scripts` contains the study as a python script.
+- The Jupyter notebook `Project_description.ipynb` details the project description.
+- The Jupyter notebook `Getaround_Analysis_pricing.ipynb` presents some exploratory data analysis along with two models for car rental pricing optimization.
+- The Jupyter notebook `Getaround_Analysis_delay_analysis.ipynb` contains exploratory data analysis of common car rental issues such as late checkout.
+- The directory `scripts` contains the two studies as standalone python scripts.
 - The directory `data` contains the relevant data for the project.
-- The file `requirements.txt` gives the list of the project dependencies. 
+- The file `requirements.txt` gives the list of notebook dependencies.
+- The directory `api` contains !!!
+- The directory `dashboard` contains !!!
+- The directory `train` contains scripts and utilities to dispatch the training of pricing models on AWS EC2 instances. 
 - The directory `presentation` contains the slideshow for the exam, in both `odp` and `pdf` formats.
 
 

@@ -11,37 +11,36 @@ import json
 import time
 
 # import numpy as np
-# import pandas as pd
+import pandas as pd
+import httpx
 import streamlit as st
 import plotly.graph_objects as go
-from httpx import ConnectError
 from plotly.subplots import make_subplots
 # import yfinance as yf
 
-from core import (probe_api, ob_template,
-                  MarketSummary, MarketOrderBook, MarketTrades,
-                  MarketCharts, MarketEvents)
-                  # MarketData, OHLCMarketData)
+# from core import (probe_api, ob_template,
+#                   MarketSummary, MarketOrderBook, MarketTrades,
+#                   MarketCharts, MarketEvents)
+#                   # MarketData, OHLCMarketData)
 
 
-INTERVALS = {'1 min': 1,
-             '5 min': 5,
-             '15 min': 15,
-             '30 min': 30,
-             '1 hour': 60,
-             '4 hours': 240,
-             '24 hours': 1440,
-             '7 days': 10080,
-             '14 days': 21600}
+API_URL = 'http://localhost:4000'
+
+# =============================================================================
+# 
+# =============================================================================
+
+def probe_api(api_url: str):
+    r = httpx.get(f'{api_url}/test', follow_redirects=True)
+    res = r.raise_for_status().json()
+    return res
 
 
-TRADES_COUNT = 30 # <= 1000
-
-ORDERS_COUNT = 50 # <= 500
-ORDERS_DISPLAY = 5 # <= ORDERS_COUNT
-OB_TEMPLATE_PATH = './static/ob_template.html'
-OB_TEMPLATE_FORMAT = {'ap': '{{:.8}}', 'aq1': '{{:.8}}', 'aq2': '{{:.4f}}',
-                      'bp': '{{:.8}}', 'bq1': '{{:.8}}', 'bq2': '{{:.4f}}',}
+def get_pricing(api_url: str,
+                data: dict[str, bool | float | str])-> float:
+    r = httpx.post(f'{api_url}/predict', follow_redirects=True, data=data)
+    res = r.raise_for_status().json()
+    return res
 
 
 # =============================================================================
@@ -64,112 +63,46 @@ def build_chart()-> go.Figure:
 # App initialization
 # =============================================================================
 
-# Crash prediction API available ?
+## Load data
+# df = pd.read_excel('./data/get_around_delay_analysis.xlsx')
+
+
+## Pricing optimization API available ?
 try:
-    probe_api()
-except ConnectError:
-    ccp_available = False
+    probe_api(API_URL)
+except httpx.ConnectError:
+    api_available = False
 else:
-    ccp_available = True
+    api_available = True
 
-
-with open('../data/ohlcvt_data_index.json', 'rt', encoding='utf-8') as f:
-    crypto_index = json.load(f)
-crypto_codes = crypto_index['codes']
-assets = crypto_index['assets']
-asset_pairs = {f'{a1}/{a2}': [a1, a2]
-               for a1, a2_list in assets.items()
-               for a2 in a2_list}
-markets = list(asset_pairs)
-
-raw_chart_options = {
-    'Market chart (OHLC)': 'ohlc',
-    'Volatility': 'volatility',
-    'Trade count': 'trades',
-    'Volume ({asset1})': 'volume1',
-    'Volume ({asset2})': 'volume2',
-}
-crash_prob_options = {"Don't show": 0,
-                      'Within one day': 1}
-
-trades_col_config = {
-    'PRICE': st.column_config.NumberColumn(
-        'PRICE', disabled=True, format='%.6g'),
-    'QUANTITY': st.column_config.NumberColumn(
-        'QUANTITY', disabled=True, format='%.2g'),
-    'TIME': st.column_config.Column('TIME', disabled=True)}
+api_available = True
 
 
 ## Setup initial session state
-if not 'Session_initialized_' in st.session_state:
-    with open('./init_session_state.json', 'rt', encoding='utf-8') as f:
-        init_sstate = json.load(f)
-    for state_elt, state_val in init_sstate.items():
-        if state_elt not in st.session_state:
-            st.session_state[state_elt] = state_val
-    
-    if 'ob_template' not in st.session_state:
-        style, template = ob_template(
-            OB_TEMPLATE_PATH, ORDERS_DISPLAY, OB_TEMPLATE_FORMAT)
-        st.session_state['ob_style'] = style
-        st.session_state['ob_template'] = template
-    
-    if 'market_chart' not in st.session_state:
-        st.session_state['market_chart'] = build_chart()
+if not 'data' in st.session_state:
+    df = pd.read_excel('./data/get_around_delay_analysis.xlsx')
+    st.session_state['data'] = df
+if api_available and not 'car_models' in st.session_state:
+    st.session_state['car_models'] = ['a', 'b']
 
+st.session_state['car_models'] = ['a', 'b']
+st.session_state['fuels'] = ['a', 'b']
+st.session_state['paint_colors'] = ['a', 'b']
+st.session_state['car_types'] = ['a', 'b']
+
+# Delay analysis data
+df = st.session_state['data']
+
+# Pricing optimization
+car_models = st.session_state['car_models']
+fuels = st.session_state['fuels']
+paint_colors = st.session_state['paint_colors']
+car_types = st.session_state['car_types']
 
 
 # =============================================================================
 # Callbacks
 # =============================================================================
-
-
-def get_market_data(asset1: str, asset2: str, time_interval: int
-                    )-> tuple:
-    """
-    
-
-    Parameters
-    ----------
-    market_pair : str
-        DESCRIPTION.
-    time_interval : int
-        DESCRIPTION.
-
-    """
-    market_pair = f'{asset1}{asset2}'
-    key = (market_pair, time_interval)
-    if market_pair not in st.session_state:
-        st.session_state[market_pair] = {
-            'summary': MarketSummary(asset1, asset2),
-            'order_book': MarketOrderBook(
-                asset1, asset2, ORDERS_DISPLAY,
-                st.session_state['ob_style'], st.session_state['ob_template']),
-            'trades': MarketTrades(asset1, asset2, TRADES_COUNT),
-        }
-        st.session_state[key] = {
-            'charts': MarketCharts(asset1, asset2, time_interval),
-            'crashes': MarketEvents(asset1, asset2, time_interval),
-        }
-    elif key not in st.session_state:
-        for mdata in st.session_state[market_pair].values():
-            mdata.set_flag(True)
-        st.session_state[key] = {
-            'charts': MarketCharts(asset1, asset2, time_interval),
-            'crashes': MarketEvents(asset1, asset2, time_interval),
-        }
-    else: 
-        for mdata in st.session_state[market_pair].values():
-            mdata.set_flag(True)
-        for mdata in st.session_state[key].values():
-            mdata.set_flag(True)
-    
-    return (st.session_state[market_pair]['summary'],
-            st.session_state[market_pair]['order_book'],
-            st.session_state[market_pair]['trades'],
-            st.session_state[key]['crashes'],
-            st.session_state[key]['charts'])
-
 
 def setup_subplot(fig: go.Figure, chart_type: str, row: int)-> go.Figure:
     match chart_type:
@@ -232,121 +165,184 @@ def setup_prob_subplots(fig: go.Figure)-> go.Figure:
 
 ########## App configuration ##########
 st.set_page_config(
-    page_title="Crypto Crash Prediction",
-    page_icon="\U0001f4b8",
-    layout="wide"
+    page_title='Getaround dashboard',
+    page_icon='\U0001f4b8',
+    layout='wide'
 )
 
 
 ########## App Title and Description ##########
-st.title("Cryptocurrency Tracker \U0001f4b9")
+st.title('Getaround dashboard \U0001f4b8')
 st.markdown(
-    "\U0001f44b Hello there! Welcome to this crypto crash prediction app. "
-    "We visualize candlestick charts for selected cryptocurrencies.")
-st.caption("Data updates dynamically using [Kraken API]"
-           "(https://docs.kraken.com/api/docs/rest-api/add-order/).")
+    '\U0001f44b Hello there! Welcome to this Getaround car rental dashboard. '
+    'The dashboard provides:'
+    '- Visualizations and information related to the implementation of '
+      'a rental delay.'
+    '- A connection to the pricing API to price a car by manually entering '
+      'its characteristics')
+st.caption('Data provided by [Jedha](https://jedha.co)')
 
 
-########## Sidebar ##########
-with st.sidebar:
-    st.title("Market selection")
-    market_pair = st.selectbox(
-        "Select market", markets, index=markets.index('XBT/USD'),
-        key='market_select')
-    time_interval = st.selectbox(
-        "Select market", list(INTERVALS), index=3,
-        key='interval_select')
-## 
-asset1, asset2 = asset_pairs[market_pair]
-chart_options = {opt.format(asset1=asset1, asset2=asset2): v
-                 for opt, v in raw_chart_options.items()}
-msummary, morderbook, mtrades, mcrashes, mcharts = get_market_data(
-    asset1, asset2, INTERVALS[time_interval])
+# ########## Sidebar ##########
+# with st.sidebar:
+#     st.title("Market selection")
+#     market_pair = st.selectbox(
+#         "Select market", markets, index=markets.index('XBT/USD'),
+#         key='market_select')
+#     time_interval = st.selectbox(
+#         "Select market", list(INTERVALS), index=3,
+#         key='interval_select')
+# ## 
+# asset1, asset2 = asset_pairs[market_pair]
+# chart_options = {opt.format(asset1=asset1, asset2=asset2): v
+#                  for opt, v in raw_chart_options.items()}
+# msummary, morderbook, mtrades, mcrashes, mcharts = get_market_data(
+#     asset1, asset2, INTERVALS[time_interval])
 
 
-########## Market summary ##########
-st.divider()
-st.markdown(f"#### {market_pair} at a glance (last 24h)")
-summary_cols = st.columns(3)
-summary_containers = []
-for col in summary_cols:
-    with col:
-        summary_containers.append(st.empty())
+# ########## Market summary ##########
+# st.divider()
+# st.markdown("#### {market_pair} at a glance (last 24h)")
+# summary_cols = st.columns(3)
+# summary_containers = []
+# for col in summary_cols:
+#     with col:
+#         summary_containers.append(st.empty())
 
 
-########## Market charts ##########
-st.divider()
-st.markdown("#### Market chart")
-col_graphselect, col_crashdisplay = st.columns(2)
-with col_graphselect:
-    top_chart = st.selectbox(
-        "Top chart", list(chart_options), key='top_chart_select')
-    bottom_chart = st.selectbox(
-        "Bottom chart", list(chart_options), index=3,key='bottom_chart_select')
-with col_crashdisplay:
-    crash_prob_select = st.selectbox(
-        "Show crash probability", crash_prob_options, key='display_crash_prob',
-        disabled=not ccp_available)
-    display_crashes = st.toggle(
-        'Display market crashes', value=False, disabled=not ccp_available)
-    if not ccp_available:
-        st.caption(':red[Crash prediction API unavailable]')
-## setup market charts
-chart_container = st.empty()
-chart = st.session_state['market_chart']
-setup_subplot(chart, chart_options[top_chart], row=1)
-setup_subplot(chart, chart_options[bottom_chart], row=2)
-## setup crash prob
-display_crash_prob = crash_prob_options[crash_prob_select]
-if display_crash_prob:
-    setup_prob_subplots(chart)
+# ########## Market charts ##########
+# st.divider()
+# st.markdown("#### Market chart")
+# col_graphselect, col_crashdisplay = st.columns(2)
+# with col_graphselect:
+#     top_chart = st.selectbox(
+#         "Top chart", list(chart_options), key='top_chart_select')
+#     bottom_chart = st.selectbox(
+#         "Bottom chart", list(chart_options), index=3,key='bottom_chart_select')
+# with col_crashdisplay:
+#     crash_prob_select = st.selectbox(
+#         "Show crash probability", crash_prob_options, key='display_crash_prob',
+#         disabled=not ccp_available)
+#     display_crashes = st.toggle(
+#         'Display market crashes', value=False, disabled=not ccp_available)
+#     if not ccp_available:
+#         st.caption(':red[Crash prediction API unavailable]')
+# ## setup market charts
+# chart_container = st.empty()
+# chart = st.session_state['market_chart']
+# setup_subplot(chart, chart_options[top_chart], row=1)
+# setup_subplot(chart, chart_options[bottom_chart], row=2)
+# ## setup crash prob
+# display_crash_prob = crash_prob_options[crash_prob_select]
+# if display_crash_prob:
+#     setup_prob_subplots(chart)
 
-########## Tables tabs ##########
-tab_orderbook, tab_trades = st.tabs(['Order book', 'Trades'])
-with tab_orderbook:
-    st.markdown('#### Order book')
-    table_orderbook = st.empty()
+tab_delay, tab_pricing = st.tabs(['delay_analysis', 'car_pricing'])
+
+########## Rental delay tab ##########
+with tab_delay:
+    st.markdown('#### Car rental delay analysis')
+    # slider
     
-with tab_trades:
-    st.markdown('#### Market trades')
-    table_trades = st.empty()
+    # plot
+    
+    # table
+    table_orderbook = st.empty()
+
+    
+########## Car pricing tab tab ##########
+with tab_pricing:
+    st.markdown('#### Car rental pricing')
+    
+    # Categorical variables
+    cols_categ = st.columns(4)
+    with cols_categ[0]:
+        car_model = st.selectbox("Car model", car_models, key='car_model',
+                                 disabled=not api_available)
+    with cols_categ[1]:
+        car_type = st.selectbox("Car type", car_types, key='car_type',
+                                disabled=not api_available)
+    with cols_categ[2]:
+        fuel = st.selectbox("Fuel", fuels, key='fuel',
+                            disabled=not api_available)
+    with cols_categ[3]:
+        paint = st.selectbox("Paint color", paint_colors, key='paint',
+                             disabled=not api_available)
+
+    # Boolean variables
+    cols_bool = st.columns(6)
+    with cols_bool[0]:
+        private_parking = st.toggle('Private parking', value=False,
+                                    disabled=not api_available)
+    with cols_bool[1]:
+        gps = st.toggle('GPS', value=False, disabled=not api_available)
+    with cols_bool[2]:
+        air_conditioning = st.toggle('Air conditioning', value=False,
+                                    disabled=not api_available)
+    with cols_bool[3]:
+        getaround_connect = st.toggle('Getaround connect', value=False,
+                                      disabled=not api_available)
+    with cols_bool[4]:
+        speed_regulator = st.toggle('Speed regulator', value=False,
+                                    disabled=not api_available)
+    with cols_bool[5]:
+        winter_tires = st.toggle('Winter tires', value=False,
+                                 disabled=not api_available)
+    
+    # Quantitative variables
+    cols_quant = st.columns(2)
+    with cols_quant[0]:
+        engine_power = st.toggle('Engine power', value=False,
+                                    disabled=not api_available)
+    with cols_quant[1]:
+        mileage = st.toggle('Mileage', value=False, disabled=not api_available)
+    
+    # Pricing recommendation
+    rental_price_container = st.empty()
 
 
 # =============================================================================
 # 
 # =============================================================================
 
-# while True:
-for container, text in zip(summary_containers, msummary.render_summary()):
-    with container:
-        st.markdown(text)
+if api_available:
+    data = {}
+    # rental_price = get_pricing(API_URL, data)
+    with rental_price_container:
+        st.markdown(f'Recomended price {1}')
 
 
-with chart_container:
-    if mcharts.update_flag:
-        mcharts.update()
-        mcharts.set_flag(False)
-    mcharts.update_chart(chart, chart_options[top_chart], row=1)
-    mcharts.update_chart(chart, chart_options[bottom_chart], row=2)
+# # while True:
+# for container, text in zip(summary_containers, msummary.render_summary()):
+#     with container:
+#         st.markdown(text)
+
+
+# with chart_container:
+#     if mcharts.update_flag:
+#         mcharts.update()
+#         mcharts.set_flag(False)
+#     mcharts.update_chart(chart, chart_options[top_chart], row=1)
+#     mcharts.update_chart(chart, chart_options[bottom_chart], row=2)
     
-    if ccp_available and mcrashes.update_flag:
-        mcrashes.update(since=mcharts.t0)
-        mcrashes.set_flag(False)
-    if display_crashes:
-        mcrashes.add_events(chart)
-    if display_crash_prob:
-        mcrashes.add_prob(chart)
+#     if ccp_available and mcrashes.update_flag:
+#         mcrashes.update(since=mcharts.t0)
+#         mcrashes.set_flag(False)
+#     if display_crashes:
+#         mcrashes.add_events(chart)
+#     if display_crash_prob:
+#         mcrashes.add_prob(chart)
     
-    st.plotly_chart(chart)
+#     st.plotly_chart(chart)
 
 
-spread_str, order_book = morderbook.render_order_book()
-with table_orderbook:
-    with st.container():
-        st.html(order_book)
-        st.markdown(spread_str)
-with table_trades:
-    mtrades.update()
-    st.dataframe(mtrades.render_trades(), width=400, hide_index=True,
-                 column_config=trades_col_config)
+# spread_str, order_book = morderbook.render_order_book()
+# with table_orderbook:
+#     with st.container():
+#         st.html(order_book)
+#         st.markdown(spread_str)
+# with table_trades:
+#     mtrades.update()
+#     st.dataframe(mtrades.render_trades(), width=400, hide_index=True,
+#                  column_config=trades_col_config)
     

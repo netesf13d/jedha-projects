@@ -59,6 +59,23 @@ from fastapi.staticfiles import StaticFiles
 
 models = {'ridge': lambda x: 100., 'SVM': lambda x: 100.}
 
+
+class PredictionFeatures(BaseModel):
+    model_key: str
+    mileage: float
+    engine_power: float
+    fuel: str
+    paint_color: str
+    car_type: str
+    private_parking_available: bool
+    has_gps: bool
+    has_air_conditioning: bool
+    automatic_car: bool
+    has_getaround_connect: bool
+    has_speed_regulator: bool
+    winter_tires: bool
+
+
 # =============================================================================
 # 
 # =============================================================================
@@ -119,49 +136,58 @@ async def test()-> int:
     return 1
 
 
-class PredictionFeatures(BaseModel):
-    model_key: str
-    mileage: float
-    engine_power: float
-    fuel: str
-    paint_color: str
-    car_type: str
-    private_parking_available: bool
-    has_gps: bool
-    has_air_conditioning: bool
-    automatic_car: bool
-    has_getaround_connect: bool
-    has_speed_regulator: bool
-    winter_tires: bool
+@app.get('/features', tags=['Test'])
+async def get_car_models()-> dict[str, str]:
+    """
+    
+    """
+    return 
 
 
-@app.post('/predict', tags=['Machine Learning'])
-async def dummy_predict(model: str):
+@app.get('/categories', tags=['Test'])
+async def get_categories()-> dict[str, list[str]]:
     """
-    Return optimal rental price.
+    
     """
-    return model
+    return ['a']
+
+
+@app.get('/car_models', tags=['Test'])
+async def get_car_models()-> list[str]:
+    """
+    
+    """
+    return ['a']
 
 
 # @app.post('/predict', tags=['Machine Learning'])
-# async def predict(data: PredictionFeatures, model: str):
+# async def dummy_predict(model: str):
 #     """
 #     Return optimal rental price.
 #     """
-#     input_features = pd.DataFrame(dict(data))
+#     return model
 
-#     # model = mlflow.pyfunc.load_model(CURR_MODEL)
-#     try:
-#         model = models[model]
-#     except KeyError:
-#         raise KeyError(f'`model` must be in {set(models.keys())}')
-#     else:
-#         prediction = model.predict(input_features)
+
+@app.post('/predict', tags=['Machine Learning'])
+async def predict(data: PredictionFeatures): #, model: str):
+    """
+    Return optimal rental price.
+    """
+    model = 'ridge'
+    input_features = pd.DataFrame(dict(data))
+
+    # model = mlflow.pyfunc.load_model(CURR_MODEL)
+    try:
+        model = models[model]
+    except KeyError:
+        raise KeyError(f'`model` must be in {set(models.keys())}')
+    else:
+        prediction = model.predict(input_features)
     
-#     # format response
-#     response = {"prediction": prediction.tolist()[0]}
+    # format response
+    response = {'prediction': prediction.tolist()[0]}
     
-    # return response
+    return response
 
 
 
