@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Script to train a ridge regression model for car rental pricing optimization.
+Script to train a gradient boosting model for car rental pricing optimization.
 The model is monitored and saved with MLFlow.
 """
 
@@ -20,11 +20,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
-from sklearn.linear_model import Ridge
+from sklearn.ensemble import GradientBoostingRegressor
 
 
 # Set your variables for your environment
-EXPERIMENT_NAME = 'car-pricing-ridge-model'
+EXPERIMENT_NAME = 'car-pricing-gradient-boosting-model'
 
 mlflow.set_tracking_uri(os.environ["APP_URI"])
 mlflow.set_experiment(EXPERIMENT_NAME)
@@ -91,16 +91,18 @@ col_preproc = ColumnTransformer(
 
 with mlflow.start_run(experiment_id = experiment.experiment_id):
     ## full pipeline
-    alpha = 1e2
-    ridge_model = Pipeline([('column_preprocessing', col_preproc),
-                            ('regressor', Ridge(alpha=alpha))])
+    nest = 500
+    gb_model = Pipeline(
+        [('column_preprocessing', col_preproc),
+         ('regressor', GradientBoostingRegressor(n_estimators=nest, random_state=1234))]
+    )
     
     ## Fit
-    ridge_model.fit(X_tr, y_tr)
+    gb_model.fit(X_tr, y_tr)
     
     
     ## evaluate of train set
-    y_pred_tr = ridge_model.predict(X_tr)
+    y_pred_tr = gb_model.predict(X_tr)
     tr_mse = mean_squared_error(y_tr, y_pred_tr)
     tr_rmse = mean_squared_error(y_tr, y_pred_tr)
     tr_r2 = r2_score(y_tr, y_pred_tr)
@@ -109,7 +111,7 @@ with mlflow.start_run(experiment_id = experiment.experiment_id):
     # tr_metrics = eval_metrics(y_tr, y_pred_tr)
     
     ## evaluate on test set
-    y_pred_test = ridge_model.predict(X_test)
+    y_pred_test = gb_model.predict(X_test)
     test_mse = mean_squared_error(y_test, y_pred_test)
     test_rmse = mean_squared_error(y_test, y_pred_test)
     test_r2 = r2_score(y_test, y_pred_test)

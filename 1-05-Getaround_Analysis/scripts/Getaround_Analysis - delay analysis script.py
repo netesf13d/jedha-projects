@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Script for Getaround project.
+Script for the rental delay analysis component of Getaround project.
 """
-
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -21,54 +19,51 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 df = pd.read_excel('../data/get_around_delay_analysis.xlsx')
 df
 
-"""
-The dataset is split in two parts, with 21310 observations each.
-- The first dataframe, `pp_df`, contains the information that we have *before* a car is rent.
-We will use these features as predictors for our machine learning model
-- The second dataframe contains information relative to the *outcome* of a rental. This data cannot be used to make predictions.
-However, we will use it to build target feature to train our ML model.
-
-We should include all the data available in our exploratory data analysis. we build a combined dataframe `eda_df` for this purpose.
-"""
-
+print(df.describe(include='all'))
 
 """
-`'checkin_type'`: `{'mobile', 'connect'}` 
-`'state'`: `{'ended', 'cancelled'}`, whether the rental was cancelled or not
-`'delay_at_checkout_in_minutes'`: delay between the expected and actual checkout times (positive means checkout later than expected)
-`'time_delta_with_previous_rental_in_minutes'`: How long the car stood by unrented (longer is a loss of money)
-``
+The dataset contains 21310 observations, each consisting of data pertaining to a car rental event.
+The dataset has 7 columns:
+- The column `car_id` refers to the car that was rented. In the absence of further information, it is of no use to us.
+- The columns `rental_id` and `previous_ended_rental_id` are identifiers of the current and previous rentals of a given car.
+We will use them to follow car rental sequences.
+- The column `checkin_type` indicates whether the rental was made using Getaround connect functionality or by mobile.
+- The column `state` indicates whether the rental was canceled or not.
+- The column `delay_at_checkout_in_minutes` gives the time difference between the actual and expected checkout times.
+A negative value indicates that the checkout occured earlier than expected, and a positive value indicates a late checkout. 
+A late checkout which makes the next customer waiting is problematic and this is what we aim to mitigate by introducing a delay
+before availability.
+- The column `time_delta_with_previous_rental_in_minutes` represents the expected amount of time between two consecutive rentals.
+This value is based on the *expected* checkout and checkin times, and does not include the checkout delay.
+A `NULL` value corresponds to a time delta larger that 12h (720 min), in which case the rental is assumed to be non-consecutive
+(`previous_ended_rental_id` is also `NULL`).
 """
-
 
 # %% EDA
 """
-## <a id="eda"></a> Preliminary data analysis
+## <a id="eda"></a> Exploratory data analysis
 
-
+Before determining the impact of the introduction of a rental delay, we first gather some
+necessary insights about user behavior.
 """
 
-# %%
-"""
-### some graphs
+## Number of rentals using each method
+print(df['checkin_type'].value_counts())
 
+## Counts of rental states for each checkin type
+df_ = df.groupby(['checkin_type', 'state']).count()['rental_id']
+print(df_)
 
-- follow the trajectory of a car
-"""
-
-##
-df_ = df.groupby(['checkin_type', 'state']).count()['car_id']
-df_
-
-##
-df_ / df_.T.groupby('checkin_type').sum()
+## Probability of rental states for each checkin type
+print(df_ / df_.T.groupby('checkin_type').sum())
 
 """
-Higher probability of cancellation when connect
+- Customers favor mobile checkin (80%) over Getaround connect (20%).
+Part of this difference is due to the fact that not all the cars (actually, only 46%)
+have the Getaround connect option.
+- Rental cancellation rates are higher when customers use Getaround connect functionality (18.5%)
+than with mobile checkin (14.5%). The cancellation process is possibly made easier with Getaround connect.
 """
-
-
-
 
 # %%
 """
@@ -79,7 +74,7 @@ Higher probability of cancellation when connect
 
 ##
 df_ = df.groupby(['checkin_type', 'state']).agg(lambda x: x.isnull().sum())
-df_
+print(df_)
 
 """
 Almost all null `delay_at_checkout_in_minutes` when canceled
@@ -154,7 +149,8 @@ axs1[1].legend(handles=[line0, line1], labels=labels)
 plt.show()
 
 """
-Figure 1 presents the distribution of checkout delays.
+Figure 1 presents the inverse cummulative distributions of checkout delays,
+for both mobile checkin (left panel) and Getaround connect checkin (right panel).
 
 Delays are shorter and occur less frequently with Getaround connect.
 """
@@ -207,7 +203,7 @@ axs2[0].set_title("Mobile checkin")
 axs2[0].hist(rental_delay['mobile'], bins=np.linspace(-30, 750, 14),
              stacked=False, density=False)
 
-line, = axs2_twin[0].plot(delay_vals, delay_hist_mfrac, color='tab:green',
+line, = axs2_twin[0].plot(delay_vals, delay_hist_mfrac, color='tab:red',
                   marker='o', markersize=5)
 axs2_twin[0].set_ylim(0, 0.425)
 axs2_twin[0].set_yticks([0, 0.1, 0.2, 0.3, 0.4])
@@ -228,7 +224,7 @@ axs2[1].set_title("Getaround connect checkin")
 axs2[1].hist(rental_delay['connect'], bins=np.linspace(-30, 750, 14), # np.linspace(-15, 735, 26)
              stacked=False, density=False)
 
-line, = axs2_twin[1].plot(delay_vals, delay_hist_cfrac, color='tab:green',
+line, = axs2_twin[1].plot(delay_vals, delay_hist_cfrac, color='tab:red',
                           marker='o', markersize=5)
 axs2_twin[1].set_ylim(0, 0.425)
 axs2_twin[1].set_yticks([0, 0.1, 0.2, 0.3, 0.4])
