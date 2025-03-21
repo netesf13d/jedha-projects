@@ -231,7 +231,7 @@ for title, item, ax in zip(cat_titles, cat_vars, axs3):
     for category, gdf in df_.loc[:, ['rental_price_per_day', item]].groupby(item):
         vdata.append(gdf['rental_price_per_day'].to_numpy())
         categories.append(category)
-    
+
     n = len(categories)
     vplot = ax.violinplot(vdata, positions=np.linspace(0, n-1, n),
                           widths=0.8, showmeans=True, bw_method=0.2)
@@ -247,7 +247,7 @@ for title, item, ax in zip(cat_titles, cat_vars, axs3):
 
 fig3.text(0.02, 0.51, 'Rental price ($/day)', rotation=90, fontsize=11,
           ha='center', va='center')
-    
+
 
 plt.show()
 
@@ -498,7 +498,7 @@ plt.show()
 r"""
 Figure 5 presents plots of our selected metrics as a function of
 the regularization parameter $\alpha$ of the ridge regression.
-The performance of the model starts to degrade for values of $\alpha$ above $\sim 100$. 
+The performance of the model starts to degrade for values of $\alpha$ above $\sim 100$.
 """
 
 
