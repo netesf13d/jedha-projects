@@ -5,36 +5,44 @@
 
 import json
 
-# import numpy as np
+import numpy as np
 import pandas as pd
-import httpx
+# import httpx
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# from core import (probe_api, ob_template,
-#                   MarketSummary, MarketOrderBook, MarketTrades,
-#                   MarketCharts, MarketEvents)
-#                   # MarketData, OHLCMarketData)
+from core import (probe_api, get_models, get_categories, get_pricing,
+                  prepare_dataset, cancel_prob, cancellation_rates,
+                  delay_info_df, update_delay_info)
 
 
 API_URL = 'http://localhost:4000'
+
+DATASET_FILENAME = './data/get_around_delay_analysis.xlsx'
+TIME_BINS = np.linspace(-15, 225, 5)
+RENTAL_DELAYS = np.linspace(-120, 300, 22)
+
 
 # =============================================================================
 # 
 # =============================================================================
 
-def probe_api(api_url: str):
-    r = httpx.get(f'{api_url}/test', follow_redirects=True)
-    res = r.raise_for_status().json()
-    return res
+# def probe_api(api_url: str):
+#     r = httpx.get(f'{api_url}/test', follow_redirects=True)
+#     res = r.raise_for_status().json()
+#     return res
 
 
-def get_pricing(api_url: str,
-                data: dict[str, bool | float | str])-> float:
-    r = httpx.post(f'{api_url}/predict', follow_redirects=True, data=data)
-    res = r.raise_for_status().json()
-    return res
+# def get_pricing(api_url: str,
+#                 data: dict[str, bool | float | str])-> float:
+#     r = httpx.post(f'{api_url}/predict', follow_redirects=True, data=data)
+#     res = r.raise_for_status().json()
+#     return res
+
+
+
+
 
 
 # =============================================================================
@@ -57,12 +65,23 @@ def build_chart()-> go.Figure:
 # App initialization
 # =============================================================================
 
-########## Setup initial session state ##########
-## Load data
-if not 'data' in st.session_state:
-    df = pd.read_excel('./data/get_around_delay_analysis.xlsx')
-    st.session_state['data'] = df
+########## Setup delay analysis session state ##########
+if not 'dataset' in st.session_state:
+    df = prepare_dataset(DATASET_FILENAME)
+    st.session_state['dataset'] = df
+    st.session_state['time_bins'] = TIME_BINS
+    
+    p_cancel = cancel_prob(df, TIME_BINS)
+    st.session_state['p_cancel'] = p_cancel
+    
+    cancel_rates = cancellation_rates(df, p_cancel, TIME_BINS, RENTAL_DELAYS)
+    st.session_state['rental_delays'] = RENTAL_DELAYS
+    st.session_state['cancellation_rates'] = cancel_rates
+    
+    st.session_state['delay_info_df'] = delay_info_df(df)
 
+
+########## Setup delay analysis session state ##########
 # ## Pricing optimization API available ?
 # if 'api_available' not in st.session_state:
 #     try:
@@ -72,32 +91,37 @@ if not 'data' in st.session_state:
 #     else:
 #         st.session_state['api_available'] = True
 
-# ## If API available, get categorical variables info
-# if api_available and not 'car_models' in st.session_state:
-#     st.session_state['car_models'] = ['a', 'b']
+# ## If the API is available, get available models
+# if api_available and not 'pricing_models' in st.session_state:
+#     st.session_state['pricing_models'] = get_models(API_URL)
+
+# ## If the API is available, get categorical variables info
+# if api_available and not 'categories' in st.session_state:
+#     st.session_state['categories'] = get_categories(API_URL)
+
+
 
 
 st.session_state['pricing_models'] = ['ridge', 'SVM']
+st.session_state['categories'] = {'model_key': ['a', 'b'],
+                                  'fuel': ['a', 'b'],
+                                  'paint_color': ['a', 'b'],
+                                  'car_type': ['a', 'b']}
 
-st.session_state['car_models'] = ['a', 'b']
-st.session_state['fuels'] = ['a', 'b']
-st.session_state['paint_colors'] = ['a', 'b']
-st.session_state['car_types'] = ['a', 'b']
+## Delay analysis data
+df = st.session_state['dataset']
+time_bins = st.session_state['time_bins']
+p_cancel = st.session_state['p_cancel']
+rental_delays = st.session_state['rental_delays']
+cancel_rates = st.session_state['cancellation_rates']
+delay_info_df = st.session_state['delay_info_df']
 
-# Delay analysis data
-df = st.session_state['data']
 
-# 
+## Pricing optimization
 # api_available = st.session_state['api_available']
 api_available = True
-
-
-# Pricing optimization
 pricing_models = st.session_state['pricing_models']
-car_models = st.session_state['car_models']
-fuels = st.session_state['fuels']
-paint_colors = st.session_state['paint_colors']
-car_types = st.session_state['car_types']
+categories = st.session_state['categories']
 
 
 # =============================================================================
@@ -166,6 +190,9 @@ The dashboard provides:
 """)
 st.caption('Data provided by [Jedha](https://jedha.co)')
 
+
+# st.write(cancellation_rates)
+
 tab_delay, tab_pricing = st.tabs(['Rental delay analysis', 'Car pricing'])
 
 
@@ -173,25 +200,32 @@ tab_delay, tab_pricing = st.tabs(['Rental delay analysis', 'Car pricing'])
 with tab_delay:
     st.markdown('#### Car rental delay analysis')
     
-    col_plot, col_table = st.columns([1, 0.4], gap='medium')
+    col_plot, col_table = st.columns([1, 0.5], gap='medium')
     
     with col_plot:
-        # slider
-        st.slider('Rental delay (min)', min_value=0, max_value=1000, value=0)
+        # Mobile checkin plot
+        mobile_fig = go.Figure()
+        trace = go.Scatter(x=rental_delays, y=cancel_rates['mobile'])
+        mobile_fig.add_trace(trace)
+        st.plotly_chart(mobile_fig, key='mobile_chart')
         
-        # plot
-        fig = go.Figure()
+        # Getaround connect plot
+        getaround_fig = go.Figure()
         trace = go.Scatter(x=[-1, 0, 1], y=[1, 0, 1])
-        fig.add_trace(trace)
-        st.plotly_chart(fig)
-        
+        getaround_fig.add_trace(trace)
+        st.plotly_chart(getaround_fig, key='getaround_chart')
         
     
     with col_table:
-        # table
-        delay_info = st.empty()
+        # Rental delay slider
+        rental_delay = st.slider('Rental delay (minutes)',
+                                 min_value=-400, max_value=400, value=0)
+        
+        # Rental delay summary table
+        delay_info_container = st.empty()
 
     
+
 ########## Car pricing tab tab ##########
 with tab_pricing:
     st.markdown('#### Car rental pricing')
@@ -199,37 +233,37 @@ with tab_pricing:
     # Categorical variables
     cols_categ = st.columns(4, gap='medium')
     with cols_categ[0]:
-        car_model = st.selectbox("Car model", car_models, key='car_model',
-                                 disabled=not api_available)
+        car_model = st.selectbox("Car model", categories['model_key'],
+                                 key='car_model', disabled=not api_available)
     with cols_categ[1]:
-        car_type = st.selectbox("Car type", car_types, key='car_type',
-                                disabled=not api_available)
+        car_type = st.selectbox("Car type", categories['car_type'],
+                                key='car_type', disabled=not api_available)
     with cols_categ[2]:
-        fuel = st.selectbox("Fuel", fuels, key='fuel',
+        fuel = st.selectbox("Fuel", categories['fuel'], key='fuel',
                             disabled=not api_available)
     with cols_categ[3]:
-        paint = st.selectbox("Paint color", paint_colors, key='paint',
-                             disabled=not api_available)
+        paint = st.selectbox("Paint color", categories['paint_color'],
+                             key='paint', disabled=not api_available)
 
     # Boolean variables
     cols_bool = st.columns(6, gap='medium')
     with cols_bool[0]:
         private_parking = st.checkbox('Private parking', value=False,
-                                    disabled=not api_available)
+                                     disabled=not api_available)
     with cols_bool[1]:
         gps = st.checkbox('GPS', value=False, disabled=not api_available)
     with cols_bool[2]:
         air_conditioning = st.checkbox('Air conditioning', value=False,
-                                    disabled=not api_available)
+                                       disabled=not api_available)
     with cols_bool[3]:
         getaround_connect = st.checkbox('Getaround connect', value=False,
-                                      disabled=not api_available)
+                                        disabled=not api_available)
     with cols_bool[4]:
         speed_regulator = st.checkbox('Speed regulator', value=False,
-                                    disabled=not api_available)
+                                      disabled=not api_available)
     with cols_bool[5]:
         winter_tires = st.checkbox('Winter tires', value=False,
-                                 disabled=not api_available)
+                                   disabled=not api_available)
     
     # Quantitative variables
     cols_quant = st.columns(2, gap='large')
@@ -257,8 +291,11 @@ with tab_pricing:
 # 
 # =============================================================================
 
-with delay_info:
-    delay_info_table = st.table(['a', 'b'])
+with delay_info_container:
+    delay_info_df = update_delay_info(df, p_cancel, time_bins,
+                                      delay_info_df, rental_delay)
+    delay_info_table = st.table(delay_info_df)
+
 
 
 if api_available:

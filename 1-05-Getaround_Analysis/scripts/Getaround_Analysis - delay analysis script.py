@@ -701,7 +701,7 @@ the is relevant to the application.
 ## Prepare the dataset
 # load
 raw_df = pd.read_excel('../data/get_around_delay_analysis.xlsx')
-# join pairs of subsequent rentals
+# join pairs of successive rentals
 prev_rental_cols = ['rental_id', 'delay_at_checkout_in_minutes']
 curr_rental_cols = ['previous_ended_rental_id', 'checkin_type', 'state',
                     'time_delta_with_previous_rental_in_minutes']
@@ -739,13 +739,10 @@ def rental_delay_info(dataset: pd.DataFrame,
     """
     info = {}
     for (checkin,), df in dataset.groupby(['checkin_type']):
-        ntot = len(df) # total cars affected, include those with missing values
         df = df.loc[~df['waiting_time'].isna()]
-        
         idx = np.digitize(df['waiting_time'], p_cancel_bins + time_delta)
         cancel_frac = np.sum(p_cancel[checkin][idx]) / len(df)
-        
-        info[checkin+'_n_rentals'] = ntot
+        info[checkin+'_n_rentals'] = len(df)
         info[checkin+'_cancel_frac'] = cancel_frac
 
     return info
@@ -787,7 +784,7 @@ mobile_n_cars = info['mobile_n_rentals']
 ##
 fig6, axs6 = plt.subplots(
     nrows=2, ncols=1, figsize=(6, 6), dpi=200,
-    gridspec_kw={'left': 0.12, 'right': 0.88, 'top': 0.9, 'bottom': 0.08,
+    gridspec_kw={'left': 0.12, 'right': 0.88, 'top': 0.91, 'bottom': 0.08,
                  'hspace': 0.28})
 axs6_twin = [ax.twinx() for ax in axs6]
 fig6.suptitle('Figure 6: Effect of the rental delay on cancellations', x=0.02, ha='left')
@@ -838,6 +835,7 @@ axs6[1].legend(handles=[l0, l1], labels=labels,
 plt.show()
 
 """
+!!! update
 Figure 6 presents the rental cancellation fraction as a function of the delay
 introduced between two consecutive rentals for both mobile checkin (top panel)
 and Getaround connect checkin (bottom panel). The dashed black line represents
