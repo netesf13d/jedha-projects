@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 # %% Loading
@@ -293,7 +292,7 @@ independent of the rental delay.
 
 # %%
 
-"""
+r"""
 ## <a id="eda_rentals"></a> Study of consecutive rentals
 
 We now focus on consecutive rentals. In this section we study how the checkout delay of the
@@ -314,7 +313,7 @@ df2 = df2.assign(is_canceled=(df2['state'] == 'canceled'))
 print(df2.describe(include='all'))
 
 
-"""
+r"""
 ### Cancellation probability vs checkout delay
 
 We now study the rental cancellation probability as a function of the delay
@@ -327,8 +326,7 @@ $$
 """
 
 ## Bseline cancellation probability for consecutive rentals
-p_cancel = df2[['checkin_type', 'is_canceled']].groupby('checkin_type').mean()
-print(p_cancel)
+print(df2[['checkin_type', 'is_canceled']].groupby('checkin_type').mean())
 
 """
 This quantity represents the baseline cancel probability for consecutive rentals or,
@@ -423,11 +421,11 @@ fig3.text(0.53, 0.025, r"Checkout delay $t$ (min)",
 
 plt.show()
 
-"""
+r"""
 Figure 3 presents the cumulative probability of rental cancellation,
-\mathrm{Prob}\, \left(\mathrm{cancel} \,|\, T \geq \tau \right), for both
-checkin methods. The points at large negative delay $\tau$ correspond (up to fluctuations)
-to the baseline cancellation probability. The curve is roughly constant until $\tau$
+$\mathrm{Prob}\, \left(\mathrm{cancel} \,|\, T \geq t \right)$, for both
+checkin methods. The points at large negative delay $t$ correspond (up to fluctuations)
+to the baseline cancellation probability. The curve is roughly constant until $t$
 becomes positive. At this point, events with large checkout delay start
 to contribute, and we observe a rise in cancellation probability
 for both checkin methods.
@@ -461,8 +459,7 @@ df2 = df2.assign(waiting_time_in_minutes=waiting_time)
 df2['waiting_time_in_minutes'].describe()
 
 """
-Most waiting times are negative, meaning that customers do not have to wait for
-their car.
+Most waiting times are negative, meaning that customers do not have to wait for their car.
 """
 
 #%%
@@ -521,7 +518,7 @@ ax4.text(0.21, 0.69,
 
 plt.show()
 
-"""
+r"""
 Figure 4 presents graphs of the rental cancellation probability
 $\mathrm{Prob}\, \left(\mathrm{cancel} \,|\, T_{\mathrm{wait}} \geq t \right)$
 when the waiting time is larger than a time $t$. The light band around the curve represent the uncertainty
@@ -547,16 +544,23 @@ It would be difficult to completely analyze the impact on revenues with the data
 (in particular we don't know about Getaround rental pricing policy). We will therefore 
 limit ourselves to the estimation of the number of cancellations avoided by a given rental delay $\Delta t$.
 
-The number of cancellations 
-!!!
-$\rho_{\mathrm{cancel}} (t)$ is the cancellation probability *density* at a waiting time $t$
-
+We posit that the waiting time is the sole determinant of rental cancellations, and that user behavior is not affected by
+the introduction of the rental delay. Under those hypotheses, with a rental delay $\Delta t$, the initial
+waiting time $t$ of a user becomes $t - \Delta t$. The probability of cancellation is evaluated at this shifted time.
+On the other hand, the car checkout time has not changed and still corresponds to the original waiting time $t$.
+The number of cancellations, n_{\mathrm{cancel}}(\Delta t), can therefore be written:
 $$
-    n_{\mathrm{cancel}}(\Delta t) = \int_{-\infty}^{\infty} p_{\mathrm{cancel}} (t - \Delta t) n_{\mathrm{wait}}(t) \mathrm{d}t
+    n_{\mathrm{cancel}}(\Delta t) = \int_{-\infty}^{\infty} p_{\mathrm{cancel}} (t - \Delta t) \, n_{\mathrm{wait}}(t) \, \mathrm{d}t,
 $$
+where:
+- $p_{\mathrm{cancel}}(t)$ is the probability of cancellation at a waiting time $t$
+(*not* when the waiting time is *larger* than $t$)
+- $n_{\mathrm{wait}}(t)$ is the density of cars returned with waiting time $t$.
+In the following we take this quantity normalized to unity, so that the number of cars is obtained by
+multiplying with the total number of cars available.
 
 
-### Probability density
+### Determination of the relevant quantities
 
 As we have seen, we now need to estimate *densities* instead of cumulative quantities.
 We do so by estimating the quantities of interest in binned regions (eg computing histograms).
@@ -590,156 +594,296 @@ for (checkin,), df_ in df2.groupby(['checkin_type']):
     pd_waiting_time[checkin] = counts / np.sum(counts)
 
 
+## Baseline cancellation probabilities (waiting time <= 0)
+df_ = df2.loc[df2['waiting_time_in_minutes'] <= 0]
+df_.loc[:, ['checkin_type', 'is_canceled']].groupby('checkin_type').mean()
+
+
 # %%
 ##
 fig5, axs5 = plt.subplots(
     nrows=2, ncols=1, figsize=(6.4, 6), dpi=200,
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.92, 'bottom': 0.08,
-                 'hspace': 0.28})
-fig5.suptitle('Figure 5: !!!', x=0.02, ha='left')
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.925, 'bottom': 0.08,
+                 'hspace': 0.26})
+fig5.suptitle('Figure 5: Waiting time distribution and associated cancellation probability',
+              x=0.02, ha='left')
 
 
 x = 790 # position out of range probabilities
 
-axs5[0].errorbar(time_vals, p_cancel['mobile'][1:-1], std_p_cancel['mobile'][1:-1],
-                       color='tab:blue', marker='o', markersize=4,
-                       label='Mobile checkin')
-axs5[0].errorbar([-x, x], p_cancel['mobile'][[0, -1]], std_p_cancel['mobile'][[0, -1]],
+
+axs5[0].plot(time_vals, pd_waiting_time['mobile'][1:-1],
+             color='tab:blue', marker='o', markersize=4,
+             label='Mobile checkin')
+axs5[0].plot([-x, x], pd_waiting_time['mobile'][[0, -1]],
              color='tab:blue', linestyle='', marker='s', markersize=6)
 
-axs5[0].errorbar(time_vals, p_cancel['connect'][1:-1], std_p_cancel['connect'][1:-1],
-                       color='tab:orange', marker='o', markersize=4,
-                       label='Getaround connect checkin')
-axs5[0].errorbar([-x, x], p_cancel['connect'][[0, -1]], std_p_cancel['connect'][[0, -1]],
+axs5[0].plot(time_vals, pd_waiting_time['connect'][1:-1],
+             color='tab:orange', marker='o', markersize=4,
+             label='Getaround connect checkin')
+axs5[0].plot([-x, x], pd_waiting_time['connect'][[0, -1]],
              color='tab:orange', linestyle='', marker='s', markersize=6)
 
 axs5[0].grid(visible=True, linewidth=0.3)
+axs5[0].grid(visible=True, which='minor', linewidth=0.2)
 axs5[0].set_xlim(-800, 800)
 axs5[0].set_xlabel('Waiting time (min)', fontsize=11)
-axs5[0].set_ylim(-0.01, 1.01)
-axs5[0].set_ylabel("Cancellation probability", fontsize=11, labelpad=7)
-axs5[0].legend(loc=(0.01, 0.67), title='Cancellation probability',
+axs5[0].set_ylim(-0.002, 0.3)
+axs5[0].set_yticks(np.linspace(0, 0.3, 4))
+axs5[0].set_yticks(np.linspace(0.05, 0.25, 3), minor=True)
+axs5[0].set_ylabel("Probability density", fontsize=11, labelpad=7)
+axs5[0].legend(loc=(0.01, 0.67),
+               title=r'Waiting time density $n_{\mathrm{wait}}$',
                title_fontproperties={'weight': 'bold'})
 
 
-axs5[1].plot(time_vals, pd_waiting_time['mobile'][1:-1],
-             color='tab:blue', marker='o', markersize=4,
-             label='Mobile checkin')
-axs5[1].plot([-x, x], pd_waiting_time['mobile'][[0, -1]],
+axs5[1].errorbar(time_vals, p_cancel['mobile'][1:-1], std_p_cancel['mobile'][1:-1],
+                       color='tab:blue', marker='o', markersize=4,
+                       label='Mobile checkin')
+axs5[1].errorbar([-x, x], p_cancel['mobile'][[0, -1]], std_p_cancel['mobile'][[0, -1]],
              color='tab:blue', linestyle='', marker='s', markersize=6)
 
-axs5[1].plot(time_vals, pd_waiting_time['connect'][1:-1],
-             color='tab:orange', marker='o', markersize=4,
-             label='Getaround connect checkin')
-axs5[1].plot([-x, x], pd_waiting_time['connect'][[0, -1]],
+axs5[1].errorbar(time_vals, p_cancel['connect'][1:-1], std_p_cancel['connect'][1:-1],
+                       color='tab:orange', marker='o', markersize=4,
+                       label='Getaround connect checkin')
+axs5[1].errorbar([-x, x], p_cancel['connect'][[0, -1]], std_p_cancel['connect'][[0, -1]],
              color='tab:orange', linestyle='', marker='s', markersize=6)
 
 axs5[1].grid(visible=True, linewidth=0.3)
-axs5[1].grid(visible=True, which='minor', linewidth=0.2)
 axs5[1].set_xlim(-800, 800)
 axs5[1].set_xlabel('Waiting time (min)', fontsize=11)
-axs5[1].set_ylim(-0.002, 0.3)
-axs5[1].set_yticks(np.linspace(0, 0.3, 4))
-axs5[1].set_yticks(np.linspace(0.05, 0.25, 3), minor=True)
-axs5[1].set_ylabel("Probability density", fontsize=11, labelpad=7)
-axs5[1].legend(loc=(0.01, 0.67), title='Waiting time probability density',
+axs5[1].set_ylim(-0.01, 1.01)
+axs5[1].set_ylabel("Cancellation probability", fontsize=11, labelpad=7)
+axs5[1].legend(loc=(0.01, 0.67), 
+               title=r'Cancellation probability $p_{\mathrm{cancel}}$',
                title_fontproperties={'weight': 'bold'})
-
 
 plt.show()
 
 
 """
-We show in figure 5 the cancellation probability in binned waiting time ranges (top panel)
-and the probability density of waiting times (bottom panel) for both checkin methods.
-The bins are 60 min wide, ranging from -750 min to 750 min. The square symbols at the
+We show in figure 5 the probability density of waiting times (top panel)
+the cancellation probability in binned waiting time ranges (bottom panel) for both checkin methods.
+The bins are 60 min wide, ranging from -750 minutes to 750 minutes. The square symbols at the
 plot edges represent the estimation in the intervals outside the bin ranges,
 $]-\infty, 750]$ and $]750, \infty[$. For instance, in the bottom panel,
-7% of the wating times are lower than 750 min.
+7% of the waiting times are less than -750 min
+(that is, the car was returned more than 12h before the next checkin).
 
-We note that positive waiting times are not so frequent.
-Such low amount of data available makes the cancellation
-probability estimation difficult in this domain.
+- The baseline cancellation rate can be estimated by averaging the values for negative waiting times.
+We get 8% and 14% for mobile checkin and getaround connect, respectively. 
+- The waiting times distribution reaches a peak at zero then decrease sharply.
+This indicates that users try as much as possible to return the car on time
+for the next checkin when they are late.
+It therefore seems that users also take into account the next checkin time when returning their car.
+A user may feel more comfortable being late if the next checkin is scheduled much later than
+their expected checkout time. This observed behavior may impair our estimation of
+the number of canellations avoided. Indeed, users could tolerate to return their car with a higher
+checkout delay in response to the introduction of the rental delay feature.
+- Positive waiting times are actually not so frequent. Such low amount of data available makes
+the cancellation probability estimation difficult in this domain.
 """
 
 
 # %%
 """
-### loss of revenue vs delay
+### Effect of the rental delay on the number of cancellations
 
-!!!
-For the sake of completeness, we repeat here the whole data treatment leading
-to the number of avoided cancellations.
+We finally evaluate the impact of the proposed rental delay on the number
+of cancellations. The code below adapts the analysis of the previous section
+to handle the low amount of data available in some ranges of waiting time.
+
+For the sake of completeness, we repeat here the whole data treatment process
+the is relevant to the application.
 """
 
 
-## Get an estimation of the average rental prices
-df_ = pd.read_csv('../data/get_around_pricing_project.csv')
-loc = df_['has_getaround_connect']
-rental_price = {'mobile': df_['rental_price_per_day'].mean(),
-                'connect': df_.loc[loc]['rental_price_per_day'].mean()}
-
-
-
-## Probability density estimation bins and center values
-time_bins = np.linspace(-750, 750, 26)
-# time_bins = np.concatenate([np.linspace(-750, -210, 10),
-#                             np.linspace(-180, 180, 13),
-#                             np.linspace(210, 750, 10)])
-
-time_vals = (time_bins[1:] + time_bins[:-1]) / 2
-
-## Probabilities
-p_cancel = {} # cancellation probability
-std_p_cancel = {} # std dev estimate of cancellation probability
-pd_waiting_time = {} # waiting time probability density
-for (checkin,), df_ in df2.groupby(['checkin_type']):
-    # the two extremal points correspond to values outside the bins
-    prob = np.zeros(len(time_vals)+2, dtype=float)
-    std_prob = np.zeros(len(time_vals)+2, dtype=float)
-    counts = np.zeros(len(time_vals)+2, dtype=int)
-
-    df_ = df_.loc[~df_['waiting_time_in_minutes'].isna()]
-    idx = np.digitize(df_['waiting_time_in_minutes'], time_bins)
-    for i in range(len(time_bins) + 1):
-        temp = df_.iloc[idx == i]['is_canceled']
-        counts[i] = temp.count()
-        prob[i] = temp.mean()
-        std_prob[i] = prob[i]*(1-prob[i]) / np.sqrt(counts[i])
-
-    p_cancel[checkin] = prob
-    std_p_cancel[checkin] = std_prob
-    pd_waiting_time[checkin] = counts / np.sum(counts)
-
-
-
-
-## Construct the dataframe for revenue loss estimation
+## Prepare the dataset
+# load
+raw_df = pd.read_excel('../data/get_around_delay_analysis.xlsx')
+# join pairs of subsequent rentals
 prev_rental_cols = ['rental_id', 'delay_at_checkout_in_minutes']
 curr_rental_cols = ['previous_ended_rental_id', 'checkin_type', 'state',
                     'time_delta_with_previous_rental_in_minutes']
-df_prev = df.loc[:, prev_rental_cols]
-df_curr = df.loc[:, curr_rental_cols]
-df_loss = pd.merge(df_prev, df_curr, how='inner', left_on='rental_id',
-                   right_on='previous_ended_rental_id')
-df_loss = df_loss.assign(is_canceled=(df_loss['state'] == 'canceled'))
+df = pd.merge(raw_df.loc[:, prev_rental_cols], raw_df.loc[:, curr_rental_cols],
+              how='inner', left_on='rental_id',
+              right_on='previous_ended_rental_id')
+df = df.assign(is_canceled=(df['state'] == 'canceled'))
+# compute waiting time
+waiting_time = (df['delay_at_checkout_in_minutes']
+                - df['time_delta_with_previous_rental_in_minutes'])
+df = df.assign(waiting_time=waiting_time)
 
 
-def revenue_loss(delay: float):
-    # TODO
+# %%
+
+##
+def rental_delay_info(dataset: pd.DataFrame,
+                      time_delta: float,
+                      p_cancel: dict[str, np.ndarray],
+                      p_cancel_bins: np.ndarray)-> dict[str, float]:
+    """
+    Estimate the impact of the introduction of a rental delay `time_delta` on
+    the number of rental cancellations, for both checkin methods.
+    
+    The computation requires an estimate of the cancellation probability in
+    contiguous time intervals. `time_delta` is expressed in minutes.
+    
+    The function returns a dict[str, float] with entries
+    - '<checkin>_n_rentals': the total number of rentals using the given <checkin>
+      method that are potentially affected by the rental delay.
+    - '<checkin>_cancel_frac': the estimated fraction of rental cancellations
+      for the given <checkin> method. This estimate includes the baseline
+      cancellation rate. It should be multiplied by the estimated cancel
+      fraction to get an estimate of the actual number of cancellations.
+    """
     info = {}
-    for (scope,), df_ in df_loss.groupby('checkin_type'):
-        loc = (df_['delay_at_checkout_in_minutes'] >= delay)
-
-        p = df_.loc[loc, 'is_canceled'].mean()
-        n = df_.loc[loc].sum()
-        info[scope] = {
-            'cancel_prob': p,
-            'cancel_nb': n*p,
-            'revenue_loss': n*(1-p) * rental_price[scope],
-            'revenue_loss_per_car': (1-p) * rental_price[scope],
-            }
+    for (checkin,), df in dataset.groupby(['checkin_type']):
+        ntot = len(df) # total cars affected, include those with missing values
+        df = df.loc[~df['waiting_time'].isna()]
+        
+        idx = np.digitize(df['waiting_time'], p_cancel_bins + time_delta)
+        cancel_frac = np.sum(p_cancel[checkin][idx]) / len(df)
+        
+        info[checkin+'_n_rentals'] = ntot
+        info[checkin+'_cancel_frac'] = cancel_frac
 
     return info
+
+## Cancellation probability estimation
+p_cancel_bins = np.linspace(-15, 225, 5)
+p_cancel = {}
+p0_cancel = {} # baseline cancellation proba
+
+for (checkin,), df_ in df.groupby(['checkin_type']):
+    df_ = df_.loc[~df_['waiting_time'].isna()]
+
+    p0_cancel[checkin] = df_['is_canceled'].mean()
+
+    prob = np.zeros(len(p_cancel_bins)+1, dtype=float)
+    idx = np.digitize(df_['waiting_time'], p_cancel_bins)
+    for i in range(len(p_cancel_bins)+1):
+        prob[i] = df_.iloc[idx == i]['is_canceled'].mean()
+    p_cancel[checkin] = prob
+
+
+##
+time_delta = 120 # minutes
+rental_delay_info(df, time_delta, p_cancel, p_cancel_bins)
+
+
+## Cars cancellation vs rental delay
+rental_delays = np.linspace(-120, 300, 22)
+connect_cancel_frac = np.zeros_like(rental_delays)
+mobile_cancel_frac = np.zeros_like(rental_delays)
+for i, dt in enumerate(rental_delays):
+    info = rental_delay_info(df, dt, p_cancel, p_cancel_bins)
+    connect_cancel_frac[i] = info['connect_cancel_frac']
+    mobile_cancel_frac[i] = info['mobile_cancel_frac']
+connect_n_cars = info['connect_n_rentals']
+mobile_n_cars = info['mobile_n_rentals']
+
+
+##
+fig6, axs6 = plt.subplots(
+    nrows=2, ncols=1, figsize=(6, 6), dpi=200,
+    gridspec_kw={'left': 0.12, 'right': 0.88, 'top': 0.9, 'bottom': 0.08,
+                 'hspace': 0.28})
+axs6_twin = [ax.twinx() for ax in axs6]
+fig6.suptitle('Figure 6: Effect of the rental delay on cancellations', x=0.02, ha='left')
+
+labels = ['Baseline', 'With rental delay']
+
+
+l0 = axs6[0].axhline(p0_cancel['mobile'], color='k', linestyle='--', linewidth=1)
+l1, = axs6[0].plot(rental_delays, mobile_cancel_frac)
+
+axs6_twin[0].set_ylim(0.08*mobile_n_cars, 0.14*mobile_n_cars)
+axs6_twin[0].set_ylabel('Rental cancellations', rotation=270, labelpad=16)
+
+axs6[0].grid(visible=True, linewidth=0.3)
+axs6[0].grid(visible=True, linewidth=0.2, which='minor')
+axs6[0].set_xlim(-120, 300)
+axs6[0].set_xticks(np.linspace(-120, 300, 8), np.arange(-2, 6))
+axs6[0].set_xticks(np.linspace(-90, 270, 7), minor=True)
+axs6[0].set_xlabel("Rental delay (h)")
+axs6[0].set_ylim(0.08, 0.12)
+axs6[0].set_yticks(np.linspace(0.085, 0.115, 4), minor=True)
+axs6[0].set_ylabel("Rental cancellation fraction")
+axs6[0].legend(handles=[l0, l1], labels=labels,
+               title='Mobile checkin',
+               title_fontproperties={'weight': 'bold'})
+
+
+l0 = axs6[1].axhline(p0_cancel['connect'], color='k', linestyle='--', linewidth=1)
+l1, = axs6[1].plot(rental_delays, connect_cancel_frac, color='tab:orange')
+
+axs6_twin[1].set_ylim(0.14*connect_n_cars, 0.18*connect_n_cars)
+axs6_twin[1].set_ylabel('Rental cancellations', rotation=270, labelpad=16)
+
+axs6[1].grid(visible=True, linewidth=0.3)
+axs6[1].grid(visible=True, linewidth=0.2, which='minor')
+axs6[1].set_xlim(-120, 300)
+axs6[1].set_xticks(np.linspace(-120, 300, 8), np.arange(-2, 6))
+axs6[1].set_xticks(np.linspace(-90, 270, 7), minor=True)
+axs6[1].set_xlabel("Rental delay (h)")
+axs6[1].set_ylim(0.14, 0.18)
+axs6[1].set_yticks(np.linspace(0.145, 0.175, 4), minor=True)
+axs6[1].set_ylabel("Rental cancellation fraction")
+axs6[1].legend(handles=[l0, l1], labels=labels,
+               title='Getaround connect checkin',
+               title_fontproperties={'weight': 'bold'})
+
+
+plt.show()
+
+"""
+Figure 6 presents the rental cancellation fraction as a function of the delay
+introduced between two consecutive rentals for both mobile checkin (top panel)
+and Getaround connect checkin (bottom panel). The dashed black line represents
+the baseline cancellation rate.
+- The cancellation rate increases sharply in the negative rental delay region.
+This corresponds to making the car available before the expected checkout time.
+Our analysis is thus in accordance with the very intuitive fact that doing so
+would create high friction between users and cause an important increase of rental cancellations.
+- The introduction of such delay does not impact rentals using mobile checkin, with a
+cancellation rate that remains constant at around 9%.
+- The introduction of the rental delay decreases significantly the number of cancellations.
+A delay of about 2h leads to an absolute decrease of about 0.7% (4.5% relative).
+This corresponds to 5 to 6 cancellations in the pool of 813 rentals of the dataset.
+"""
+
+# %%
+"""
+## <a id="conclusion"></a> Conclusion and perspectives
+
+We studied the user behavior relative to the delay with expected car checkout time
+and its potential impact on the next user.
+- Checkout delays have a broad distribution. Most are less than 2 hours from the expected value, but
+there is a significant number of large outliers. Very large values are probably due to
+events such as accidents or car breakdowns.
+- The Getaround connect functionality tends to reduce the occurence of such large delays.
+- The downside is that users using the Getaround connect functionality are less tolerant
+to checkout delays. We showed that this is related to the actual user waiting time.
+- The problem is less frequent when users do not use the Getaround functionality.
+This is likely because two consecutive users keep contact with their smartphone and
+can synchronize for any delay.
+
+To circumvent the problem of rental cancellation, it is proposed to introduce a delay between
+the expected checkout time and the car availability for a subsequent rental.
+- We designed a simple model to estimate the number of cancellations avoided, by computing the
+convolution between the waiting time density and the cancellation probability.
+- We determined that rentals using mobile checkin would not benefit from this feature.
+- For Getaround connect checkin, we established that a rental delay of about 2h would be beneficial
+to rental cancellations, with an expected absolute reduction of about 0.7%.
+
+
+Our analysis showed that users tend to take into account the next checkin time
+when returning their car. They tend to return their car later (ie causing a larger checkout delay)
+if they have a good margin.
+The proposed introduction of a rental delay may therefore not be as efficient as predicted.
+Other approaches are possible to circumvent this problem. For instance the application could show
+to the current driver a checkin time closer to the checkout than what it actually is.
+"""
 
 

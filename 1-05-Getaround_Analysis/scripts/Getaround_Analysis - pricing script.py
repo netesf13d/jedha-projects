@@ -673,8 +673,8 @@ evaluation_df.iloc[3] = eval_metrics(y_test, y_pred_test)
 print(evaluation_df)
 
 """
-The gradient boosting model is significantly more performant than the simple ridge model.
+The gradient boosting model is more performant than the simple ridge model.
 However, overfitting is still present, and even worse than for ridge regression.
-Nevertheless, we note that the test set metrics are quite close
+Nevertheless, the test set metrics are quite close
 to those obtained by cross-validation (see figure 6).
 """
