@@ -20,7 +20,7 @@ df
 
 print(df.describe(include='all'))
 
-"""
+r"""
 The dataset contains 21310 observations, each consisting of data pertaining to a car rental event.
 The dataset has 7 columns:
 - The column `car_id` refers to the car that was rented. In the absence of further information, it is of no use to us.
@@ -328,7 +328,7 @@ $$
 ## Bseline cancellation probability for consecutive rentals
 print(df2[['checkin_type', 'is_canceled']].groupby('checkin_type').mean())
 
-"""
+r"""
 This quantity represents the baseline cancel probability for consecutive rentals or,
 with the previous expression, $\mathrm{Prob}\left(\mathrm{cancel} | \tau \geq -\infty \right)$.
 The value is still larger for Getaround connect (16%) than for mobile checkin (9%).
@@ -834,8 +834,7 @@ axs6[1].legend(handles=[l0, l1], labels=labels,
 
 plt.show()
 
-"""
-!!! update
+r"""
 Figure 6 presents the rental cancellation fraction as a function of the delay
 introduced between two consecutive rentals for both mobile checkin (top panel)
 and Getaround connect checkin (bottom panel). The dashed black line represents
@@ -848,11 +847,11 @@ would create high friction between users and cause an important increase of rent
 cancellation rate that remains constant at around 9%.
 - The introduction of the rental delay decreases significantly the number of cancellations.
 A delay of about 2h leads to an absolute decrease of about 0.7% (4.5% relative).
-This corresponds to 5 to 6 cancellations in the pool of 813 rentals of the dataset.
+This corresponds to 5 to 6 cancellations in the pool of 791 rentals considered here.
 """
 
 # %%
-"""
+r"""
 ## <a id="conclusion"></a> Conclusion and perspectives
 
 We studied the user behavior relative to the delay with expected car checkout time

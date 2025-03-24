@@ -3,10 +3,8 @@
 
 """
 
-import json
-
 import numpy as np
-import pandas as pd
+# import pandas as pd
 # import httpx
 import streamlit as st
 import plotly.graph_objects as go
@@ -28,36 +26,62 @@ RENTAL_DELAYS = np.linspace(-120, 300, 22)
 # 
 # =============================================================================
 
-# def probe_api(api_url: str):
-#     r = httpx.get(f'{api_url}/test', follow_redirects=True)
-#     res = r.raise_for_status().json()
-#     return res
+def rental_delay_chart(rental_delays: np.ndarray,
+                       cancel_rates: np.ndarray,
+                       p0: float, n0: float,
+                       y0: float, y1: float)-> go.Figure:
+    """
+    Produce a plotly Figure displaying the cancellation rate data.
 
-
-# def get_pricing(api_url: str,
-#                 data: dict[str, bool | float | str])-> float:
-#     r = httpx.post(f'{api_url}/predict', follow_redirects=True, data=data)
-#     res = r.raise_for_status().json()
-#     return res
-
-
-
-
-
-
-# =============================================================================
-# 
-# =============================================================================
-
-def build_chart()-> go.Figure:
-    layout = {
-        'height': 700,
-        'xaxis_rangeslider_visible': False,
-    }
-    fig = make_subplots(
-        rows=2, shared_xaxes=True,
-        specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
-    fig.update_layout(layout, overwrite=True)
+    Parameters
+    ----------
+    rental_delays, cancel_rates: np.ndarray
+        Cancellation rate data (x, y).
+    y0, y1 : float
+        y-axis initial range.
+    p0, n0 : float
+        Baseline cancellation probability and number of rental cancellations.
+    """    
+    
+    layout = go.Layout(
+        width=700, height=400,
+        margin=dict(l=60, r=40, t=50, b=40),
+        showlegend=False,
+        xaxis={'title': 'Rental delay (h)',
+               'range': rental_delays[[0, -1]]/60,
+               'gridcolor': '#ccc',
+               'gridwidth': 0.2},
+        yaxis={'title': 'Rental cancellation fraction',
+               'range': [y0, y1],
+               'gridcolor': '#ccc',
+               'gridwidth': 0.2},
+        yaxis2={'title': 'Rental cancellations',
+                'range': [y0*n0/p0, y1*n0/p0],
+                'showgrid': False,
+                'side': 'right'},
+        )
+    
+    hoverdata = np.array([100*cancel_rates, 100*(cancel_rates-p0),
+                          n0/p0*cancel_rates, n0/p0*cancel_rates-n0]).T
+    data_trace = go.Scatter(
+        x=rental_delays/60, y=cancel_rates,
+        customdata=hoverdata,
+        hovertemplate=(
+            'Cancel rate: %{customdata[0]:.2f} %<br>'
+            'Rate difference: %{customdata[1]:.2f} %<br>'
+            'Cancel number: %{customdata[2]:.2f}<br>'
+            'Cancel diff: %{customdata[3]:.2f}<br>'
+            '<extra></extra>'
+        )
+    )
+    
+    baseline_trace = go.Scatter(x=[-1000, 1000], y=[n0, n0], yaxis='y2',
+                                line={'dash': '5, 4', 'color': 'black'})
+    
+    fig = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
+    fig.update_layout(layout)
+    fig.add_trace(data_trace)
+    fig.add_trace(baseline_trace)
     return fig
 
 
@@ -124,46 +148,6 @@ pricing_models = st.session_state['pricing_models']
 categories = st.session_state['categories']
 
 
-# =============================================================================
-# Callbacks
-# =============================================================================
-
-def setup_subplot(fig: go.Figure, chart_type: str, row: int)-> go.Figure:
-    match chart_type:
-        case 'ohlc':
-            d = {'x': [], 'open': [], 'close': [], 'high': [], 'low': []}
-            trace = go.Candlestick(**d, yaxis='y1')
-            # ytitle = ''
-        case 'volume1':
-            trace = go.Bar(x=[], y=[], yaxis='y1')
-        case 'volume2':
-            trace = go.Bar(x=[], y=[], yaxis='y1')
-        case 'trades':
-            trace = go.Bar(x=[], y=[], yaxis='y1')
-        case 'volatility':
-            trace = go.Scatter(x=[], y=[], yaxis='y1')
-        # case '_prob':
-        #     trace = go.Scatter(x=[], y=[])
-        case _:
-            raise ValueError('invalid chart data requested')
-    
-    if row > len(fig.data):
-        fig.add_trace(trace, row=row, col=1, secondary_y=False)
-        # fig.update_layout(yaxis1={'side': 'left'})
-    else:
-        fig.data = []
-        fig.add_trace(trace, row=row, col=1, secondary_y=False)
-        # fig.update_layout(yaxis={'side': 'left'}, overwrite=True)
-
-
-def setup_prob_subplots(fig: go.Figure)-> go.Figure:
-    trace = go.Scatter(x=[], y=[], yaxis='y2')
-    for row in range(1, 3):
-        fig.add_trace(trace, row=row, col=1, secondary_y=True)
-        # fig.update_layout(yaxis2={'title': 'crash prob.', 'side': 'right'},
-        #                   overwrite=True)
-
-
 
 # =============================================================================
 # Application structure
@@ -191,7 +175,7 @@ The dashboard provides:
 st.caption('Data provided by [Jedha](https://jedha.co)')
 
 
-# st.write(cancellation_rates)
+# st.write(cancellation_rates) # test
 
 tab_delay, tab_pricing = st.tabs(['Rental delay analysis', 'Car pricing'])
 
@@ -203,17 +187,26 @@ with tab_delay:
     col_plot, col_table = st.columns([1, 0.5], gap='medium')
     
     with col_plot:
-        # Mobile checkin plot
-        mobile_fig = go.Figure()
-        trace = go.Scatter(x=rental_delays, y=cancel_rates['mobile'])
-        mobile_fig.add_trace(trace)
-        st.plotly_chart(mobile_fig, key='mobile_chart')
         
-        # Getaround connect plot
-        getaround_fig = go.Figure()
-        trace = go.Scatter(x=[-1, 0, 1], y=[1, 0, 1])
-        getaround_fig.add_trace(trace)
-        st.plotly_chart(getaround_fig, key='getaround_chart')
+        ## Mobile checkin plot
+        n0 = delay_info_df.loc['Baseline cancel nb', 'mobile']
+        p0 = delay_info_df.loc['Baseline cancel rate', 'mobile']
+        mobile_fig = rental_delay_chart(
+            rental_delays, cancel_rates['mobile'], p0, n0, 0.08, 0.12)
+        mobile_fig.update_layout(
+            title={'text': 'Mobile checkin', 'y':0.94, 'x':0.5},)
+        st.plotly_chart(mobile_fig, key='mobile_chart', theme=None,
+                        use_container_width=True)
+        
+        ## Getaround connect checkin plot
+        n0 = delay_info_df.loc['Baseline cancel nb', 'connect']
+        p0 = delay_info_df.loc['Baseline cancel rate', 'connect']
+        getaround_fig = rental_delay_chart(
+            rental_delays, cancel_rates['connect'], p0, n0, 0.14, 0.18)
+        getaround_fig.update_layout(
+            title={'text': 'Getaround connect checkin', 'y':0.94, 'x':0.5},)
+        st.plotly_chart(getaround_fig, key='getaround_chart', theme=None,
+                        use_container_width=True)
         
     
     with col_table:

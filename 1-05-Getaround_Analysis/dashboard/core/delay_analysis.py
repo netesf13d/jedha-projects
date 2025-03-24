@@ -79,18 +79,13 @@ def cancel_prob(dataset: pd.DataFrame,
 def _cancel_rate(df: pd.DataFrame,
                  p_cancel: np.ndarray,
                  time_bins: np.ndarray,
-                 time_delta: float,):
+                 time_delta: float)-> float:
     """
-    TODO doc
-
-    Args:
-        df (pd.DataFrame): _description_
-        time_delta (float): _description_
-        p_cancel (dict[str, np.ndarray]): _description_
-        time_bins (np.ndarray): _description_
-
-    Returns:
-        _type_: _description_
+    Estimate the rental cancellation rate at a given rental delay `time_delta`.
+    The function uses `p_cancel`, an estimation of the cancellation probability
+    in the given `time_bins`.
+    
+    The dataset `df` must contain the column 'waiting_time'.
     """
     idx = np.digitize(df['waiting_time'], time_bins + time_delta)
     return np.sum(p_cancel[idx]) / len(df)
@@ -100,16 +95,10 @@ def cancellation_rates(dataset: pd.DataFrame,
                       p_cancel: dict[str, np.ndarray],
                       time_bins: np.ndarray,
                       rental_delays: np.ndarray
-                      )-> dict[str, float | np.ndarray]:
+                      )-> dict[str, np.ndarray]:
     """
-    TODO doc
-
-    Args:
-        dataset (pd.DataFrame): _description_
-        rental_delays (np.ndarray): _description_
-
-    Returns:
-        dict[str, np.ndarray]: _description_
+    Estimate the cancellation rates for both checkin methods at the selected
+    `rental_delays`.
     """
     cancellation_rate = {}
     for (checkin,), df in dataset.groupby(['checkin_type']):
@@ -118,28 +107,13 @@ def cancellation_rates(dataset: pd.DataFrame,
         for i, dt in enumerate(rental_delays):
             cancel_rate[i] = _cancel_rate(df, p_cancel[checkin], time_bins, dt)
         cancellation_rate[checkin] = cancel_rate
-        # cancellation_rate[checkin + '_ntot'] = len(df)
     return cancellation_rate
 
 
 def delay_info_df(dataset: pd.DataFrame)-> pd.DataFrame:
     """
-    TODO doc
-    Estimate the impact of the introduction of a rental delay `time_delta` on
-    the number of rental cancellations, for both checkin methods.
-    
-    The dataset must contain columns 'checkin_type' and 'waiting_time'.
-    
-    The computation requires an estimate of the cancellation probability in
-    contiguous time intervals. `time_delta` is expressed in minutes.
-    
-    The function returns a dict[str, float] with entries
-    - '<checkin>_n_rentals': the total number of rentals using the given <checkin>
-      method that are potentially affected by the rental delay.
-    - '<checkin>_cancel_frac': the estimated fraction of rental cancellations
-      for the given <checkin> method. This estimate includes the baseline
-      cancellation rate. It should be multiplied by the estimated cancel
-      fraction to get an estimate of the actual number of cancellations.
+    Setup the dataframe holding info relative to the rental delay feature.
+    Compute the baselines values which are static.
     """
     info_df = pd.DataFrame(
         np.zeros((7, 3), dtype=float),
@@ -171,22 +145,8 @@ def update_delay_info(dataset: pd.DataFrame,
                       info_df: pd.DataFrame,
                       time_delta: float )-> pd.DataFrame:
     """
-    TODO doc
-    Estimate the impact of the introduction of a rental delay `time_delta` on
-    the number of rental cancellations, for both checkin methods.
-    
-    The dataset must contain columns 'checkin_type' and 'waiting_time'.
-    
-    The computation requires an estimate of the cancellation probability in
-    contiguous time intervals. `time_delta` is expressed in minutes.
-    
-    The function returns a dict[str, float] with entries
-    - '<checkin>_n_rentals': the total number of rentals using the given <checkin>
-      method that are potentially affected by the rental delay.
-    - '<checkin>_cancel_frac': the estimated fraction of rental cancellations
-      for the given <checkin> method. This estimate includes the baseline
-      cancellation rate. It should be multiplied by the estimated cancel
-      fraction to get an estimate of the actual number of cancellations.
+    Update the rental delay info dataframe with estimates at the selected
+    rental delay `time_delta`.
     """
     ## Distinct checkout methods
     for (checkin,), df in dataset.groupby(['checkin_type']):
@@ -197,9 +157,10 @@ def update_delay_info(dataset: pd.DataFrame,
     
     ## Total
     df = dataset.loc[~dataset['waiting_time'].isna()]
-    cancel_frac = _cancel_rate(df, p_cancel[checkin], time_bins, time_delta)
+    cancel_frac = _cancel_rate(df, p_cancel['total'], time_bins, time_delta)
     info_df.loc['Cancel rate', 'total'] = cancel_frac
-    info_df.loc['Cancel nb', 'total'] = len(df) * cancel_frac
+    info_df.loc['Cancel nb', 'total'] = (info_df.loc['Cancel nb', 'mobile']
+                                         +info_df.loc['Cancel nb', 'connect'])
     
     ## Differences
     info_df.loc['Cancel nb diff'] = (info_df.loc['Cancel nb']
