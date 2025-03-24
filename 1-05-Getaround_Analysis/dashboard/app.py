@@ -4,8 +4,7 @@
 """
 
 import numpy as np
-# import pandas as pd
-# import httpx
+import httpx
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -106,31 +105,32 @@ if not 'dataset' in st.session_state:
 
 
 ########## Setup delay analysis session state ##########
-# ## Pricing optimization API available ?
-# if 'api_available' not in st.session_state:
-#     try:
-#         probe_api(API_URL)
-#     except httpx.ConnectError:
-#         st.session_state['api_available'] = False
-#     else:
-#         st.session_state['api_available'] = True
+## Pricing optimization API available ?
+if 'api_available' not in st.session_state:
+    try:
+        probe_api(API_URL)
+    except httpx.ConnectError:
+        st.session_state['api_available'] = False
+    else:
+        st.session_state['api_available'] = True
+api_available = st.session_state['api_available']
 
-# ## If the API is available, get available models
-# if api_available and not 'pricing_models' in st.session_state:
-#     st.session_state['pricing_models'] = get_models(API_URL)
+## If the API is available, get available models
+if api_available and not 'pricing_models' in st.session_state:
+    st.session_state['pricing_models'] = get_models(API_URL)
 
-# ## If the API is available, get categorical variables info
-# if api_available and not 'categories' in st.session_state:
-#     st.session_state['categories'] = get_categories(API_URL)
-
-
+## If the API is available, get categorical variables info
+if api_available and not 'categories' in st.session_state:
+    st.session_state['categories'] = get_categories(API_URL)
 
 
-st.session_state['pricing_models'] = ['ridge', 'SVM']
-st.session_state['categories'] = {'model_key': ['a', 'b'],
-                                  'fuel': ['a', 'b'],
-                                  'paint_color': ['a', 'b'],
-                                  'car_type': ['a', 'b']}
+
+
+# st.session_state['pricing_models'] = ['ridge', 'SVM']
+# st.session_state['categories'] = {'model_key': ['a', 'b'],
+#                                   'fuel': ['a', 'b'],
+#                                   'paint_color': ['a', 'b'],
+#                                   'car_type': ['a', 'b']}
 
 ## Delay analysis data
 df = st.session_state['dataset']
@@ -142,8 +142,6 @@ delay_info_df = st.session_state['delay_info_df']
 
 
 ## Pricing optimization
-# api_available = st.session_state['api_available']
-api_available = True
 pricing_models = st.session_state['pricing_models']
 categories = st.session_state['categories']
 
@@ -239,7 +237,7 @@ with tab_pricing:
                              key='paint', disabled=not api_available)
 
     # Boolean variables
-    cols_bool = st.columns(6, gap='medium')
+    cols_bool = st.columns(7, gap='medium')
     with cols_bool[0]:
         private_parking = st.checkbox('Private parking', value=False,
                                      disabled=not api_available)
@@ -249,12 +247,15 @@ with tab_pricing:
         air_conditioning = st.checkbox('Air conditioning', value=False,
                                        disabled=not api_available)
     with cols_bool[3]:
+        automatic_car = st.checkbox('Automatic car', value=False,
+                                    disabled=not api_available)
+    with cols_bool[4]:
         getaround_connect = st.checkbox('Getaround connect', value=False,
                                         disabled=not api_available)
-    with cols_bool[4]:
+    with cols_bool[5]:
         speed_regulator = st.checkbox('Speed regulator', value=False,
                                       disabled=not api_available)
-    with cols_bool[5]:
+    with cols_bool[6]:
         winter_tires = st.checkbox('Winter tires', value=False,
                                    disabled=not api_available)
     
@@ -297,38 +298,3 @@ if api_available:
     with rental_price_container:
         st.html(f'<p style="font-size:20px;">Recomended price : {1}</p>')
 
-
-# # while True:
-# for container, text in zip(summary_containers, msummary.render_summary()):
-#     with container:
-#         st.markdown(text)
-
-
-# with chart_container:
-#     if mcharts.update_flag:
-#         mcharts.update()
-#         mcharts.set_flag(False)
-#     mcharts.update_chart(chart, chart_options[top_chart], row=1)
-#     mcharts.update_chart(chart, chart_options[bottom_chart], row=2)
-    
-#     if ccp_available and mcrashes.update_flag:
-#         mcrashes.update(since=mcharts.t0)
-#         mcrashes.set_flag(False)
-#     if display_crashes:
-#         mcrashes.add_events(chart)
-#     if display_crash_prob:
-#         mcrashes.add_prob(chart)
-    
-#     st.plotly_chart(chart)
-
-
-# spread_str, order_book = morderbook.render_order_book()
-# with table_orderbook:
-#     with st.container():
-#         st.html(order_book)
-#         st.markdown(spread_str)
-# with table_trades:
-#     mtrades.update()
-#     st.dataframe(mtrades.render_trades(), width=400, hide_index=True,
-#                  column_config=trades_col_config)
-    

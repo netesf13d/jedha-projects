@@ -5,7 +5,8 @@
 
 from contextlib import asynccontextmanager
 
-import mlflow
+# import mlflow
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 
@@ -55,8 +56,10 @@ from fastapi.staticfiles import StaticFiles
 # ridge_model = Pipeline([('column_preprocessing', col_preproc),
 #                         ('regressor', Ridge())])
 
-
-models = {'ridge': lambda x: 100., 'SVM': lambda x: 100.}
+class DummyModel:
+    def predict(self, c):
+        return np.arange(2)
+models = {'ridge': DummyModel(), 'SVM': DummyModel()}
 
 
 class PredictionFeatures(BaseModel):
@@ -135,28 +138,22 @@ async def test()-> int:
     return 1
 
 
-@app.get('/features', tags=['Test'])
+
+@app.get('/models', tags=['Model info'])
 async def get_car_models()-> dict[str, str]:
     """
     
     """
-    return 
+    return {'ridge': 'ridge'}
 
 
-@app.get('/categories', tags=['Test'])
+@app.get('/categories', tags=['Model info'])
 async def get_categories()-> dict[str, list[str]]:
     """
     
     """
-    return ['a']
+    return {'model_key': ['a']}
 
-
-@app.get('/car_models', tags=['Test'])
-async def get_car_models()-> list[str]:
-    """
-    
-    """
-    return ['a']
 
 
 # @app.post('/predict', tags=['Machine Learning'])
@@ -173,7 +170,9 @@ async def predict(data: PredictionFeatures): #, model: str):
     Return optimal rental price.
     """
     model = 'ridge'
-    input_features = pd.DataFrame(dict(data))
+    # input_features = pd.DataFrame(dict(data))
+    input_features = 'a'
+    print('wow')
 
     # model = mlflow.pyfunc.load_model(CURR_MODEL)
     try:
