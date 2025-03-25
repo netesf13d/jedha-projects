@@ -35,6 +35,11 @@ in the csv file `get_around_pricing_project.csv`.
 df = pd.read_csv('../data/get_around_pricing_project.csv')
 df = df.drop('Unnamed: 0', axis=1)
 
+## cast the quantitative variable to float, for better handling of missing values
+df = df.astype({'mileage': float,
+                'engine_power': float,
+                'rental_price_per_day': float})
+
 print(df.describe(include='all'))
 
 r"""

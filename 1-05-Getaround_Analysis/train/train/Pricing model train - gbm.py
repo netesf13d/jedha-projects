@@ -56,6 +56,9 @@ def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
 ## Load and prepare data
 df = pd.read_csv('./data/get_around_pricing_project.csv')
 df = df.drop('Unnamed: 0', axis=1)
+df = df.astype({'mileage': float,
+                'engine_power': float,
+                'rental_price_per_day': float})
 
 ## Remove outliers
 q1, q2 = 0.25, 0.75

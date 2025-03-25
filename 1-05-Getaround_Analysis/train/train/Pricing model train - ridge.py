@@ -7,11 +7,12 @@ The model is monitored and saved with MLFlow.
 import os
 
 import mlflow
-import numpy as np
+# import numpy as np
 import pandas as pd
 
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (mean_squared_error,
+                             root_mean_squared_error,
                              r2_score,
                              mean_absolute_error,
                              mean_absolute_percentage_error)
@@ -23,34 +24,36 @@ from sklearn.preprocessing import (OneHotEncoder,
 from sklearn.linear_model import Ridge
 
 
+
+
+
+
+## Setup environment variables
+S3_WRITER_ACCESS_KEYS = './certification-project-s3-writer_accessKeys.key'
+with open(S3_WRITER_ACCESS_KEYS, 'rt', encoding='utf-8') as f:
+    id_, key_ = f.readlines()[-1].strip().split(',')
+os.environ["AWS_ACCESS_KEY_ID"] = id_
+os.environ["AWS_SECRET_ACCESS_KEY"] = key_
+
+tracking_uri = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+
+
+
+
 # Set your variables for your environment
-EXPERIMENT_NAME = 'car-pricing-ridge-model'
-# APP_URI = 'http://localhost:7860'
+# # EXPERIMENT_NAME = 'car-pricing-ridge-model'
+# os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
 
-print(os.environ['MLFLOW_TRACKING_URI'])
+# print(os.environ['MLFLOW_TRACKING_URI'])
 
-mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
-mlflow.set_experiment(EXPERIMENT_NAME)
-experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
-mlflow.sklearn.autolog()
+mlflow.set_tracking_uri(tracking_uri) # os.environ['MLFLOW_TRACKING_URI'])
+experiment = mlflow.set_experiment('car-pricing-ridge-model')
+mlflow.set_experiment_tag('ridge', 'Ridge regression')
+# experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+mlflow.autolog(disable=True)
 
-print('go')
+# print('go')
 
-# =============================================================================
-# 
-# =============================================================================
-
-## setup evaluation metrics
-def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
-    """
-    Helper function that evaluates the relevant evaluation metrics:
-        MSE, RMSE, R-squared, MAE, MAPE
-    """
-    mse = mean_squared_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
-    mape = 100 * mean_absolute_percentage_error(y_true, y_pred)
-    return mse, np.sqrt(mse), r2, mae, mape
 
 
 # =============================================================================
@@ -60,6 +63,10 @@ def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
 ## Load and prepare data
 df = pd.read_csv('./get_around_pricing_project.csv')
 df = df.drop('Unnamed: 0', axis=1)
+df = df.astype({'mileage': float,
+                'engine_power': float,
+                'rental_price_per_day': float})
+
 
 ## Remove outliers
 q1, q2 = 0.25, 0.75
@@ -96,27 +103,32 @@ col_preproc = ColumnTransformer(
 with mlflow.start_run(experiment_id = experiment.experiment_id):
     ## full pipeline
     alpha = 1e2
-    ridge_model = Pipeline([('column_preprocessing', col_preproc),
-                            ('regressor', Ridge(alpha=alpha))])
+    model = Pipeline([('column_preprocessing', col_preproc),
+                      ('regressor', Ridge(alpha=alpha))])
     
     ## Fit
-    ridge_model.fit(X_tr, y_tr)
+    model.fit(X_tr, y_tr)
     
+    ## Log model
+    mlflow.log_param('alpha', alpha)
+    mlflow.sklearn.log_model(model, 'ridge',
+                             registered_model_name='ridge-regression',
+                             input_example=df.iloc[[0], :-1])
     
-    ## evaluate of train set
-    y_pred_tr = ridge_model.predict(X_tr)
-    tr_mse = mean_squared_error(y_tr, y_pred_tr)
-    tr_rmse = mean_squared_error(y_tr, y_pred_tr)
-    tr_r2 = r2_score(y_tr, y_pred_tr)
-    tr_mae = mean_absolute_error(y_tr, y_pred_tr)
-    tr_mape = 100 * mean_absolute_percentage_error(y_tr, y_pred_tr)
-    # tr_metrics = eval_metrics(y_tr, y_pred_tr)
+    ## Evaluate of train set
+    y_pred_tr = model.predict(X_tr)
+    mlflow.log_metric('train-mse', mean_squared_error(y_tr, y_pred_tr))
+    mlflow.log_metric('train-rmse', root_mean_squared_error(y_tr, y_pred_tr))
+    mlflow.log_metric('train-r-squared', r2_score(y_tr, y_pred_tr))
+    mlflow.log_metric('train-mae', mean_absolute_error(y_tr, y_pred_tr))
+    mlflow.log_metric('train-mape',
+                      100*mean_absolute_percentage_error(y_tr, y_pred_tr))
     
-    ## evaluate on test set
-    y_pred_test = ridge_model.predict(X_test)
-    test_mse = mean_squared_error(y_test, y_pred_test)
-    test_rmse = mean_squared_error(y_test, y_pred_test)
-    test_r2 = r2_score(y_test, y_pred_test)
-    test_mae = mean_absolute_error(y_test, y_pred_test)
-    test_mape = 100 * mean_absolute_percentage_error(y_test, y_pred_test)
-    # test_metrics = eval_metrics(y_test, y_pred_test)
+    ## Evaluate on test set
+    y_pred_test = model.predict(X_test)
+    mlflow.log_metric('test-mse', mean_squared_error(y_test, y_pred_test))
+    mlflow.log_metric('test-rmse', root_mean_squared_error(y_test, y_pred_test))
+    mlflow.log_metric('test-r-squared', r2_score(y_test, y_pred_test))
+    mlflow.log_metric('test-mae', mean_absolute_error(y_test, y_pred_test))
+    mlflow.log_metric('test-mape',
+                      100*mean_absolute_percentage_error(y_test, y_pred_test))

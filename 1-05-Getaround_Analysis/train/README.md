@@ -1,6 +1,6 @@
 ---
 title: Getaround project pricing model training
-emoji: \U0001f697
+emoji: 🚗
 colorFrom: pink
 colorTo: purple
 sdk: docker

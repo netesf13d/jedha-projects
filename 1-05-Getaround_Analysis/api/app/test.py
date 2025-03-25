@@ -8,6 +8,8 @@ import sys
 import requests
 
 
+# import mlflow
+
 # =============================================================================
 # 
 # =============================================================================
@@ -55,29 +57,71 @@ def test_predict(data: list, model: str, url: str = 'http://localhost:8000'):
     return 1
 
 
-d = {'model_key': 'Audi',
-     'mileage': 132979,
-     'engine_power': 112,
-     'fuel': 'diesel',
-     'paint_color': 'brown',
-     'car_type': 'estate',
-     'private_parking_available': True,
-     'has_gps': True,
-     'has_air_conditioning': False,
-     'automatic_car': False,
-     'has_getaround_connect': True,
-     'has_speed_regulator': True,
-     'winter_tires': True}
-r = requests.post("http://localhost:8000/predict", json={'data': d})
+# d = {'model_key': 'Audi',
+#      'mileage': 132979,
+#      'engine_power': 112,
+#      'fuel': 'diesel',
+#      'paint_color': 'brown',
+#      'car_type': 'estate',
+#      'private_parking_available': True,
+#      'has_gps': True,
+#      'has_air_conditioning': False,
+#      'automatic_car': False,
+#      'has_getaround_connect': True,
+#      'has_speed_regulator': True,
+#      'winter_tires': True}
+# r = requests.post("http://localhost:8000/predict", json={'data': d})
+
+tracking_uri = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+
+# data = {'max_results': 10}
+# r = requests.post(uri + 'api/2.0/mlflow/experiments/search', json=data)
+
+# data = {'experiments_ids': [0, 1]}
+# r = requests.post(uri + 'api/2.0/mlflow/runs/search', json=data)
+
+from mlflow import MlflowClient
+
+client = MlflowClient(tracking_uri)
+
+
+models = client.search_registered_models()
+
+
+# # %%
+# experiments = [expt for expt in client.search_experiments()
+#                if expt.name != 'Default']
+
+# experiment_ids = [expt.experiment_id for expt in experiments]
+
+# # %%
+
+# runs = [client.search_runs([expt_id])[0] # ], order_by='metrics.r2 DESC')[0]
+#         for expt_id in experiment_ids]
+
+# run_ids = [run.info.run_id for run in runs]
 
 
 
-if __name__ == '__main__':
-    addr = 'http://localhost:8000'
+
+# mlflow.set_tracking_uri()
+
+
+# all_runs = mlflow.search_runs(search_all_experiments=True)
+
+
+
+
+# logged_model = 'runs:/c09d09ef14e546b08f2f339d2c966da6/salary_estimator' 
+# model = mlflow.pyfunc.load_model(logged_model)
+
+
+# if __name__ == '__main__':
+#     addr = 'http://localhost:8000'
     
-    print('Probe API:', bool(probe_api(addr)))
-    print('GET models:', bool(res:=test_get_pricing_models(addr)), res)
-    print('GET categories:', bool(res:=test_get_categories(addr)), res)
+#     print('Probe API:', bool(probe_api(addr)))
+#     print('GET models:', bool(res:=test_get_pricing_models(addr)), res)
+#     print('GET categories:', bool(res:=test_get_categories(addr)), res)
     
 
     # data = ['Audi', 132979, 112, 'diesel', 'brown', 'estate',
