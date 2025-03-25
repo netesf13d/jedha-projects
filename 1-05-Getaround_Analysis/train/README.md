@@ -15,9 +15,40 @@ T
 
 ## Contents
 
+## Setup external ressources
+
+To run the code, some resources must be created:
+- A [S3 bucket](https://aws.amazon.com/s3/) as a data lake to store the collected data.
+- An [AWS](https://aws.amazon.com/) user with `AmazonS3FullAccess` policy attached.
+- A [Neon](https://neon.tech) database.
+
 
 
 ## MLFlow tracking server deployment
+
+### Local deployment
+
+Create a file `secrets.sh`:
+```
+export MLFLOW_TRACKING_URI="http://localhost:7860"
+export AWS_ACCESS_KEY_ID="AKIA****************"
+export AWS_SECRET_ACCESS_KEY="****************************************"
+export BACKEND_STORE_URI="{dialect}+{driver}://{user}:{password}@{hostname}:{port}/{database-name}?sslmode=require"
+export ARTIFACT_STORE_URI="s3://{bucket-name}""https://mlflow-artifact-store-1-05-getaround.s3.eu-west-3.amazonaws.com"
+```
+
+Set the environment variables 
+```bash
+source secrets.sh
+```
+
+Run the MLFlow server
+```bash
+mlflow server --host 0.0.0.0 --port 7860 --backend-store-uri $BACKEND_STORE_URI --default-artifact-root $ARTIFACT_STORE_URI
+```
+
+
+### Cloud deployment
 
 The tracking server is deployed in an Huggingface space.
 

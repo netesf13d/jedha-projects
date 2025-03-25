@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Script to train a gradient boosting model for car rental pricing optimization.
+Script to train a ridge regression model for car rental pricing optimization.
 The model is monitored and saved with MLFlow.
 """
 
@@ -20,17 +20,21 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.linear_model import Ridge
 
 
 # Set your variables for your environment
-EXPERIMENT_NAME = 'car-pricing-gradient-boosting-model'
+EXPERIMENT_NAME = 'car-pricing-ridge-model'
+# APP_URI = 'http://localhost:7860'
 
-mlflow.set_tracking_uri(os.environ["APP_URI"])
+print(os.environ['MLFLOW_TRACKING_URI'])
+
+mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
 mlflow.set_experiment(EXPERIMENT_NAME)
 experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
 mlflow.sklearn.autolog()
 
+print('go')
 
 # =============================================================================
 # 
@@ -54,7 +58,7 @@ def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
 # =============================================================================
 
 ## Load and prepare data
-df = pd.read_csv('./data/get_around_pricing_project.csv')
+df = pd.read_csv('./get_around_pricing_project.csv')
 df = df.drop('Unnamed: 0', axis=1)
 
 ## Remove outliers
@@ -91,18 +95,16 @@ col_preproc = ColumnTransformer(
 
 with mlflow.start_run(experiment_id = experiment.experiment_id):
     ## full pipeline
-    nest = 500
-    gb_model = Pipeline(
-        [('column_preprocessing', col_preproc),
-         ('regressor', GradientBoostingRegressor(n_estimators=nest, random_state=1234))]
-    )
+    alpha = 1e2
+    ridge_model = Pipeline([('column_preprocessing', col_preproc),
+                            ('regressor', Ridge(alpha=alpha))])
     
     ## Fit
-    gb_model.fit(X_tr, y_tr)
+    ridge_model.fit(X_tr, y_tr)
     
     
     ## evaluate of train set
-    y_pred_tr = gb_model.predict(X_tr)
+    y_pred_tr = ridge_model.predict(X_tr)
     tr_mse = mean_squared_error(y_tr, y_pred_tr)
     tr_rmse = mean_squared_error(y_tr, y_pred_tr)
     tr_r2 = r2_score(y_tr, y_pred_tr)
@@ -111,7 +113,7 @@ with mlflow.start_run(experiment_id = experiment.experiment_id):
     # tr_metrics = eval_metrics(y_tr, y_pred_tr)
     
     ## evaluate on test set
-    y_pred_test = gb_model.predict(X_test)
+    y_pred_test = ridge_model.predict(X_test)
     test_mse = mean_squared_error(y_test, y_pred_test)
     test_rmse = mean_squared_error(y_test, y_pred_test)
     test_r2 = r2_score(y_test, y_pred_test)
