@@ -10,7 +10,7 @@
 ### Local deployment
 
 ```bash
-$ streamlit run app.py --server.address localhost --server.port 5000
+streamlit run app.py --server.address localhost --server.port 5000
 ```
 
 ### Deployment on Huggingface

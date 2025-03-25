@@ -9,7 +9,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from core import (probe_api, get_models, get_categories, get_pricing,
+from core import (probe_api, get_pricing_models, get_categories, get_pricing,
                   prepare_dataset, cancel_prob, cancellation_rates,
                   delay_info_df, update_delay_info)
 
@@ -117,7 +117,7 @@ api_available = st.session_state['api_available']
 
 ## If the API is available, get available models
 if api_available and not 'pricing_models' in st.session_state:
-    st.session_state['pricing_models'] = get_models(API_URL)
+    st.session_state['pricing_models'] = get_pricing_models(API_URL)
 
 ## If the API is available, get categorical variables info
 if api_available and not 'categories' in st.session_state:
@@ -215,7 +215,7 @@ with tab_delay:
         # Rental delay summary table
         delay_info_container = st.empty()
 
-    
+
 
 ########## Car pricing tab tab ##########
 with tab_pricing:
@@ -282,15 +282,13 @@ with tab_pricing:
 
 
 # =============================================================================
-# 
+# Dynamically changing content
 # =============================================================================
 
 with delay_info_container:
     delay_info_df = update_delay_info(df, p_cancel, time_bins,
                                       delay_info_df, rental_delay)
     delay_info_table = st.table(delay_info_df)
-
-
 
 if api_available:
     data = {}

@@ -139,8 +139,8 @@ async def test()-> int:
 
 
 
-@app.get('/models', tags=['Model info'])
-async def get_car_models()-> dict[str, str]:
+@app.get('/pricing_models', tags=['Model info'])
+async def get_pricing_models()-> dict[str, str]:
     """
     
     """

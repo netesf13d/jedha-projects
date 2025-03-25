@@ -356,6 +356,12 @@ for (checkin,), df_ in df2.groupby(['checkin_type']):
     cancel_prob_std[checkin] = prob_std
 
 
+pc_mob = cancel_prob['mobile']
+pc_conn = cancel_prob['connect']
+std_pc_mob = cancel_prob_std['mobile']
+std_pc_conn = cancel_prob_std['connect']
+
+
 ##
 fig3, axs3 = plt.subplots(
     nrows=1, ncols=2, sharey=True, figsize=(6, 3.8), dpi=200,
@@ -374,14 +380,19 @@ axs3[1].plot([0, 0], [0, 1], transform=axs3[1].transAxes,
              marker=[(-0.4, -1), (0.4, 1)], markersize=10, linestyle='',
              color='k', mec='k', mew=1, clip_on=False)
 axs3[1].tick_params(axis='y', labelleft=False, left=False, which='both')
-ms = 5
 
-eb0 = axs3[0].errorbar(delay_vals_pos, cancel_prob['mobile'][20::-1],
-                       yerr=cancel_prob_std['mobile'][20::-1],
-                       linestyle='-', marker='o', markersize=ms, color='tab:blue')
-eb1 = axs3[0].errorbar(delay_vals_pos, cancel_prob['connect'][20::-1],
-                       yerr=cancel_prob_std['connect'][20::-1],
-                       linestyle='-', marker='o', markersize=ms, color='tab:orange')
+
+l1, = axs3[0].plot(delay_vals_pos, pc_mob[20::-1], color='tab:blue')
+fill1 = axs3[0].fill_between(delay_vals_pos,
+                             pc_mob[20::-1]-std_pc_mob[20::-1],
+                             pc_mob[20::-1]+std_pc_mob[20::-1],
+                             color='tab:blue', alpha=0.2)
+
+l2, = axs3[0].plot(delay_vals_pos, pc_conn[20::-1], color='tab:orange')
+fill2 = axs3[0].fill_between(delay_vals_pos,
+                             pc_conn[20::-1]-std_pc_conn[20::-1],
+                             pc_conn[20::-1]+std_pc_conn[20::-1],
+                             color='tab:orange', alpha=0.2)
 
 axs3[0].grid(visible=True, linewidth=0.3)
 axs3[0].grid(visible=True, axis='y', which='minor', linewidth=0.2)
@@ -393,17 +404,22 @@ axs3[0].set_xticks([1e4, 1e3, 1e2, 1e1, 1],
 axs3[0].set_ylim(0, 1)
 axs3[0].set_yticks(np.linspace(0.1, 0.9, 5), minor=True)
 axs3[0].set_ylabel('Inverse cumm. prob.', fontsize=11)
-axs3[0].legend(handles=[eb0, eb1],
+axs3[0].legend(handles=[(l1, fill1), (l2, fill2)],
                labels=['Mobile checkin', 'Getaround connect checkin'],
                loc=(0.02, 0.82))
 
 
-axs3[1].errorbar(delay_vals_pos, cancel_prob['mobile'][21:],
-                 yerr=cancel_prob_std['mobile'][21:],
-                 linestyle='-', marker='o', markersize=ms, color='tab:blue')
-axs3[1].errorbar(delay_vals_pos, cancel_prob['connect'][21:],
-                 yerr=cancel_prob_std['connect'][21:],
-                 linestyle='-', marker='o', markersize=ms, color='tab:orange')
+axs3[1].plot(delay_vals_pos, pc_mob[21:], color='tab:blue')
+axs3[1].fill_between(delay_vals_pos,
+                     pc_mob[21:]-std_pc_mob[21:],
+                     pc_mob[21:]+std_pc_mob[21:],
+                     color='tab:blue', alpha=0.2)
+
+axs3[1].plot(delay_vals_pos, pc_conn[21:], color='tab:orange')
+axs3[1].fill_between(delay_vals_pos,
+                     pc_conn[21:]-std_pc_conn[21:],
+                     pc_conn[21:]+std_pc_conn[21:],
+                     color='tab:orange', alpha=0.2)
 axs3[1].grid(visible=True, linewidth=0.3)
 axs3[1].grid(visible=True, axis='y', which='minor', linewidth=0.2)
 axs3[1].set_xscale('log')
@@ -424,7 +440,8 @@ plt.show()
 r"""
 Figure 3 presents the cumulative probability of rental cancellation,
 $\mathrm{Prob}\, \left(\mathrm{cancel} \,|\, T \geq t \right)$, for both
-checkin methods. The points at large negative delay $t$ correspond (up to fluctuations)
+checkin methods. The light band around the curve represent the uncertainty
+in the probability estimation. The points at large negative delay $t$ correspond (up to fluctuations)
 to the baseline cancellation probability. The curve is roughly constant until $t$
 becomes positive. At this point, events with large checkout delay start
 to contribute, and we observe a rise in cancellation probability
@@ -490,31 +507,31 @@ fig4.suptitle('Figure 4: Effect of the waiting time on the cancellation probabil
               x=0.02, ha='left')
 
 
-ax4.plot(waiting_times, cancel_prob2['mobile'],
-         color='tab:blue', label='Mobile checkin')
-ax4.fill_between(waiting_times, cancel_prob2['mobile']-cancel_prob2_std['mobile'],
-                 cancel_prob2['mobile']+cancel_prob2_std['mobile'],
-                 color='tab:blue', alpha=0.2)
+l1, = ax4.plot(waiting_times, cancel_prob2['mobile'], color='tab:blue')
+fill1 = ax4.fill_between(waiting_times, cancel_prob2['mobile']-cancel_prob2_std['mobile'],
+                         cancel_prob2['mobile']+cancel_prob2_std['mobile'],
+                         color='tab:blue', alpha=0.2)
 
-ax4.plot(waiting_times, cancel_prob2['connect'],
-         color='tab:orange', label='Getaround connect checkin')
-ax4.fill_between(waiting_times, cancel_prob2['connect']-cancel_prob2_std['connect'],
-                 cancel_prob2['connect']+cancel_prob2_std['connect'],
-                 color='tab:orange', alpha=0.2)
+l2, = ax4.plot(waiting_times, cancel_prob2['connect'], color='tab:orange')
+fill2 = ax4.fill_between(waiting_times,
+                         cancel_prob2['connect']-cancel_prob2_std['connect'],
+                         cancel_prob2['connect']+cancel_prob2_std['connect'],
+                         color='tab:orange', alpha=0.2)
 
 ax4.grid(visible=True, linewidth=0.3)
 ax4.set_xlim(-450, 450)
 ax4.set_xticks(np.linspace(-400, 400, 9))
-# ax4.set_xticks(np.linspace(60, 660, 6), minor=True)
 ax4.set_xlabel("Waiting time $t$ (min)")
 ax4.set_ylim(-0.005, 1.005)
 ax4.set_ylabel("Cancellation probability")
-ax4.legend()
+ax4.legend(handles=[(l1, fill1), (l2, fill2)],
+           labels=['Mobile checkin', 'Getaround connect checkin'])
 
 ax4.text(0.21, 0.69,
          r'$\mathrm{Prob}\, \left(\mathrm{cancel} \,|\, T_{\mathrm{wait}} \geq t \right)$',
          ha='center', transform=ax4.transAxes, fontsize=11,
          bbox={'boxstyle': 'round,pad=0.45', 'facecolor': '0.96'})
+
 
 plt.show()
 

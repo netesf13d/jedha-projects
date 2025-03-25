@@ -11,7 +11,7 @@ In this project we deploy a small application.
 ##### Windows
 
 `gunicorn` is not available on Windows, you must use `uvicorn` to run the app:
-```shell
+```bash
 uvicorn app:app --reload --host localhost --port 8000
 ```
 
