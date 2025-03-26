@@ -7,7 +7,6 @@ The model is monitored and saved with MLFlow.
 import os
 
 import mlflow
-# import numpy as np
 import pandas as pd
 
 from sklearn.compose import ColumnTransformer
@@ -24,40 +23,41 @@ from sklearn.preprocessing import (OneHotEncoder,
 from sklearn.linear_model import Ridge
 
 
-
-
-
-
 ## Setup environment variables
+os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
 S3_WRITER_ACCESS_KEYS = './certification-project-s3-writer_accessKeys.key'
 with open(S3_WRITER_ACCESS_KEYS, 'rt', encoding='utf-8') as f:
     id_, key_ = f.readlines()[-1].strip().split(',')
 os.environ["AWS_ACCESS_KEY_ID"] = id_
 os.environ["AWS_SECRET_ACCESS_KEY"] = key_
 
-tracking_uri = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+
+## Check that the required env variables are set
+if 'MLFLOW_TRACKING_URI' not in os.environ:
+    raise KeyError('environment variable `MLFLOW_TRACKING_URI` is not set')
+if 'AWS_ACCESS_KEY_ID' not in os.environ:
+    raise KeyError('artifact store environment variable '
+                   '`AWS_ACCESS_KEY_ID` is not set')
+if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
+    raise KeyError('artifact store environment variable '
+                   ' `AWS_SECRET_ACCESS_KEY` is not set')
 
 
-
-
-# Set your variables for your environment
-# # EXPERIMENT_NAME = 'car-pricing-ridge-model'
-# os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
-
-# print(os.environ['MLFLOW_TRACKING_URI'])
-
-mlflow.set_tracking_uri(tracking_uri) # os.environ['MLFLOW_TRACKING_URI'])
+## Configure experiment
+mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
 experiment = mlflow.set_experiment('car-pricing-ridge-model')
-mlflow.set_experiment_tag('ridge', 'Ridge regression')
-# experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+mlflow.set_experiment_tag('model_category', 'linear')
+
+
+## Configure logging
 mlflow.autolog(disable=True)
+# mlflow.sklearn.autolog() # Autologging functionality
 
-# print('go')
 
-
+random_state = 1234
 
 # =============================================================================
-# 
+# Run experiment
 # =============================================================================
 
 ## Load and prepare data
@@ -78,13 +78,20 @@ loc = ((df['mileage'] < med_mil + k*iqr_mil)
        * (df['rental_price_per_day'] < med_pr + k*iqr_pr))
 processed_df = df.loc[loc]
 
+
+## Create instance of PandasDataset for logging
+# dataset = mlflow.data.from_pandas(processed_df,
+#                                   name='getaround_delay_analysis',
+#                                   targets='rental_price_per_day')
+
+
 ## data preparation
 y = processed_df['rental_price_per_day']
 X = processed_df.drop('rental_price_per_day', axis=1)
 
 ## train-test split
 X_tr, X_test, y_tr, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=1234)
+    X, y, test_size=0.2, random_state=random_state)
 
 ## column preprocessing
 cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
@@ -100,21 +107,32 @@ col_preproc = ColumnTransformer(
      ('quant_scaler', StandardScaler(), quant_vars)])
 
 
-with mlflow.start_run(experiment_id = experiment.experiment_id):
+with mlflow.start_run(experiment_id=experiment.experiment_id):
     ## full pipeline
     alpha = 1e2
     model = Pipeline([('column_preprocessing', col_preproc),
                       ('regressor', Ridge(alpha=alpha))])
-    
+
     ## Fit
     model.fit(X_tr, y_tr)
-    
-    ## Log model
+
+    ## Log dataset
+    # mlflow.log_input(dataset, context='training')
+
+    ## Log parameters manually
+    mlflow.log_param('random_state', random_state)
     mlflow.log_param('alpha', alpha)
+    mlflow.log_param('steps', model.steps)
+    ## Log model
     mlflow.sklearn.log_model(model, 'ridge',
                              registered_model_name='ridge-regression',
-                             input_example=df.iloc[[0], :-1])
-    
+                             input_example=df.iloc[[0], :-1],
+                             metadata={'description': 'Ridge regression'})
+    ## Log categories
+    ohe = model['column_preprocessing']['cat_ohe']
+    categories = {k: v.tolist() for k, v in zip(ohe.feature_names_in_, ohe.categories_)}
+    mlflow.log_param('categories', categories)
+
     ## Evaluate of train set
     y_pred_tr = model.predict(X_tr)
     mlflow.log_metric('train-mse', mean_squared_error(y_tr, y_pred_tr))
@@ -123,7 +141,7 @@ with mlflow.start_run(experiment_id = experiment.experiment_id):
     mlflow.log_metric('train-mae', mean_absolute_error(y_tr, y_pred_tr))
     mlflow.log_metric('train-mape',
                       100*mean_absolute_percentage_error(y_tr, y_pred_tr))
-    
+
     ## Evaluate on test set
     y_pred_test = model.predict(X_test)
     mlflow.log_metric('test-mse', mean_squared_error(y_test, y_pred_test))

@@ -5,6 +5,3 @@
 
 
 from .main import app
-
-
-

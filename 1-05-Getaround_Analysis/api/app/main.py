@@ -1,66 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-
+FastAPI application.
 """
 
+import os
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-# import mlflow
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel
+from fastapi import FastAPI, Body, HTTPException
+from fastapi.responses import RedirectResponse
 
-# from sklearn.compose import ColumnTransformer
-# from sklearn.metrics import (mean_squared_error,
-#                              r2_score,
-#                              mean_absolute_error,
-#                              mean_absolute_percentage_error)
-# from sklearn.model_selection import train_test_split, KFold, GridSearchCV
-# from sklearn.pipeline import Pipeline
-# from sklearn.preprocessing import (OneHotEncoder,
-#                                    StandardScaler,
-#                                    FunctionTransformer)
-# from sklearn.linear_model import Ridge
-# from sklearn.svm import SVR
+from .utils import check_environment_vars, fetch_models, fetch_categories
 
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-# from fastapi.openapi.docs import get_swagger_ui_html
-
-# from .utils import iter_npz
-# from .routers import fetching, processing
-
-
-# CURR_MODEL = 'runs:/c09d09ef14e546b08f2f339d2c966da6/salary_estimator'
 
 # =============================================================================
-# setup model
+#
 # =============================================================================
-
-# ## column preprocessing
-# cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
-# bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
-#              'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
-#              'winter_tires']
-# quant_vars = ['mileage', 'engine_power']
-# col_preproc = ColumnTransformer(
-#     [('cat_ohe',
-#       OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.01),
-#       cat_vars),
-#      ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
-#      ('quant_scaler', StandardScaler(), quant_vars)])
-
-# col_preproc
-
-# ##
-# ridge_model = Pipeline([('column_preprocessing', col_preproc),
-#                         ('regressor', Ridge())])
-
-class DummyModel:
-    def predict(self, c):
-        return np.arange(2)
-models = {'ridge': DummyModel(), 'SVM': DummyModel()}
-
 
 class PredictionFeatures(BaseModel):
     model_key: str
@@ -78,39 +35,72 @@ class PredictionFeatures(BaseModel):
     winter_tires: bool
 
 
+prediction_examples = [
+    {
+         'model_key': 'Audi',
+         'mileage': 132979,
+         'engine_power': 112,
+         'fuel': 'diesel',
+         'paint_color': 'brown',
+         'car_type': 'estate',
+         'private_parking_available': True,
+         'has_gps': True,
+         'has_air_conditioning': False,
+         'automatic_car': False,
+         'has_getaround_connect': True,
+         'has_speed_regulator': True,
+         'winter_tires': True
+    },
+]
+
+
 # =============================================================================
-# 
+# Setup application
 # =============================================================================
+
+models = {}
+categories = {}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    TODO
-    - load model from config file
-    - put model in app namespace
+    Initialization and shutdown of the application.
     """
     # done at startup
-    print('wow! Nice application launching')
-    # model = mlflow.pyfunc.load_model(CURR_MODEL)
+    print('Loading models...', end=' ')
+    check_environment_vars()
+    models.update(fetch_models(os.environ['MLFLOW_TRACKING_URI']))
+    categories.update(fetch_categories(models))
+    print('Done.')
+
     # yield to the app
     yield
+
     # done at shutdown
     print('wow! Nice application stopping')
-    
+    models.clear()
+
 
 # =============================================================================
-# 
+#
 # =============================================================================
 
-title = 'Getaround rental pricing API'
+title = 'Getaroun car rental pricing API'
 
-description = "Nice place to be"
+description = (
+    'The API interfaces the pricing models registry. It is used by the '
+    'dashboard to propose a user-friendly pricing estimation.'
+)
+
 
 tags_metadata = [
     {'name': 'Test',
      'description': 'API test endpoint.'},
-    {'name': 'Prediction',
-     'description': 'Prediction endpoint.'}
+    {'name': 'Models info',
+     'description': 'Information about available pricing models.'},
+    {'name': 'Pricing',
+     'description': 'Car rental pricing optimization.'},
 ]
 
 contact = {'name': 'Jedha', 'url': 'https://jedha.co'}
@@ -125,9 +115,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# app.mount('/', StaticFiles(directory='./static', html=True), name='static')
-# app.include_router(fetching.router)
-# app.include_router(processing.router)
+
+
+@app.get('/', include_in_schema=False)
+async def docs_redirect():
+    return RedirectResponse(url='/docs')
 
 
 @app.get('/test', tags=['Test'])
@@ -135,70 +127,43 @@ async def test()-> int:
     """
     Probe API endpoint.
     """
-    return 1
+    return 1 if models else 0
 
 
 
-@app.get('/pricing_models', tags=['Model info'])
-async def get_pricing_models()-> dict[str, str]:
+@app.get('/pricing_models', tags=['Models info'])
+async def get_pricing_models()-> list[str]:
     """
-    
+    Get the pricing models available from the MLFlow server.
     """
-    return {'ridge': 'ridge'}
+    return list(models)
 
 
-@app.get('/categories', tags=['Model info'])
+@app.get('/categories', tags=['Models info'])
 async def get_categories()-> dict[str, list[str]]:
     """
-    
+    Get the categories associated to each categorical feature.
     """
-    return {'model_key': ['a']}
+    return categories
 
 
-
-# @app.post('/predict', tags=['Machine Learning'])
-# async def dummy_predict(model: str):
-#     """
-#     Return optimal rental price.
-#     """
-#     return model
-
-
-@app.post('/predict', tags=['Machine Learning'])
-async def predict(data: PredictionFeatures): #, model: str):
+@app.post('/predict/{model_name}', tags=['Pricing'])
+async def predict(model_name: str,
+                  data: Annotated[PredictionFeatures,
+                                  Body(examples=prediction_examples)]
+                  )-> dict[str, float]:
     """
-    Return optimal rental price.
+    Evaluate a car rental price using the selected model.
     """
-    model = 'ridge'
-    # input_features = pd.DataFrame(dict(data))
-    input_features = 'a'
-    print('wow')
+    input_features = pd.DataFrame.from_records([dict(data)])
 
-    # model = mlflow.pyfunc.load_model(CURR_MODEL)
     try:
-        model = models[model]
+        model = models[model_name]
     except KeyError:
-        raise KeyError(f'`model` must be in {set(models.keys())}')
+        detail = {'message': f'pricing model {model_name} not available',
+                  'pricing_models': list(models)}
+        raise HTTPException(status_code=404, detail=detail)
     else:
         prediction = model.predict(input_features)
-    
-    # format response
-    response = {'prediction': prediction.tolist()[0]}
-    
-    return response
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return {'prediction': prediction.tolist()[0]}

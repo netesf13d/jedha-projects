@@ -1,12 +1,30 @@
+---
+title: Getaround Pricing API
+emoji: 🚗
+sdk: docker
+app_port: 7860
+---
 # Getaround Pricing API
 
 In this project we deploy a small application.
 
 
+## Contents
+
+The API provides two endpoints:
+- `GET test`: Probe the API for a response
+- `POST predict`: Get a car rental price from car attributes
+- The `requirements.txt` files applies to the docker image
+
 
 ## Deployment
 
 ### Local deployment
+
+```bash
+python run_api.py
+```
+
 
 ##### Windows
 
@@ -17,7 +35,7 @@ uvicorn app:app --reload --host localhost --port 8000
 
 ##### Linux/Unix
 
-Both `gunicorn` and `uvicorn` are both available. It is recommended to use `uvicorn` (see [here](https://www.uvicorn.org/deployment/)).
+Both `gunicorn` and `uvicorn` are both available. It is [recommended](https://www.uvicorn.org/deployment/) to use `uvicorn`.
 ```bash
 uvicorn app:app --reload --host localhost --port 8000
 ```
@@ -36,27 +54,52 @@ gunicorn app:app --host localhost --port 8000 --worker-class uvicorn_worker.Uvic
 ```
 
 
-## Contents
-
-The API provides two endpoints:
-- `GET test`: Probe the API for a response
-- `POST predict`: Get a car rental price from car attributes
-
 
 ## Usage
 
 
 ```bash
-curl -i -H "Content-Type: application/json" -X POST -d '{"input": [[7.0, 0.27, 0.36, 20.7, 0.045, 45.0, 170.0, 1.001, 3.0, 0.45, 8.8]]}' http://your-url/predict
+curl -X 'POST' \
+  'http://localhost:8000/predict/ridge-regression' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "model_key": "Audi",
+  "mileage": 132979,
+  "engine_power": 112,
+  "fuel": "diesel",
+  "paint_color": "brown",
+  "car_type": "estate",
+  "private_parking_available": true,
+  "has_gps": true,
+  "has_air_conditioning": false,
+  "automatic_car": false,
+  "has_getaround_connect": true,
+  "has_speed_regulator": true,
+  "winter_tires": true
+}'
 ```
+
 
 ```python
 >>> import requests
->>> r = requests.post("https://your-url/predict", json={
-...     "data": [[7.0, 0.27, 0.36, 20.7, 0.045, 45.0, 170.0, 1.001, 3.0, 0.45, 8.8]]
-... })
->>> print(response.json())
-
+>>> model_name = 'ridge_regression'
+>>> data = {'model_key': 'Audi',
+...         'mileage': 132979,
+...         'engine_power': 112,
+...         'fuel': 'diesel',
+...         'paint_color': 'brown',
+...         'car_type': 'estate',
+...         'private_parking_available': True,
+...         'has_gps': True,
+...         'has_air_conditioning': False,
+...         'automatic_car': False,
+...         'has_getaround_connect': True,
+...         'has_speed_regulator': True,
+...         'winter_tires': True}
+>>> r = requests.post('http://localhost:8000/predict/ridge-regression', json=data)
+>>> r.json()
+{'prediction': 120.81970398796342}
 ```
 
 

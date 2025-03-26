@@ -1,36 +1,49 @@
 # -*- coding: utf-8 -*-
 """
-
+API utilities
 """
 
-import io
+import ast
+import os
 
-import numpy as np
+import mlflow
 
 
-# =============================================================================
-# 
-# =============================================================================
 
-def iter_npz(data: dict[str, np.ndarray])-> bytes:
+def check_environment_vars()-> None:
     """
-    TODO docs
-
-    Parameters
-    ----------
-    data : dict[str, np.ndarray]
-        DESCRIPTION.
-
-    Yields
-    ------
-    bytes
-        DESCRIPTION.
-
+    Check that the following environment variables are set in order to
+    interact with the MLFlow server and fetch the models:
+    - `MLFLOW_TRACKING_URI`: the URI of MLFlow tracking server
+    - `AWS_ACCESS_KEY_ID`: access id to the artifact store
+    - `AWS_SECRET_ACCESS_KEY`: access key to the artifact store
     """
-    with io.BytesIO() as f:
-        np.savez_compressed(f, **data)
-        f.seek(0)
-        yield from f
+    if 'MLFLOW_TRACKING_URI' not in os.environ:
+        raise KeyError('environment variable `MLFLOW_TRACKING_URI` is not set')
+    if 'AWS_ACCESS_KEY_ID' not in os.environ:
+        raise KeyError('artifact store environment variable '
+                       '`AWS_ACCESS_KEY_ID` is not set')
+    if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
+        raise KeyError('artifact store environment variable '
+                       ' `AWS_SECRET_ACCESS_KEY` is not set')
 
 
+def fetch_models(mlflow_tracking_uri: str)-> dict:
+    """
+    Fetch available pricing optimization models from the MLFlow server.
+    """
+    mlflow.set_tracking_uri(mlflow_tracking_uri)
+    model_infos = mlflow.search_registered_models()
+    model_uris = {m.name: f'models:/{m.name}/{m.latest_versions[0].version}'
+                  for m in model_infos}
+    return {name: mlflow.pyfunc.load_model(uri)
+              for name, uri in model_uris.items()}
 
+
+def fetch_categories(models: dict)-> dict[str, list[str]]:
+    """
+    
+    """
+    model = next(iter(models.values()))
+    run = mlflow.get_run(model._model_meta.run_id)
+    return ast.literal_eval(run.data.params['categories'])
