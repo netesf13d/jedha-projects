@@ -112,7 +112,7 @@ if not 'dataset' in st.session_state:
 if 'api_available' not in st.session_state:
     try:
         probe_api(API_URL)
-    except httpx.ConnectError:
+    except httpx.HTTPError:
         st.session_state['api_available'] = False
     else:
         st.session_state['api_available'] = True
@@ -316,6 +316,6 @@ if api_available:
         st.session_state['curr_data'] = data
 
     with rental_price_container:
-        st.html('<p style="font-size:20px;">Recomended price : '
+        st.html('<p style="font-size:20px;">Recommended price : '
                 f'{rental_price:.2f}</p>')
 

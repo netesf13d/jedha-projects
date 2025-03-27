@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
 #
 # =============================================================================
 
-title = 'Getaroun car rental pricing API'
+title = 'Getaround car rental pricing API'
 
 description = (
     'The API interfaces the pricing models registry. It is used by the '

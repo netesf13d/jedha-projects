@@ -16,12 +16,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import spacy
 
-
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
 
 
 # %% Loading
@@ -90,7 +91,7 @@ messages = np.array([row[1].replace('&lt;', '<') \
      for row in raw_data], dtype=object)
 
 df = pd.DataFrame({'message': messages, 'is_spam': is_spam})
-df.describe()
+print(df.describe(include='all'))
 
 
 """
@@ -144,6 +145,7 @@ We could also consider adding words related to the lexical field of sex.
 For the purpose of data visualization, we remove the duplicates in the dataset.
 """
 
+## Define some helper functions
 def count_tokens(msgs: pd.DataFrame, tokens: list['str'])-> pd.DataFrame:
     """
     Count the number of tokens in the token list from the casefolded messages.
@@ -263,7 +265,6 @@ will perform very well.
 We set up a simple logistic regression here as a benchmark for comparison with more advanced deep learning methods.
 """
 
-
 def print_metrics(cm: np.ndarray,
                   print_cm: bool = True,
                   print_precrec: bool = True)-> None:
@@ -294,11 +295,11 @@ X_tr, X_test, y_tr, y_test = train_test_split(
     build_features(df['message']), df['is_spam'],
     test_size=0.2, stratify=df['is_spam'], random_state=1234)
 
-# pipeline
+## pipeline
 pipeline = Pipeline([('column_preprocessing', StandardScaler()),
                      ('classifier', LogisticRegression())])
 
-# training
+## training
 lr_model = pipeline.fit(X_tr, y_tr)
 
 """
@@ -321,7 +322,7 @@ at the beginning of the message.
 
 #%%
 """
-### Model performance
+### Model evaluation
 
 When considering the performance of our model, we must keep in mind that the masking of some
 spam words introduce biases. This is especially the case for the masking of digits, the most important
@@ -338,30 +339,29 @@ print_metrics(confusion_matrix(y_test, lr_model.predict(X_test)))
 Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve this score.
 """
 
-# %% text preprocessing
-
+# %% TF-IDF MLP
 """
-## <a id="tfidf-mlp"></a> A first model: Multi-layer perceptron and TF-IDF
+## <a id="tfidf-mlp"></a> A first neural network: Multi-layer perceptron and TF-IDF
+
+!!!
+
+### Text preprocessing
 
 The text prepocessing proceeds in 5 steps:
 1. Remove diacritics and casefold the messages.
-2. Lemmatize words. However, we keep stop words and punctuation as valid tokens.
-4. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
-4. Discard the ham-specific token `<#>`.
-3. Finally, replace tokens with low count (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
+2. Lemmatize words. However, we keep stop words as valid tokens.
+3. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
+Also discard the ham-specific token `<#>`.
+4. Finally, replace tokens with a single occurrence (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
+This processing is currently not available with scikit-learn `CountVectorizer`, so we do it manually.
 
 
 Most of the messages are written in [SMS language](https://en.wikipedia.org/wiki/SMS_language) with inconsistent style.
 Our tokenization will produce different tokens for words that have essentially the same meaning.
-
-
 """
 
 
-
-
-# TODO add columns
-## step 1 remove diacritics and preprocess
+## step 1: remove diacritics and preprocess
 def strip_diacritics(txt: str)-> str:
     """
     Remove all diacritics from words and characters forbidden in filenames.
@@ -375,31 +375,144 @@ norm_msgs = df['message'].apply(strip_diacritics).apply(str.casefold)
 norm_msgs.head()
 
 
-sys.exit()
+# %%
 
-
-## filter words and normalize into lowercase lemmas
+## step 2: lemmatize words, remove punctuation
 nlp = spacy.load('en_core_web_sm')
 corpus = []
-for desc in descriptions:
-    doc = nlp(desc)
-    doc = ' '.join(wd.lemma_.lower() for wd in doc
-                   if wd.is_alpha and not wd.is_stop)
+for msg in norm_msgs:
+    doc = nlp(msg)
+    doc = ' '.join(wd.lemma_ for wd in doc if not wd.is_punct)
+                   # if wd.is_alpha and not wd.is_stop)
     corpus.append(doc)
 corpus = np.array(corpus, dtype=object)
 
 
+# %%
+## step 3: replace numbers and specific tokens
+preprocessed_corpus = np.empty_like(corpus, dtype=object)
+for i, msg in enumerate(corpus):
+    msg = msg.replace(' < > ', '') # discard `< # >` token
+    msg = re.sub(r'< decimal >|< time >', '<num>', msg) # replace number masking tokens with `<num>`
+    msg = re.sub(r'\b[,\.\-\w]*\d[,\.\-\w]*\b', '<num>', msg) # replace numbers with `<num>`
+    msg = re.sub(r'\s+', ' ', msg) # replace consecutive whitespaces with single whitespace
+    preprocessed_corpus[i] = msg
+
+##
+print(corpus[12])
+print('----------')
+print(preprocessed_corpus[12])
+
+##
+print(corpus[802])
+print('----------')
+print(preprocessed_corpus[802])
+
+##
+print(corpus[2408])
+print('----------')
+print(preprocessed_corpus[2408])
 
 
+# %%
 
-sys.exit()
+## Step 4: manual handling of singwords
+text = ' ## '.join(preprocessed_corpus)
+
+vocab, counts = np.unique(text.split(' '), return_counts=True)
+single_words = vocab[counts == 1]
+for wd in single_words:
+    text = text.replace(f' {wd} ', ' <oov> ')
+processed_corpus = np.array(text.split(' ## '), dtype=np.str_)
 
 
+# %%
+"""
+### Model construction and training
+"""
+
+## Construct the TF-IDF matrix
 vectorizer = CountVectorizer(token_pattern=r'[^\s]+')
-word_counts = vectorizer.fit_transform(corpus)
-
-vocabulary = vectorizer.get_feature_names_out()
+word_counts = vectorizer.fit_transform(processed_corpus)
 tfidf = TfidfTransformer(norm='l2').fit_transform(word_counts)
+tfidf
+
+## Train-test split
+X_tr, X_test, y_tr, y_test = train_test_split(
+    tfidf, df['is_spam'], test_size=0.2, stratify=df['is_spam'],
+    random_state=1234)
+
+## MLP classifer, no preprocessing pipeline
+mlp_model = MLPClassifier(hidden_layer_sizes=(1000, 300, 100, 10),
+                          solver='adam', alpha=1e-1,
+                          max_iter=300, random_state=1234)
+
+mlp_model.fit(X_tr, y_tr)
+
+
+# %%
+"""
+### Model evaluation
+"""
+
+print('===== Train set metrics =====')
+print_metrics(confusion_matrix(y_tr, mlp_model.predict(X_tr)))
+
+print('\n===== Test set metrics =====')
+print_metrics(confusion_matrix(y_test, mlp_model.predict(X_test)))
+
+"""
+The F1-score reaches a value of 93.1% on the test set, a significative improvement
+over the simple linear regression. However, this comes at the cost of a much longer
+training time. Another drawback is the tendency of the model to overfit, as
+indicated by the difference between train and test F1-scores.
+"""
+
+# %%
+"""
+## <a id=""></a> A first model: Multi-layer perceptron and TF-IDF
+
+
+### Text preprocessing
+
+We retain a vocabulary size of 500 tokens,
+the less frequent having only 16 counts accross the whole corpus.
+
+"""
+import tensorflow as tf
+from tensorflow import keras
+
+# preprocessed_corpus = np.load('preprocessed_corpus.npy', allow_pickle=False)
+unique_tokens, token_counts = np.unique(sum(norm_msgs, start=[]), return_counts=True)
+unique_tokens = unique_tokens[np.argsort(token_counts)][::-1] # decreasing order
+token_counts = np.sort(token_counts)[::-1]
+
+np.sum(token_counts)
+
+##
+vocab_size = 500
+
+print(f'Vocabulary totaling {np.sum(token_counts[:vocab_size])} counts\n')
+k = 10
+print('========== Top tokens (rank, token, count) ==========')
+for i in range(k):
+    print('||   ', end='')
+    for j in range(3):
+        n = i + k*j
+        print(f'({n+1:>2})   {unique_tokens[n]:<7} : {token_counts[n]:>4}',
+              end='   ||   ')
+    print()
+
+print('\n========== Last retained tokens (rank, token, count) ==========')
+for i in range(k, 0, -1):
+    print('||   ', end='')
+    for j in range(3, 0, -1):
+        n = vocab_size-i-k*j + k
+        print(f'({n+1})   {unique_tokens[n]:<14} : {token_counts[n]:>4}',
+              end='   ||   ')
+    print()
+
+
 
 
 
@@ -407,22 +520,6 @@ tfidf = TfidfTransformer(norm='l2').fit_transform(word_counts)
 
 
 sys.exit()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # %% text preprocessing
 
@@ -642,14 +739,6 @@ Do:
 """
 ## <a id="conclusion"></a> Conclusion and perspectives
 
-The intertwining of semantic fields within descriptions makes the clustering difficult.
-Our clustering yielded many outliers along with one large cluster containing about 40% of observations.
-This indicates that we were not able to properly factor out the various properties of garments.
 
-Ideally we would like to factor a garment according to its type (shirt, bra, ...),
-its fabric material (cotton, polyester, ...) and some additional elements (pockets, zipper, ...).
-Such result could possibly be obtained with more data. Another approach would be to split the
-descriptions into different parts (eg the item name, its description, the fabric composition)
-and apply clustering to each.
 """
 
