@@ -1,11 +1,8 @@
 ---
-title: Getaround project pricing model training
+title: Getaround project pricing model MLFlow server
 emoji: 🚗
-colorFrom: pink
-colorTo: purple
 sdk: docker
 app_port: 7860
-pinned: false
 ---
 
 # Getaround Pricing Model Training

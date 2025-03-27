@@ -7,11 +7,11 @@ The model is monitored and saved with MLFlow.
 import os
 
 import mlflow
-import numpy as np
 import pandas as pd
 
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import (mean_squared_error,
+                             root_mean_squared_error,
                              r2_score,
                              mean_absolute_error,
                              mean_absolute_percentage_error)
@@ -23,42 +23,49 @@ from sklearn.preprocessing import (OneHotEncoder,
 from sklearn.ensemble import GradientBoostingRegressor
 
 
-# Set your variables for your environment
-EXPERIMENT_NAME = 'car-pricing-gradient-boosting-model'
+## Setup environment variables
+os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+S3_WRITER_ACCESS_KEYS = './s3-writer_accessKeys.key'
+with open(S3_WRITER_ACCESS_KEYS, 'rt', encoding='utf-8') as f:
+    id_, key_ = f.readlines()[-1].strip().split(',')
+os.environ["AWS_ACCESS_KEY_ID"] = id_
+os.environ["AWS_SECRET_ACCESS_KEY"] = key_
 
-mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
-mlflow.set_experiment(EXPERIMENT_NAME)
-experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
-mlflow.sklearn.autolog()
+
+## Check that the required env variables are set
+if 'MLFLOW_TRACKING_URI' not in os.environ:
+    raise KeyError('environment variable `MLFLOW_TRACKING_URI` is not set')
+if 'AWS_ACCESS_KEY_ID' not in os.environ:
+    raise KeyError('artifact store environment variable '
+                   '`AWS_ACCESS_KEY_ID` is not set')
+if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
+    raise KeyError('artifact store environment variable '
+                   ' `AWS_SECRET_ACCESS_KEY` is not set')
+
+## Configure experiment
+mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
+experiment = mlflow.set_experiment('car-pricing-gradient-boosting-model')
+mlflow.set_experiment_tag('model_category', 'ensemble')
+
+## Configure logging
+mlflow.autolog(disable=True)
+# mlflow.sklearn.autolog() # Autologging functionality
+
+
+random_state = 1234
 
 
 # =============================================================================
-# 
-# =============================================================================
-
-## setup evaluation metrics
-def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
-    """
-    Helper function that evaluates the relevant evaluation metrics:
-        MSE, RMSE, R-squared, MAE, MAPE
-    """
-    mse = mean_squared_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
-    mape = 100 * mean_absolute_percentage_error(y_true, y_pred)
-    return mse, np.sqrt(mse), r2, mae, mape
-
-
-# =============================================================================
-# 
+# Run experiment
 # =============================================================================
 
 ## Load and prepare data
-df = pd.read_csv('./data/get_around_pricing_project.csv')
+df = pd.read_csv('./get_around_pricing_project.csv')
 df = df.drop('Unnamed: 0', axis=1)
-df = df.astype({'mileage': float,
+df = df.astype({'mileage': float, # better handling of missing values
                 'engine_power': float,
                 'rental_price_per_day': float})
+
 
 ## Remove outliers
 q1, q2 = 0.25, 0.75
@@ -70,13 +77,20 @@ loc = ((df['mileage'] < med_mil + k*iqr_mil)
        * (df['rental_price_per_day'] < med_pr + k*iqr_pr))
 processed_df = df.loc[loc]
 
+
+## Create instance of PandasDataset for logging
+# dataset = mlflow.data.from_pandas(processed_df,
+#                                   name='getaround_delay_analysis',
+#                                   targets='rental_price_per_day')
+
+
 ## data preparation
 y = processed_df['rental_price_per_day']
 X = processed_df.drop('rental_price_per_day', axis=1)
 
 ## train-test split
 X_tr, X_test, y_tr, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=1234)
+    X, y, test_size=0.2, random_state=random_state)
 
 ## column preprocessing
 cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
@@ -94,30 +108,49 @@ col_preproc = ColumnTransformer(
 
 with mlflow.start_run(experiment_id = experiment.experiment_id):
     ## full pipeline
-    nest = 500
-    gb_model = Pipeline(
+    n_estimators = 500
+    model = Pipeline(
         [('column_preprocessing', col_preproc),
-         ('regressor', GradientBoostingRegressor(n_estimators=nest, random_state=1234))]
+         ('regressor', GradientBoostingRegressor(n_estimators=n_estimators,
+                                                 random_state=random_state))]
     )
     
     ## Fit
-    gb_model.fit(X_tr, y_tr)
-    
-    
-    ## evaluate of train set
-    y_pred_tr = gb_model.predict(X_tr)
-    tr_mse = mean_squared_error(y_tr, y_pred_tr)
-    tr_rmse = mean_squared_error(y_tr, y_pred_tr)
-    tr_r2 = r2_score(y_tr, y_pred_tr)
-    tr_mae = mean_absolute_error(y_tr, y_pred_tr)
-    tr_mape = 100 * mean_absolute_percentage_error(y_tr, y_pred_tr)
-    # tr_metrics = eval_metrics(y_tr, y_pred_tr)
-    
-    ## evaluate on test set
-    y_pred_test = gb_model.predict(X_test)
-    test_mse = mean_squared_error(y_test, y_pred_test)
-    test_rmse = mean_squared_error(y_test, y_pred_test)
-    test_r2 = r2_score(y_test, y_pred_test)
-    test_mae = mean_absolute_error(y_test, y_pred_test)
-    test_mape = 100 * mean_absolute_percentage_error(y_test, y_pred_test)
-    # test_metrics = eval_metrics(y_test, y_pred_test)
+    model.fit(X_tr, y_tr)
+
+    ## Log dataset
+    # mlflow.log_input(dataset, context='training')
+
+    ## Log parameters manually
+    mlflow.log_param('random_state', random_state)
+    mlflow.log_param('n_estmators', n_estimators)
+    mlflow.log_param('steps', model.steps)
+    ## Log model
+    mlflow.sklearn.log_model(
+        model, 'gradient-boosting',
+        registered_model_name='gradient-boosting',
+        input_example=df.iloc[[0], :-1],
+        metadata={'description': 'Gradient boosting regressor'}
+    )
+    ## Log categories
+    ohe = model['column_preprocessing']['cat_ohe']
+    categories = {k: v.tolist() for k, v in zip(ohe.feature_names_in_, ohe.categories_)}
+    mlflow.log_param('categories', categories)
+
+    ## Evaluate of train set
+    y_pred_tr = model.predict(X_tr)
+    mlflow.log_metric('train-mse', mean_squared_error(y_tr, y_pred_tr))
+    mlflow.log_metric('train-rmse', root_mean_squared_error(y_tr, y_pred_tr))
+    mlflow.log_metric('train-r-squared', r2_score(y_tr, y_pred_tr))
+    mlflow.log_metric('train-mae', mean_absolute_error(y_tr, y_pred_tr))
+    mlflow.log_metric('train-mape',
+                      100*mean_absolute_percentage_error(y_tr, y_pred_tr))
+
+    ## Evaluate on test set
+    y_pred_test = model.predict(X_test)
+    mlflow.log_metric('test-mse', mean_squared_error(y_test, y_pred_test))
+    mlflow.log_metric('test-rmse', root_mean_squared_error(y_test, y_pred_test))
+    mlflow.log_metric('test-r-squared', r2_score(y_test, y_pred_test))
+    mlflow.log_metric('test-mae', mean_absolute_error(y_test, y_pred_test))
+    mlflow.log_metric('test-mape',
+                      100*mean_absolute_percentage_error(y_test, y_pred_test))

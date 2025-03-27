@@ -3,6 +3,8 @@
 
 """
 
+import os
+
 import numpy as np
 import httpx
 import streamlit as st
@@ -14,7 +16,8 @@ from core import (probe_api, get_pricing_models, get_categories, get_pricing,
                   delay_info_df, update_delay_info)
 
 
-API_URL = 'http://localhost:4000'
+API_URL = 'http://localhost:8000'
+# API_URL = os.environ['API_URL']
 
 DATASET_FILENAME = './data/get_around_delay_analysis.xlsx'
 TIME_BINS = np.linspace(-15, 225, 5)
@@ -104,7 +107,7 @@ if not 'dataset' in st.session_state:
     st.session_state['delay_info_df'] = delay_info_df(df)
 
 
-########## Setup delay analysis session state ##########
+########## Setup pricing optimization session state ##########
 ## Pricing optimization API available ?
 if 'api_available' not in st.session_state:
     try:
@@ -122,15 +125,12 @@ if api_available and not 'pricing_models' in st.session_state:
 ## If the API is available, get categorical variables info
 if api_available and not 'categories' in st.session_state:
     st.session_state['categories'] = get_categories(API_URL)
+    
+## If the API is available, track the state of the current car attributes input
+if api_available and not 'curr_data' in st.session_state:
+    st.session_state['curr_model'] = ''
+    st.session_state['curr_data'] = {}
 
-
-
-
-# st.session_state['pricing_models'] = ['ridge', 'SVM']
-# st.session_state['categories'] = {'model_key': ['a', 'b'],
-#                                   'fuel': ['a', 'b'],
-#                                   'paint_color': ['a', 'b'],
-#                                   'car_type': ['a', 'b']}
 
 ## Delay analysis data
 df = st.session_state['dataset']
@@ -140,11 +140,9 @@ rental_delays = st.session_state['rental_delays']
 cancel_rates = st.session_state['cancellation_rates']
 delay_info_df = st.session_state['delay_info_df']
 
-
 ## Pricing optimization
 pricing_models = st.session_state['pricing_models']
 categories = st.session_state['categories']
-
 
 
 # =============================================================================
@@ -153,7 +151,7 @@ categories = st.session_state['categories']
 
 ########## App configuration ##########
 st.set_page_config(
-    page_title='Getaround dashboard',
+    page_title='Getaround analysis dashboard',
     page_icon='\U0001f697',
     layout='wide'
 )
@@ -210,7 +208,7 @@ with tab_delay:
     with col_table:
         # Rental delay slider
         rental_delay = st.slider('Rental delay (minutes)',
-                                 min_value=-400, max_value=400, value=0)
+                                 min_value=-400, max_value=400, value=0, step=2)
         
         # Rental delay summary table
         delay_info_container = st.empty()
@@ -224,7 +222,7 @@ with tab_pricing:
     # Categorical variables
     cols_categ = st.columns(4, gap='medium')
     with cols_categ[0]:
-        car_model = st.selectbox("Car model", categories['model_key'],
+        model_key = st.selectbox("Car model", categories['model_key'],
                                  key='car_model', disabled=not api_available)
     with cols_categ[1]:
         car_type = st.selectbox("Car type", categories['car_type'],
@@ -233,8 +231,8 @@ with tab_pricing:
         fuel = st.selectbox("Fuel", categories['fuel'], key='fuel',
                             disabled=not api_available)
     with cols_categ[3]:
-        paint = st.selectbox("Paint color", categories['paint_color'],
-                             key='paint', disabled=not api_available)
+        paint_color = st.selectbox("Paint color", categories['paint_color'],
+                                   key='paint', disabled=not api_available)
 
     # Boolean variables
     cols_bool = st.columns(7, gap='medium')
@@ -291,8 +289,29 @@ with delay_info_container:
     delay_info_table = st.table(delay_info_df)
 
 if api_available:
-    data = {}
-    # rental_price = get_pricing(API_URL, data)
+    data = {"model_key": model_key,
+            "mileage": mileage,
+            "engine_power": engine_power,
+            "fuel": fuel,
+            "paint_color": paint_color,
+            "car_type": car_type,
+            "private_parking_available": private_parking,
+            "has_gps": gps,
+            "has_air_conditioning": air_conditioning,
+            "automatic_car": automatic_car,
+            "has_getaround_connect": getaround_connect,
+            "has_speed_regulator": speed_regulator,
+            "winter_tires": winter_tires}
+    rental_price = 100
+    
+    ## fetch a new rental price only if necessary
+    if (pricing_model != st.session_state['curr_model']
+        or data != st.session_state['curr_data']):
+        rental_price = get_pricing(API_URL, pricing_model, data)
+        st.session_state['curr_model'] = pricing_model
+        st.session_state['curr_data'] = data
+    
     with rental_price_container:
-        st.html(f'<p style="font-size:20px;">Recomended price : {1}</p>')
+        st.html('<p style="font-size:20px;">Recomended price : '
+                f'{rental_price:.2f}</p>')
 

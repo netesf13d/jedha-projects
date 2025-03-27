@@ -50,7 +50,7 @@ gunicorn app:app --host localhost --port 8000 --worker-class uvicorn_worker.Uvic
 
 It is assumed that the deployment OS is Linux.
 ```bash
-gunicorn app:app --host localhost --port 8000 --worker-class uvicorn_worker.UvicornWorker
+gunicorn app:app --host 0.0.0.0 --port 8000 --worker-class uvicorn_worker.UvicornWorker
 ```
 
 

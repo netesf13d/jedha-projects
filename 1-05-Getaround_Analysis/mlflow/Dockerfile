@@ -23,5 +23,8 @@ ENV ARTIFACT_STORE_URI=$ARTIFACT_STORE_URI
 # Upgrade the database schema 
 # RUN mlflow db upgrade $BACKEND_STORE_UR
 
-CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "$PORT", \
-     "--backend-store-uri", "$BACKEND_STORE_URI", "--default-artifact-root", "$ARTIFACT_STORE_URI"]
+CMD mlflow server \
+    --host 0.0.0.0 \
+    --port $PORT \
+    --backend-store-uri $BACKEND_STORE_URI \
+    --default-artifact-root $ARTIFACT_STORE_URI

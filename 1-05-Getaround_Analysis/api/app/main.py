@@ -93,7 +93,6 @@ description = (
     'dashboard to propose a user-friendly pricing estimation.'
 )
 
-
 tags_metadata = [
     {'name': 'Test',
      'description': 'API test endpoint.'},

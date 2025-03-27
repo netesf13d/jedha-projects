@@ -1,6 +1,30 @@
 # Build from a LINUX lightweight version of Anaconda
 FROM continuumio/miniconda3
 
+WORKDIR /home/app
+
+RUN apt-get update -y \
+    && apt-get install -y nano unzip python3.10 curl
+
+RUN curl -fsSL https://get.deta.dev/cli.sh | sh
+
+COPY requirements.txt /dependencies/requirements.txt
+RUN pip install -r /dependencies/requirements.txt
+
+COPY . /home/app
+
+# Copier le script d'entrée
+COPY entrypoint.sh /home/app/entrypoint.sh
+RUN chmod +x /home/app/entrypoint.sh
+
+# Utiliser le script comme commande d'entrée
+CMD ["/home/app/entrypoint.sh"]
+
+
+
+# Build from a LINUX lightweight version of Anaconda
+FROM continuumio/miniconda3
+
 # Update packages and install nano unzip and curl
 RUN apt-get update
 RUN apt-get install nano unzip curl -y

@@ -25,7 +25,7 @@ from sklearn.linear_model import Ridge
 
 ## Setup environment variables
 os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
-S3_WRITER_ACCESS_KEYS = './certification-project-s3-writer_accessKeys.key'
+S3_WRITER_ACCESS_KEYS = './s3-writer_accessKeys.key'
 with open(S3_WRITER_ACCESS_KEYS, 'rt', encoding='utf-8') as f:
     id_, key_ = f.readlines()[-1].strip().split(',')
 os.environ["AWS_ACCESS_KEY_ID"] = id_
@@ -42,12 +42,10 @@ if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
     raise KeyError('artifact store environment variable '
                    ' `AWS_SECRET_ACCESS_KEY` is not set')
 
-
 ## Configure experiment
 mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
 experiment = mlflow.set_experiment('car-pricing-ridge-model')
 mlflow.set_experiment_tag('model_category', 'linear')
-
 
 ## Configure logging
 mlflow.autolog(disable=True)
@@ -56,6 +54,7 @@ mlflow.autolog(disable=True)
 
 random_state = 1234
 
+
 # =============================================================================
 # Run experiment
 # =============================================================================
@@ -63,7 +62,7 @@ random_state = 1234
 ## Load and prepare data
 df = pd.read_csv('./get_around_pricing_project.csv')
 df = df.drop('Unnamed: 0', axis=1)
-df = df.astype({'mileage': float,
+df = df.astype({'mileage': float, # better handling of missing values
                 'engine_power': float,
                 'rental_price_per_day': float})
 
