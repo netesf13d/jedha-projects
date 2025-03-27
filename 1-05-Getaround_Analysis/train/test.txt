@@ -1,0 +1,48 @@
+1. Verify the IAM user or role credentials:
+   - Navigate to the IAM console
+   - Locate the IAM user or role associated with the ARN 'arn:aws:iam::699475941446:root'
+   - Ensure the access key and secret key are valid and active
+
+2. Check the time synchronization:
+   - Verify that the system clock on the device or server making the API request is correctly synchronized
+   - Use a reliable time synchronization service to ensure accurate time
+
+3. Review the S3 bucket policy:
+   - Go to the S3 console
+   - Select the bucket 'mlflow-artifact-store-1-05-getaround'
+   - Click on the 'Permissions' tab
+   - Review the bucket policy to ensure it allows the necessary actions for the IAM user or role
+
+4. If you don't have permissions to do the following changes, contact your AWS Administrator:
+   - Create a new IAM policy with the following permissions:
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Effect": "Allow",
+           "Action": [
+             "s3:PutObject",
+             "s3:GetBucketLocation"
+           ],
+           "Resource": [
+             "arn:aws:s3:::mlflow-artifact-store-1-05-getaround",
+             "arn:aws:s3:::mlflow-artifact-store-1-05-getaround/*"
+           ]
+         }
+       ]
+     }
+     ```
+   - Attach this policy to the IAM user or role associated with the ARN 'arn:aws:iam::699475941446:root'
+
+5. Clear browser cache and cookies:
+   - Open browser settings
+   - Clear cache and cookies
+   - Restart the browser and try accessing the S3 console again
+
+6. Try accessing the S3 bucket from a different browser or incognito/private mode
+
+7. If the issue persists, contact AWS Support:
+   - Go to the AWS Support Center
+   - Create a new case
+   - Provide the error message and the steps you've taken to troubleshoot

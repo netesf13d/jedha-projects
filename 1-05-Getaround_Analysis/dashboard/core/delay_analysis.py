@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Functions for the analysis of rental delays 
+Functions for the analysis of rental delays
 """
 
 import numpy as np
@@ -10,7 +10,7 @@ import pandas as pd
 def prepare_dataset(filename: str)-> pd.DataFrame:
     """
     Prepare the dataset for rental delay analysis.
-    
+
     The preparation steps are:
     - Load the data from xlsl file.
     - Join pairs of successive rentals
@@ -44,10 +44,10 @@ def cancel_prob(dataset: pd.DataFrame,
                 time_bins: np.ndarray)-> dict[str, np.ndarray]:
     """
     Estimate cancellation probability in `time_bins` from the `dataset`.
-    
+
     The dataset must contain columns 'checkin_type', 'is_canceled',
     and 'waiting_time'.
-    
+
     Returns
     -------
     p_cancel : dict[str, np.ndarray]
@@ -84,7 +84,7 @@ def _cancel_rate(df: pd.DataFrame,
     Estimate the rental cancellation rate at a given rental delay `time_delta`.
     The function uses `p_cancel`, an estimation of the cancellation probability
     in the given `time_bins`.
-    
+
     The dataset `df` must contain the column 'waiting_time'.
     """
     idx = np.digitize(df['waiting_time'], time_bins + time_delta)
@@ -122,14 +122,14 @@ def delay_info_df(dataset: pd.DataFrame)-> pd.DataFrame:
                'Baseline cancel rate', 'Cancel rate', 'Cancel rate diff',
                'Baseline cancel nb', 'Cancel nb',  'Cancel nb diff']
     )
-    
+
     ## Distinct checkout methods
     for (checkin,), df in dataset.groupby(['checkin_type']):
         df = df.loc[~df['waiting_time'].isna()]
         info_df.loc['Nb rentals', checkin] = len(df)
         info_df.loc['Baseline cancel rate', checkin] = df['is_canceled'].mean()
         info_df.loc['Baseline cancel nb', checkin] = df['is_canceled'].sum()
-    
+
     ## Total
     df = dataset.loc[~dataset['waiting_time'].isna()]
     info_df.loc['Nb rentals', 'total'] = len(dataset)
@@ -154,14 +154,14 @@ def update_delay_info(dataset: pd.DataFrame,
         cancel_frac = _cancel_rate(df, p_cancel[checkin], time_bins, time_delta)
         info_df.loc['Cancel rate', checkin] = cancel_frac
         info_df.loc['Cancel nb', checkin] = len(df) * cancel_frac
-    
+
     ## Total
     df = dataset.loc[~dataset['waiting_time'].isna()]
     cancel_frac = _cancel_rate(df, p_cancel['total'], time_bins, time_delta)
     info_df.loc['Cancel rate', 'total'] = cancel_frac
     info_df.loc['Cancel nb', 'total'] = (info_df.loc['Cancel nb', 'mobile']
                                          +info_df.loc['Cancel nb', 'connect'])
-    
+
     ## Differences
     info_df.loc['Cancel nb diff'] = (info_df.loc['Cancel nb']
                                      - info_df.loc['Baseline cancel nb'])

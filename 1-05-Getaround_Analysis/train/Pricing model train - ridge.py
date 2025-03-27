@@ -24,7 +24,8 @@ from sklearn.linear_model import Ridge
 
 
 ## Setup environment variables
-os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+# os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+os.environ['MLFLOW_TRACKING_URI'] = 'http://localhost:7860'
 S3_WRITER_ACCESS_KEYS = './s3-writer_accessKeys.key'
 with open(S3_WRITER_ACCESS_KEYS, 'rt', encoding='utf-8') as f:
     id_, key_ = f.readlines()[-1].strip().split(',')
@@ -44,7 +45,7 @@ if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
 
 ## Configure experiment
 mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
-experiment = mlflow.set_experiment('car-pricing-ridge-model')
+experiment = mlflow.set_experiment('car-pricing')
 mlflow.set_experiment_tag('model_category', 'linear')
 
 ## Configure logging

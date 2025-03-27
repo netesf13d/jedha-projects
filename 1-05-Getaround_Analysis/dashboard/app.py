@@ -4,6 +4,7 @@
 """
 
 import os
+from collections import defaultdict
 
 import numpy as np
 import httpx
@@ -16,8 +17,7 @@ from core import (probe_api, get_pricing_models, get_categories, get_pricing,
                   delay_info_df, update_delay_info)
 
 
-API_URL = 'http://localhost:8000'
-# API_URL = os.environ['API_URL']
+API_URL = os.environ['API_URL'].strip('/')
 
 DATASET_FILENAME = './data/get_around_delay_analysis.xlsx'
 TIME_BINS = np.linspace(-15, 225, 5)
@@ -25,7 +25,7 @@ RENTAL_DELAYS = np.linspace(-120, 300, 22)
 
 
 # =============================================================================
-# 
+#
 # =============================================================================
 
 def rental_delay_chart(rental_delays: np.ndarray,
@@ -43,8 +43,8 @@ def rental_delay_chart(rental_delays: np.ndarray,
         y-axis initial range.
     p0, n0 : float
         Baseline cancellation probability and number of rental cancellations.
-    """    
-    
+    """
+
     layout = go.Layout(
         width=700, height=400,
         margin=dict(l=60, r=40, t=50, b=40),
@@ -62,7 +62,7 @@ def rental_delay_chart(rental_delays: np.ndarray,
                 'showgrid': False,
                 'side': 'right'},
         )
-    
+
     hoverdata = np.array([100*cancel_rates, 100*(cancel_rates-p0),
                           n0/p0*cancel_rates, n0/p0*cancel_rates-n0]).T
     data_trace = go.Scatter(
@@ -76,10 +76,10 @@ def rental_delay_chart(rental_delays: np.ndarray,
             '<extra></extra>'
         )
     )
-    
+
     baseline_trace = go.Scatter(x=[-1000, 1000], y=[n0, n0], yaxis='y2',
                                 line={'dash': '5, 4', 'color': 'black'})
-    
+
     fig = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
     fig.update_layout(layout)
     fig.add_trace(data_trace)
@@ -96,14 +96,14 @@ if not 'dataset' in st.session_state:
     df = prepare_dataset(DATASET_FILENAME)
     st.session_state['dataset'] = df
     st.session_state['time_bins'] = TIME_BINS
-    
+
     p_cancel = cancel_prob(df, TIME_BINS)
     st.session_state['p_cancel'] = p_cancel
-    
+
     cancel_rates = cancellation_rates(df, p_cancel, TIME_BINS, RENTAL_DELAYS)
     st.session_state['rental_delays'] = RENTAL_DELAYS
     st.session_state['cancellation_rates'] = cancel_rates
-    
+
     st.session_state['delay_info_df'] = delay_info_df(df)
 
 
@@ -119,13 +119,17 @@ if 'api_available' not in st.session_state:
 api_available = st.session_state['api_available']
 
 ## If the API is available, get available models
-if api_available and not 'pricing_models' in st.session_state:
+if 'pricing_models' not in st.session_state:
+    st.session_state['pricing_models'] = defaultdict(list)
+if api_available:
     st.session_state['pricing_models'] = get_pricing_models(API_URL)
 
 ## If the API is available, get categorical variables info
-if api_available and not 'categories' in st.session_state:
+if 'categories' not in st.session_state:
+    st.session_state['categories'] = defaultdict(list)
+if api_available:
     st.session_state['categories'] = get_categories(API_URL)
-    
+
 ## If the API is available, track the state of the current car attributes input
 if api_available and not 'curr_data' in st.session_state:
     st.session_state['curr_model'] = ''
@@ -161,11 +165,11 @@ st.set_page_config(
 st.title('Getaround dashboard \U0001f697')
 st.markdown(
 """
-\U0001f44b Hello there! Welcome to this Getaround car rental dashboard. 
+\U0001f44b Hello there! Welcome to this Getaround car rental dashboard.
 The dashboard provides:
-- Visualizations and information related to the implementation of 
+- Visualizations and information related to the implementation of
   a rental delay.
-- A connection to the pricing API to price a car by manually entering 
+- A connection to the pricing API to price a car by manually entering
   its characteristics
 """)
 st.caption('Data provided by [Jedha](https://jedha.co)')
@@ -179,11 +183,11 @@ tab_delay, tab_pricing = st.tabs(['Rental delay analysis', 'Car pricing'])
 ########## Rental delay tab ##########
 with tab_delay:
     st.markdown('#### Car rental delay analysis')
-    
+
     col_plot, col_table = st.columns([1, 0.5], gap='medium')
-    
+
     with col_plot:
-        
+
         ## Mobile checkin plot
         n0 = delay_info_df.loc['Baseline cancel nb', 'mobile']
         p0 = delay_info_df.loc['Baseline cancel rate', 'mobile']
@@ -193,7 +197,7 @@ with tab_delay:
             title={'text': 'Mobile checkin', 'y':0.94, 'x':0.5},)
         st.plotly_chart(mobile_fig, key='mobile_chart', theme=None,
                         use_container_width=True)
-        
+
         ## Getaround connect checkin plot
         n0 = delay_info_df.loc['Baseline cancel nb', 'connect']
         p0 = delay_info_df.loc['Baseline cancel rate', 'connect']
@@ -203,13 +207,13 @@ with tab_delay:
             title={'text': 'Getaround connect checkin', 'y':0.94, 'x':0.5},)
         st.plotly_chart(getaround_fig, key='getaround_chart', theme=None,
                         use_container_width=True)
-        
-    
+
+
     with col_table:
         # Rental delay slider
         rental_delay = st.slider('Rental delay (minutes)',
                                  min_value=-400, max_value=400, value=0, step=2)
-        
+
         # Rental delay summary table
         delay_info_container = st.empty()
 
@@ -218,7 +222,7 @@ with tab_delay:
 ########## Car pricing tab tab ##########
 with tab_pricing:
     st.markdown('#### Car rental pricing')
-    
+
     # Categorical variables
     cols_categ = st.columns(4, gap='medium')
     with cols_categ[0]:
@@ -256,7 +260,7 @@ with tab_pricing:
     with cols_bool[6]:
         winter_tires = st.checkbox('Winter tires', value=False,
                                    disabled=not api_available)
-    
+
     # Quantitative variables
     cols_quant = st.columns(2, gap='large')
     with cols_quant[0]:
@@ -265,9 +269,9 @@ with tab_pricing:
     with cols_quant[1]:
         mileage = st.number_input('Mileage', min_value=0, value=100_000,
                                   disabled=not api_available)
-    
+
     st.divider()
-    
+
     col_model, col_pricing = st.columns([0.5, 1], gap='medium')
     # Select pricing model
     with col_model:
@@ -303,14 +307,14 @@ if api_available:
             "has_speed_regulator": speed_regulator,
             "winter_tires": winter_tires}
     rental_price = 100
-    
+
     ## fetch a new rental price only if necessary
     if (pricing_model != st.session_state['curr_model']
         or data != st.session_state['curr_data']):
         rental_price = get_pricing(API_URL, pricing_model, data)
         st.session_state['curr_model'] = pricing_model
         st.session_state['curr_data'] = data
-    
+
     with rental_price_container:
         st.html('<p style="font-size:20px;">Recomended price : '
                 f'{rental_price:.2f}</p>')

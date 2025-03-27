@@ -42,7 +42,7 @@ def fetch_models(mlflow_tracking_uri: str)-> dict:
 
 def fetch_categories(models: dict)-> dict[str, list[str]]:
     """
-    
+
     """
     model = next(iter(models.values()))
     run = mlflow.get_run(model._model_meta.run_id)

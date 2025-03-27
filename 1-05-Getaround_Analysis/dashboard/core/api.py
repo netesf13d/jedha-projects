@@ -11,7 +11,7 @@ def probe_api(api_url: str)-> int:
     """
     Probe the API endpoint for availability.
     """
-    r = httpx.get(f'{api_url}/test', follow_redirects=True, timeout=2)
+    r = httpx.get(f'{api_url}/test', follow_redirects=True)
     res = r.raise_for_status().json()
     return res
 

@@ -46,11 +46,12 @@ gunicorn app:app --host localhost --port 8000 --worker-class uvicorn_worker.Uvic
 ```
 
 
-### Deployment on Huggingface
+### Deployment on HuggingFace
 
 It is assumed that the deployment OS is Linux.
+Port 8501 is required by HuggingFace
 ```bash
-gunicorn app:app --host 0.0.0.0 --port 8000 --worker-class uvicorn_worker.UvicornWorker
+gunicorn --bind 0.0.0.0:8501 --worker-class uvicorn_worker.UvicornWorker app:app
 ```
 
 

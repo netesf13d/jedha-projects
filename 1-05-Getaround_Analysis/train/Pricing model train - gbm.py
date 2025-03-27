@@ -24,7 +24,8 @@ from sklearn.ensemble import GradientBoostingRegressor
 
 
 ## Setup environment variables
-os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+# os.environ['MLFLOW_TRACKING_URI'] = 'https://netesf13d-mlflow-server-1-05-getaround.hf.space/'
+os.environ['MLFLOW_TRACKING_URI'] = 'http://localhost:7860'
 S3_WRITER_ACCESS_KEYS = './s3-writer_accessKeys.key'
 with open(S3_WRITER_ACCESS_KEYS, 'rt', encoding='utf-8') as f:
     id_, key_ = f.readlines()[-1].strip().split(',')
@@ -44,7 +45,7 @@ if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
 
 ## Configure experiment
 mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
-experiment = mlflow.set_experiment('car-pricing-gradient-boosting-model')
+experiment = mlflow.set_experiment('car-pricing')
 mlflow.set_experiment_tag('model_category', 'ensemble')
 
 ## Configure logging
@@ -106,7 +107,7 @@ col_preproc = ColumnTransformer(
      ('quant_scaler', StandardScaler(), quant_vars)])
 
 
-with mlflow.start_run(experiment_id = experiment.experiment_id):
+with mlflow.start_run(experiment_id=experiment.experiment_id):
     ## full pipeline
     n_estimators = 500
     model = Pipeline(
@@ -114,7 +115,7 @@ with mlflow.start_run(experiment_id = experiment.experiment_id):
          ('regressor', GradientBoostingRegressor(n_estimators=n_estimators,
                                                  random_state=random_state))]
     )
-    
+
     ## Fit
     model.fit(X_tr, y_tr)
 
@@ -128,7 +129,7 @@ with mlflow.start_run(experiment_id = experiment.experiment_id):
     ## Log model
     mlflow.sklearn.log_model(
         model, 'gradient-boosting',
-        registered_model_name='gradient-boosting',
+        registered_model_name='gradient-boosting-regressor',
         input_example=df.iloc[[0], :-1],
         metadata={'description': 'Gradient boosting regressor'}
     )
@@ -139,6 +140,8 @@ with mlflow.start_run(experiment_id = experiment.experiment_id):
 
     ## Evaluate of train set
     y_pred_tr = model.predict(X_tr)
+
+
     mlflow.log_metric('train-mse', mean_squared_error(y_tr, y_pred_tr))
     mlflow.log_metric('train-rmse', root_mean_squared_error(y_tr, y_pred_tr))
     mlflow.log_metric('train-r-squared', r2_score(y_tr, y_pred_tr))
