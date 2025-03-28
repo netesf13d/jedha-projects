@@ -24,6 +24,13 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 
+import tensorflow as tf
+from tensorflow import keras
+
+
+SEED = 1234
+rng = np.random.default_rng(seed=SEED)
+
 
 # %% Loading
 r'''
@@ -116,6 +123,8 @@ the presence of some tokens specific to ham messages: `<#>`, `<DECIMAL>`, `<TIME
 These were certainly introduced to mask personal information from hams. Although the kind of values that
 `<DECIMAL>`, `<TIME>` and `<URL>` replace is obvious, this is not the case for `<#>`, which seems to be used
 in replacement of any kind of value.
+The character `*` seems to also be used to replace personal information in some ham messages
+(see for instance message 983). However, this character is also present as such in messages.
 """
 
 tokens_df = pd.DataFrame(
@@ -123,12 +132,14 @@ tokens_df = pd.DataFrame(
      'count_<#>': df['message'].map(lambda x: x.count('<#>')),
      'count_<DECIMAL>': df['message'].map(lambda x: x.count('<DECIMAL>')),
      'count_<TIME>': df['message'].map(lambda x: x.count('<TIME>')),
-     'count_<URL>': df['message'].map(lambda x: x.count('<URL>'))})
+     'count_<URL>': df['message'].map(lambda x: x.count('<URL>')),
+     'count_*': df['message'].map(lambda x: x.count('*'))})
 
 tokens_df.groupby('is_spam').sum()
 
 """
-Indeed, these tokens are specific to hams. There presence, due to human annotations, could introduce
+Indeed, these tokens are specific to hams (except the character `*`).
+There presence, due to human annotations, could introduce
 important biases to an automated detection system if not handled properly.
 
 With this remark in mind, we can move to the characterization of messages using the following descriptive features:
@@ -258,11 +269,11 @@ Most hams have few digits and are made of short words. We expect that a simple l
 will perform very well.
 """
 
-# %% logreg
+# %% Utils
 """
-## <a id="logreg"></a> Benchmarking with a logistic regression
+## <a id="utils"></a> Utilities
 
-We set up a simple logistic regression here as a benchmark for comparison with more advanced deep learning methods.
+We define here some utility functions
 """
 
 def print_metrics(cm: np.ndarray,
@@ -282,7 +293,84 @@ def print_metrics(cm: np.ndarray,
     print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
 
 
+def plot_metrics(x: np.ndarray,
+                 loss: np.ndarray, val_loss: np.ndarray,
+                 prec: np.ndarray, val_prec: np.ndarray,
+                 recall: np.ndarray, val_recall: np.ndarray,
+                 f1_score: np.ndarray, val_f1_score: np.ndarray):
+    """
+    
+
+    Parameters
+    ----------
+    x : np.ndarray
+        DESCRIPTION.
+    loss, val_loss : np.ndarray
+        DESCRIPTION.
+    prec, val_prec : np.ndarray
+        DESCRIPTION.
+    recall, val_recall : np.ndarray
+        DESCRIPTION.
+    f1_score, val_f1_score : np.ndarray
+        DESCRIPTION.
+
+    """
+    fig, axs = plt.subplots(
+        nrows=2, ncols=2, figsize=(6.6, 5.8), dpi=200, sharex=True,
+        gridspec_kw={'left': 0.08, 'right': 0.975, 'top': 0.92, 'bottom': 0.08,
+                     'wspace': 0.18, 'hspace': 0.18}
+    )
+    
+    for ax in axs.ravel():
+        ax.grid(visible=True, linewidth=0.3)
+        ax.set_xlim(0, len(x))
+        ax.set_xticks(np.arange(0, len(x), len(x)//5))
+
+    ## loss
+    l1, = axs[0, 0].plot(x, loss, color='tab:blue')
+    l2, = axs[0, 0].plot(x, val_loss, color='tab:orange')
+    axs[0, 0].text(0.82, 0.9, 'Loss', fontsize=11,
+                    transform=axs[0, 0].transAxes,
+                    bbox={'boxstyle': 'round,pad=0.4', 'facecolor': '0.96'})
+
+    ## precision
+    axs[0, 1].plot(x, prec, color='tab:blue')
+    axs[0, 1].plot(x, val_prec, color='tab:orange')
+    axs[0, 1].set_ylim(0.65, 1)
+    axs[0, 1].text(0.62, 0.1, 'Precision', fontsize=11,
+                   transform=axs[0, 1].transAxes,
+                   bbox={'boxstyle': 'round,pad=0.4', 'facecolor': '0.96'})
+
+    ## recall
+    axs[1, 0].plot(x, recall, color='tab:blue')
+    axs[1, 0].plot(x, val_recall, color='tab:orange')
+    axs[1, 0].set_ylim(0.65, 1)
+    axs[1, 0].text(0.62, 0.1, 'Recall', fontsize=11,
+                   transform=axs[1, 0].transAxes,
+                   bbox={'boxstyle': 'round,pad=0.4', 'facecolor': '0.96'})
+
+    ## F1-score
+    axs[1, 1].plot(x, recall, color='tab:blue')
+    axs[1, 1].plot(x, val_recall, color='tab:orange')
+    axs[1, 1].set_ylim(0.65, 1)
+    axs[1, 1].text(0.69, 0.08, 'F1-score', fontsize=11,
+                   transform=axs[1, 1].transAxes,
+                   bbox={'boxstyle': 'round,pad=0.4', 'facecolor': '0.96'})
+
+    fig.text(0.5, 0.015, 'Epoch #', fontsize=11, ha='center')
+    fig.legend(handles=[l1, l2], labels=['train', 'validation'],
+               loc=(0.63, 0.945), ncols=2)
+    
+    return fig, axs
+
+
+# %% logreg
 """
+## <a id="logreg"></a> Benchmarking with a logistic regression
+
+We set up a simple logistic regression here as a benchmark for comparison with more advanced deep learning methods.
+
+
 ### Model construction and training
 
 We keep things simple here: no parameter tuning or decision threshold adjustment.
@@ -293,7 +381,7 @@ We split the dataset into a train and test set, the latter containing 20% of the
 ## Simple train-test split, use the dataset with duplicates
 X_tr, X_test, y_tr, y_test = train_test_split(
     build_features(df['message']), df['is_spam'],
-    test_size=0.2, stratify=df['is_spam'], random_state=1234)
+    test_size=0.2, stratify=df['is_spam'], random_state=SEED)
 
 ## pipeline
 pipeline = Pipeline([('column_preprocessing', StandardScaler()),
@@ -338,7 +426,6 @@ print_metrics(confusion_matrix(y_test, lr_model.predict(X_test)))
 """
 Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve this score.
 """
-
 # %% TF-IDF MLP
 """
 ## <a id="tfidf-mlp"></a> A first neural network: Multi-layer perceptron and TF-IDF
@@ -347,14 +434,13 @@ Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve 
 
 ### Text preprocessing
 
-The text prepocessing proceeds in 5 steps:
+The text prepocessing proceeds in 4 steps:
 1. Remove diacritics and casefold the messages.
 2. Lemmatize words. However, we keep stop words as valid tokens.
 3. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
 Also discard the ham-specific token `<#>`.
 4. Finally, replace tokens with a single occurrence (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
 This processing is currently not available with scikit-learn `CountVectorizer`, so we do it manually.
-
 
 Most of the messages are written in [SMS language](https://en.wikipedia.org/wiki/SMS_language) with inconsistent style.
 Our tokenization will produce different tokens for words that have essentially the same meaning.
@@ -440,12 +526,12 @@ tfidf
 ## Train-test split
 X_tr, X_test, y_tr, y_test = train_test_split(
     tfidf, df['is_spam'], test_size=0.2, stratify=df['is_spam'],
-    random_state=1234)
+    random_state=SEED)
 
 ## MLP classifer, no preprocessing pipeline
 mlp_model = MLPClassifier(hidden_layer_sizes=(1000, 300, 100, 10),
                           solver='adam', alpha=1e-1,
-                          max_iter=300, random_state=1234)
+                          max_iter=300, random_state=SEED)
 
 mlp_model.fit(X_tr, y_tr)
 
@@ -468,19 +554,268 @@ training time. Another drawback is the tendency of the model to overfit, as
 indicated by the difference between train and test F1-scores.
 """
 
+# %% GRU chars
+"""
+## <a id="gru-char"></a> Gated Recurrent Units with character tokens
+
+The messages are rather short, we can therefore consider a tokenization at the character level.
+"""
+
+##
+df['message'].apply(len).describe(percentiles=[0.25, 0.5, 0.75, 0.90, 0.99, 0.999])
+
+"""
+The messages have a maximal length of 910 characters, with less than 50 messages
+longer than 300 characters.
+"""
+
+"""
+### Text preprocessing
+
+Handling the messages at the character level imposes its own processing. In
+particular, we must manage the ham-specific tokens.
+- The numeric tokens `<DECIMAL>` and `<TIME>` are replaced by a random digit.
+- The tokens `<#>` and `<URL>` are simply discarded.
+- The characters with less than 10 counts are replaced by an out-of-vocabulary token
+- The message sequence length is truncated to 200 characters. This operation affects 109
+messages (2%) of the dataset.
+"""
+
+## Setup the corpus
+gru_corpus = np.array([m.replace('<DECIMAL>', f'{rng.integers(0, 10)}') \
+                        .replace('<TIME>', f'{rng.integers(0, 10)}') \
+                        .replace('<#>', '').replace('<URL>', '')
+                       for m in df['message']])
+
+## create vocabluary keep chars that occur more than 10 times
+text_chars = np.array([''.join(gru_corpus)]).view('<U1')
+chars, counts = np.unique(text_chars, return_counts=True)
+chars[np.argsort(counts)], np.sort(counts)
+
+## setup text vectorizer
+vocabulary = chars[counts >= 10]
+chars_encoder = keras.layers.TextVectorization(
+    standardize=None, split='character', vocabulary=vocabulary,
+    output_sequence_length=200)
+
+
 # %%
 """
-## <a id=""></a> A first model: Multi-layer perceptron and TF-IDF
+### Dataset construction
+
+"""
+
+## train - validation - test split of the data
+is_spam = df['is_spam'].to_numpy()
+X_, X_test, y_, y_test = train_test_split(
+    gru_corpus, is_spam, test_size=0.2, stratify=is_spam, random_state=SEED)
+X_tr, X_val, y_tr, y_val = train_test_split(
+    X_, y_, test_size=0.2, stratify=y_, random_state=SEED)
+
+
+## construction of tensorflow Datasets
+batch_size = 32
+ds_tr = tf.data.Dataset.from_tensor_slices((X_tr, y_tr)).batch(batch_size)
+ds_val = tf.data.Dataset.from_tensor_slices((X_val, y_val)).batch(batch_size)
+ds_test = tf.data.Dataset.from_tensor_slices((X_test, y_test)).batch(batch_size)
+
+
+# %%
+"""
+### Model construction
+
+!!!
+- masking to handle messages of variable length
+- Initialize bias
+We set inital bias to speedup training. See
+https://www.tensorflow.org/tutorials/structured_data/imbalanced_data?hl=en
+https://karpathy.github.io/2019/04/25/recipe/#2-set-up-the-end-to-end-trainingevaluation-skeleton--get-dumb-baselines
+"""
+## Compute bias 
+p_spam = df['is_spam'].mean()
+bias_init = keras.initializers.Constant(np.log(p_spam / (1 - p_spam)))
+p_spam
+
+## Setup early stopping
+early_stop_cb = keras.callbacks.EarlyStopping(
+    monitor='val_loss', patience=5, restore_best_weights=True)
+
+## GRU model
+gru_chars_model = keras.models.Sequential(
+    [chars_encoder,
+     keras.layers.Embedding(
+         input_dim=len(chars_encoder.get_vocabulary()),
+         output_dim=64, mask_zero=True),
+     keras.layers.GRU(units=64, return_sequences=True),
+     keras.layers.GRU(units=32),
+     keras.layers.Dense(16, activation='relu'),
+     keras.layers.Dense(1, activation='sigmoid', bias_initializer=bias_init)],
+    name='GRU_chars_model',
+)
+
+gru_chars_model.compile(optimizer='nadam',
+                        loss=tf.keras.losses.BinaryCrossentropy(),
+                        metrics=[keras.metrics.Precision(name='precision'),
+                                 keras.metrics.Recall(name='recall'),
+                                 # keras.metrics.F1Score(name='F1-score')
+                                 ])
+
+# %%
+##
+history = gru_chars_model.fit(ds_tr, epochs=50, validation_data=ds_val,
+                              verbose=2, callbacks=[early_stop_cb])
+
+
+# %%
+"""
+### Model evaluation
+
+!!!
+"""
+
+x = history.epoch
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+prec = np.array(history.history['precision_7'])
+val_prec = np.array(history.history['val_precision_7'])
+recall = np.array(history.history['recall_7'])
+val_recall = np.array(history.history['val_recall_7'])
+f1_score = 2 * prec*recall / (prec + recall)
+val_f1_score = 2 * val_prec*val_recall / (val_prec + val_recall)
+
+
+fig2, axs2 = plot_metrics(history.epoch, loss, val_loss,
+                          prec, val_prec, recall, val_recall,
+                          f1_score, val_f1_score)
+
+fig2.suptitle('Figure 2: Evaluation metrics', x=0.02, ha='left')
+plt.show()
+
+
+
+# %%
+##
+print('===== Train set metrics =====')
+y_pred_tr = (gru_chars_model.predict(X_tr).ravel() > 0.5)
+print_metrics(confusion_matrix(y_tr, y_pred_tr))
+
+##
+print('===== Validation set metrics =====')
+y_pred_val = (gru_chars_model.predict(X_val).ravel() > 0.5)
+print_metrics(confusion_matrix(y_val, y_pred_val))
+
+##
+print('\n===== Test set metrics =====')
+y_pred_test = (gru_chars_model.predict(X_test).ravel() > 0.5)
+print_metrics(confusion_matrix(y_test, y_pred_test))
+
+
+"""
+!!!
+"""
+
+
+# %% GRU words
+"""
+## <a id="gru-word"></a> Gated Recurrent Units with word tokens
+
 
 
 ### Text preprocessing
 
-We retain a vocabulary size of 500 tokens,
-the less frequent having only 16 counts accross the whole corpus.
+The text prepocessing is similar to that of the TF-IDF encoding:
+1. Remove diacritics and casefold the messages.
+2. Lemmatize words, keep stop words as valid tokens.
+3. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
+Also discard the ham-specific token `<#>`.
+4. Finally, replace tokens with a single occurrence (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
+This processing is currently not available with scikit-learn `CountVectorizer`, so we do it manually.
 
 """
-import tensorflow as tf
-from tensorflow import keras
+
+
+chars_encoder = keras.layers.TextVectorization(
+    standardize=None, split='character', vocabulary=vocabulary,
+    output_sequence_length=200)
+chars_ohe = keras.layers.CategoryEncoding(
+    chars_encoder.vocabulary_size(), output_mode='one_hot')
+
+chars_ohe = keras.layers.IntegerLookup(
+     output_mode='one_hot',
+    vocabulary=np.arange(chars_encoder.vocabulary_size()))
+
+
+
+## GRU model
+gru_words_model = keras.models.Sequential(
+    [chars_encoder,
+     keras.layers.Embedding(
+         input_dim=len(chars_encoder.get_vocabulary()),
+         output_dim=64, mask_zero=True),
+     keras.layers.GRU(units=64, return_sequences=True),
+     keras.layers.GRU(units=32),
+     keras.layers.Dense(16, activation='relu'),
+     keras.layers.Dense(1, activation='sigmoid', bias_initializer=bias_init)],
+    name='GRU_words_model',
+)
+
+gru_words_model.compile(optimizer='nadam',
+                        loss=tf.keras.losses.BinaryCrossentropy(),
+                        metrics=[keras.metrics.Precision(),
+                                 keras.metrics.Recall(),
+                                 # keras.metrics.F1Score()
+                                 ])
+# %%
+##
+history = gru_words_model.fit(ds_tr, epochs=1, validation_data=ds_val,
+                              verbose=2)
+
+
+# %%
+"""
+### Model evaluation
+
+
+"""
+
+
+
+
+
+##
+print('===== Train set metrics =====')
+print_metrics(confusion_matrix(y_tr, gru_words_model.predict(X_tr)))
+
+##
+print('===== Validation set metrics =====')
+print_metrics(confusion_matrix(y_val, gru_words_model.predict(X_val)))
+
+##
+print('\n===== Test set metrics =====')
+print_metrics(confusion_matrix(y_test, gru_words_model.predict(X_test)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# %%
 
 # preprocessed_corpus = np.load('preprocessed_corpus.npy', allow_pickle=False)
 unique_tokens, token_counts = np.unique(sum(norm_msgs, start=[]), return_counts=True)
