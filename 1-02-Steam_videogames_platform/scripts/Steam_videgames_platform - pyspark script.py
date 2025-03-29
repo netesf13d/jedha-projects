@@ -92,7 +92,11 @@ df = df.withColumn(
     'required_age',
     F.regexp_extract(df['required_age'], r'\d+', 0).cast('Integer')
 )
-df.select('required_age').show()
+df.select('required_age') \
+    .groupby('required_age') \
+    .count() \
+    .sort('count', ascending=False) \
+    .show(20) # most games have no age requirement
 
 r"""
 The owner ranges are specified on a logarithmic scale (each successive range increases in size by a factor $\sim 2$).
@@ -124,7 +128,6 @@ main_cols = [
 ]
 main_df = df.select(*main_cols)
 
-
 ##
 release_dates_df = df.select('appid', 'release_date')
 
@@ -132,7 +135,6 @@ release_dates_df = df.select('appid', 'release_date')
 tags_df = df.select('appid', 'tags.*') \
             .alias('*') \
             .fillna(0)
-
 
 ##
 genres = df.select('appid', F.explode(F.split(df['genre'], ', ')).alias('genre'))
@@ -202,8 +204,6 @@ languages_df = languages_df.withColumn(
     'total',
     sum([F.col(c) for c in languages_df.columns if c not in {'', 'appid'}])
 )
-
-languages_df.show(10)
 
 
 #%%
@@ -607,7 +607,7 @@ dev_distribs_cdf = np.sum(dev_distribs_cdf >= vals, axis=0)
 
 ## plot
 fig4, ax4 = plt.subplots(
-    nrows=1, ncols=1, figsize=(5.5, 4), dpi=100,
+    nrows=1, ncols=1, figsize=(5.5, 4), dpi=200,
     gridspec_kw={'left': 0.13, 'right': 0.97, 'top': 0.88, 'bottom': 0.13})
 fig4.suptitle('Figure 4: Complementary cumulative distribution of game units'
               '\n               distributed per publisher/developer',
@@ -670,7 +670,7 @@ game_releases = game_releases_df.toPandas().astype({'date': 'datetime64[s]'})
 
 
 fig5, axs5 = plt.subplots(
-    nrows=1, ncols=2, figsize=(7, 3.5), dpi=100,
+    nrows=1, ncols=2, figsize=(8, 3.8), dpi=200,
     gridspec_kw={'left': 0.09, 'right': 0.97, 'top': 0.89, 'bottom': 0.14, 'wspace': 0.24})
 fig5.suptitle('Figure 5: Evolution of game releases', x=0.02, ha='left')
 
@@ -969,7 +969,7 @@ COLORS = [
     ]
 
 fig6, axs6 = plt.subplots(
-    nrows=1, ncols=2, figsize=(8, 5), dpi=100,
+    nrows=1, ncols=2, figsize=(8, 5), dpi=200,
     gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.59, 'bottom': 0.1, 'wspace': 0.25})
 fig6.suptitle('Figure 6: Evolution of game genre releases', x=0.02, ha='left')
 
@@ -1129,7 +1129,7 @@ cum_platform_monthly_releases = platform_releases_df \
 
 ##
 fig7, axs7 = plt.subplots(
-    nrows=1, ncols=2, figsize=(7, 3.8), dpi=100,
+    nrows=1, ncols=2, figsize=(8, 3.8), dpi=200,
     gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.83, 'bottom': 0.13, 'wspace': 0.25})
 fig7.suptitle('Figure 7: Evolution of game releases in different platforms', x=0.02, ha='left')
 

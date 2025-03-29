@@ -19,7 +19,7 @@ import matplotlib.dates as mdates
 """
 
 ##
-with open('../steam_game_output.json', 'rt', encoding='utf-8') as f:
+with open('../data/steam_game_output.json', 'rt', encoding='utf-8') as f:
     data = json.load(f)
 
 df_dict = {k: [entry['data'][k] for entry in data] for k in data[0]['data']}
@@ -436,7 +436,7 @@ cumulative_releases = releases_per_month.cumsum()
 
 ##
 fig5, axs5 = plt.subplots(
-    nrows=1, ncols=2, figsize=(7, 3.5), dpi=100,
+    nrows=1, ncols=2, figsize=(8, 3.8), dpi=200,
     gridspec_kw={'left': 0.09, 'right': 0.97, 'top': 0.89, 'bottom': 0.14, 'wspace': 0.24})
 fig5.suptitle('Figure 5: Evolution of game releases', x=0.02, ha='left')
 
@@ -622,7 +622,7 @@ COLORS = [
     ]
 
 fig6, axs6 = plt.subplots(
-    nrows=1, ncols=2, figsize=(8, 5), dpi=100,
+    nrows=1, ncols=2, figsize=(8, 5), dpi=200,
     gridspec_kw={'left': 0.08, 'right': 0.97, 'top': 0.59, 'bottom': 0.1, 'wspace': 0.25})
 fig6.suptitle('Figure 6: Evolution of game genre releases', x=0.02, ha='left')
 
@@ -713,7 +713,7 @@ cumulative_platform_releases = platform_releases_per_month.cumsum()
 
 ##
 fig7, axs7 = plt.subplots(
-    nrows=1, ncols=2, figsize=(7, 3.8), dpi=100,
+    nrows=1, ncols=2, figsize=(8, 3.8), dpi=200,
     gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.83, 'bottom': 0.13, 'wspace': 0.25})
 fig7.suptitle('Figure 7: Evolution of game releases in different platforms', x=0.02, ha='left')
 
