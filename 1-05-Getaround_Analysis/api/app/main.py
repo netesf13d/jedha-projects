@@ -133,7 +133,7 @@ async def test()-> int:
 @app.get('/pricing_models', tags=['Models info'])
 async def get_pricing_models()-> list[str]:
     """
-    Get the pricing models available from the MLFlow server.
+    Get the pricing models available from the MLflow server.
     """
     return list(models)
 

@@ -13,8 +13,8 @@ import mlflow
 def check_environment_vars()-> None:
     """
     Check that the following environment variables are set in order to
-    interact with the MLFlow server and fetch the models:
-    - `MLFLOW_TRACKING_URI`: the URI of MLFlow tracking server
+    interact with the MLflow server and fetch the models:
+    - `MLFLOW_TRACKING_URI`: the URI of MLflow tracking server
     - `AWS_ACCESS_KEY_ID`: access id to the artifact store
     - `AWS_SECRET_ACCESS_KEY`: access key to the artifact store
     """
@@ -30,7 +30,7 @@ def check_environment_vars()-> None:
 
 def fetch_models(mlflow_tracking_uri: str)-> dict:
     """
-    Fetch available pricing optimization models from the MLFlow server.
+    Fetch available pricing optimization models from the MLflow server.
     """
     mlflow.set_tracking_uri(mlflow_tracking_uri)
     model_infos = mlflow.search_registered_models()

@@ -11,7 +11,7 @@ This project consists in the contruction of a small application displaying weath
 
 This project repository is structured as follows.
 - The Jupyter notebook `Plan_your_trip_with_Kayak.ipynb` presents the application.
-- The Jupyter notebook `data_collection.ipynb` illustrates the usage of the `etl` package to fetch and store the data relevant to the project.
+- The Jupyter notebook `Data_Collection.ipynb` illustrates the usage of the `etl` package to fetch and store the data relevant to the project.
 - The Python package `etl` provides the functionality for data collection and storage.
 - The directory `data` contains the relevant data for the project.
 - The directory `media` condains media displayed in the notbooks.
@@ -26,7 +26,7 @@ To setup the Python environment:
 - Using `conda`, run `conda create --name <env_name> --file requirements.txt`
 
 To run the code, some resources must be created:
-- A [S3 bucket](https://aws.amazon.com/s3/) as a data lake to store the collected data. In the notebook `data_collection.ipynb`, the variable `BUCKET_NAME` must be set to the path to a file containing the bucket name.
+- A [S3 bucket](https://aws.amazon.com/s3/) as a data lake to store the collected data. In the notebook `Data_Collection.ipynb`, the variable `BUCKET_NAME` must be set to the path to a file containing the bucket name.
 - An [AWS](https://aws.amazon.com/) user with `AmazonS3FullAccess` policy attached. This profile is used to transfer the data to the S3 bucket. In the notebook `data_collection.ipynb`, the variable `S3_WRITER_ACCESS_KEYS` must be set to the path of the access keys file.
 - An [AWS](https://aws.amazon.com/) user with `AmazonS3ReadOnlyAccess` policy attached. This profile is used to transfer the data to the S3 bucket. In the notebook `data_collection.ipynb`, the variable `S3_READER_ACCESS_KEYS` must be set to the path of the access keys file.
 - A [Neon](https://neon.tech) database. In both notebooks `data_collection.ipynb` and `Plan_your_trip_with_Kayak.ipynb`, the variable `NEONDB_ACCESS_KEYS` must be set to the path to a file containing the database connection parameters (host, database, user, password).

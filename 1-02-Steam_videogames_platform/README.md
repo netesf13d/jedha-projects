@@ -5,7 +5,7 @@ In this project we conduct an exploratory data analysis of the computer videogam
 - the availability of video games to the public, in terms of age, language and platform;
 - the trends in game genres and their evolution.
 
-The dataset is composed from games available in the catalog of Steam's platform. Ths dataset is limited to games released before december 2022 and can be found [here](https://full-stack-bigdata-datasets.s3.amazonaws.com/Big_Data/Project_Steam/steam_game_output.json). An updated dataset (in csv format) can be found [here](https://www.kaggle.com/datasets/fronkongames/steam-games-dataset).
+The dataset is composed from games available in the catalog of Steam's platform. Ths dataset is limited to games released before december 2022 and can be found [here](https://full-stack-bigdata-datasets.s3.amazonaws.com/Big_Data/Project_Steam/steam_game_output.json). An updated dataset can be found [here](https://www.kaggle.com/datasets/fronkongames/steam-games-dataset) (with some changes in the columns).
 
 
 ## Structure of the project
@@ -19,9 +19,9 @@ This project repository is structured as follows.
 
 ## Usage
 
-To setup the Python environment:
-- With `pip`, run `pip install -r requirements.txt`
-- Using `conda`, run `conda create --name <env_name> --file requirements.txt`
+The code runs on Python 3.12. To setup the Python environment:
+- With `pip`, with python 3.12 installed, run `pip install -r requirements.txt`
+- Using `conda`, run `conda create --name <env_name> python=3.12 --file requirements.txt`
 
 
 ## Notes

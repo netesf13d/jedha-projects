@@ -18,6 +18,6 @@ This project repository is structured as follows.
 
 ## Usage
 
-To setup the Python environment:
-- With `pip`, run `pip install -r requirements.txt`
-- Using `conda`, run `conda create --name <env_name> --file requirements.txt`
+The code runs on Python 3.12. To setup the Python environment:
+- With `pip`, with python 3.12 installed, run `pip install -r requirements.txt`
+- Using `conda`, run `conda create --name <env_name> python=3.12 --file requirements.txt`

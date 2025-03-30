@@ -25,7 +25,7 @@ def textstr(data: np.ndarray)-> str:
 #
 # =============================================================================
 
-fname = "./Speed+Dating+Data.csv"
+fname = "../data/Speed+Dating+Data.csv"
 df = pd.read_csv(fname, encoding='mac_roman', thousands=',', decimal='.')
 
 
