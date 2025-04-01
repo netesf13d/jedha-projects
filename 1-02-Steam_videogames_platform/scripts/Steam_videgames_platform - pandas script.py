@@ -190,7 +190,7 @@ We note that prices have preferential values: 4.99, 9.99, 14.99, etc.
 """
 
 
-## Cumulative game owners distribution function
+## Complementary cumulative game owners distribution function
 owners_distrib = df_['owners_low'].value_counts() / df_['owners_low'].count()
 owners_cdf = owners_distrib.iloc[::-1].cumsum().iloc[::-1]
 
@@ -203,7 +203,7 @@ own_frac = np.linspace([1], [0], 201, endpoint=True)
 own_nb_games = len(cum_owners) - np.argmax(cum_owners >= own_frac, axis=-1)
 own_nb_games[0] = 0
 
-## Cumulative revenues distribution function
+## Complementary cumulative revenues distribution function
 revenues_vals = np.logspace(1, 9, 17)
 revenues_cdf = [(df_['revenues_low'] >= x).mean() for x in revenues_vals]
 
@@ -219,9 +219,9 @@ rev_nb_games[0] = 0
 
 ##
 fig2, axs2 = plt.subplots(
-    nrows=2, ncols=2, figsize=(7.2, 6), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.9, 'bottom': 0.1,
-                 'wspace': 0.26, 'hspace': 0.42})
+    nrows=2, ncols=2, figsize=(7.2, 6.2), dpi=200,
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.89, 'bottom': 0.1,
+                 'wspace': 0.26, 'hspace': 0.44})
 fig2.suptitle('Figure 2: Distribution of game owners and revenues', x=0.02, ha='left')
 fig2.text(0.5, 0.92, 'Game owners', ha='center', fontsize=11)
 fig2.text(0.5, 0.46, 'Game revenues', ha='center', fontsize=11)
@@ -320,7 +320,7 @@ There are about 30000 publishers/developers. We recognize some well known compan
 part of the released games.
 """
 
-## Cumulative distributions of number of game releases for developers and publishers
+## Complementary cumulative distributions of number of game releases for developers and publishers
 vals = np.logspace(0, 3, 13)
 publishers_cdf = [(publishers >= x).sum() for x in vals]
 developers_cdf = [(developers >= x).sum() for x in vals]
@@ -380,7 +380,7 @@ ranging over 7 orders of magnitude. This is a combined effect: the largest compa
 """
 
 
-## Cumulative distributions of number of games distributed for developers and publishers
+## Complementary cumulative distributions of number of games distributed for developers and publishers
 vals = np.logspace(3, 9, 19)
 pub_vs_owners_cdf = [(publishers_vs_owners >= x).sum() for x in vals]
 dev_vs_owners_cdf = [(developers_vs_owners >= x).sum() for x in vals]
@@ -653,7 +653,7 @@ fig6.legend(handles=polys, labels=genre_release_df.columns.to_list(),
 plt.show()
 
 """
-Figure 7 shows stack plots of monthly genre releases (left panel) and cumulated releases (right panel) over time.
+Figure 6 shows stack plots of monthly genre releases (left panel) and cumulated releases (right panel) over time.
 The counts are larger than the number of games since the latter can have multiple genres. The incresaing trend
 in game releases appear to be balanced between all the major genres. No genre is gaining interest over time.
 """
@@ -741,7 +741,8 @@ fig7.legend(handles=polys, labels=platform_release_df.columns.to_list(),
 plt.show()
 
 """
-Figure 7 shows stack plots of monthly game releases over time (left panel) and their cumulated number (right panel).
+Figure 7 shows stack plots of monthly game releases over time (left panel) and their cumulated number (right panel),
+stacked by platform availability.
 The trend is stable over time. The different pLatforms availability does not change significantly over time.
 No platform seems to be taking over the others.
 """

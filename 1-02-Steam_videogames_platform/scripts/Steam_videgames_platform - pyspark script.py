@@ -50,7 +50,7 @@ An alternative way is to download the dataset on the local file system from
 # raw_df = spark.read.json('s3a://full-stack-bigdata-datasets/Big_Data/Project_Steam/steam_game_output.json')
 
 ## from local filesystem
-raw_df = spark.read.json('../steam_game_output.json')
+raw_df = spark.read.json('../data/steam_game_output.json')
 
 raw_df.printSchema(2)
 
@@ -303,7 +303,7 @@ We note that prices have preferential values: 4.99, 9.99, 14.99, etc.
 
 #%%
 
-## Cumulative game owners distribution function
+## Complementary cumulative game owners distribution function
 owners_distrib = spark.sql(
     """
     SELECT
@@ -362,7 +362,7 @@ own_frac = np.linspace(0, 1, 201, endpoint=True)
 own_nb_games = np.sum(own_frac_vs_games.toPandas().to_numpy() < own_frac, axis=0)
 
 
-## Cumulative revenues distribution function
+## Complementary cumulative revenues distribution function
 # again, no easy way to do that with SQL
 revenues_vals = np.logspace(1, 9, 17)
 revenues_cdf = spark.sql("SELECT revenues_low FROM df").toPandas().to_numpy()
@@ -404,9 +404,9 @@ rev_nb_games = np.sum(rev_frac_vs_games.toPandas().to_numpy() < rev_frac, axis=0
 
 ##
 fig2, axs2 = plt.subplots(
-    nrows=2, ncols=2, figsize=(7.2, 6), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.9, 'bottom': 0.1,
-                 'wspace': 0.26, 'hspace': 0.42})
+    nrows=2, ncols=2, figsize=(7.2, 6.2), dpi=200,
+    gridspec_kw={'left': 0.1, 'right': 0.96, 'top': 0.89, 'bottom': 0.1,
+                 'wspace': 0.26, 'hspace': 0.44})
 fig2.suptitle('Figure 2: Distribution of game owners and revenues', x=0.02, ha='left')
 fig2.text(0.5, 0.92, 'Game owners', ha='center', fontsize=11)
 fig2.text(0.5, 0.46, 'Game revenues', ha='center', fontsize=11)
@@ -480,6 +480,34 @@ originating from 200 games (although here we are missing parts of the revenues).
 This analysis indicates that the videogames market is actually dominated by a few superproductions.
 """
 
+# %%
+# !!! DELETE
+
+fig2, axs2 = plt.subplots(
+    nrows=1, ncols=1, figsize=(6., 3.4), dpi=200,
+    gridspec_kw={'left': 0.12, 'right': 0.96, 'top': 0.96, 'bottom': 0.16,
+                 'wspace': 0.26, 'hspace': 0.44})
+
+fig2.text(0.77, 0.86, 'Game units owned', ha='center', fontsize=15,
+          bbox={'boxstyle': 'round,pad=0.5', 'facecolor': '0.92'})
+
+owners_cdf = owners_distrib.toPandas()
+
+axs2.plot(own_nb_games, 1-own_frac, marker='', linestyle='-', lw=2)
+axs2.plot([0, own_nb_games[100], own_nb_games[100]], [0.5, 0.5, 0],
+                color='k', lw=1, ls='--')
+axs2.tick_params(labelsize=12)
+axs2.set_xscale('log')
+axs2.set_xlim(8e-1, 1e5)
+axs2.set_ylim(0, 1)
+axs2.grid(visible=True, linewidth=1)
+axs2.set_xlabel('Number of games', fontsize=14)
+axs2.set_ylabel('Fraction of games units', fontsize=14, labelpad=7)
+
+fig2.savefig('Own_frac.png')
+plt.show()
+
+
 
 # %%
 """
@@ -537,7 +565,7 @@ part of the released games. We also note that releasing a large number of games 
 a large number of units is distributed.
 """
 
-## Cumulative distributions of number of game releases for developers and publishers
+## Complementary cumulative distributions of number of game releases for developers and publishers
 vals = np.logspace(0, 3, 13)
 
 pub_releases_cdf = publishers_df.select('game_releases').toPandas().to_numpy()
@@ -954,7 +982,7 @@ genre_releases_df = genre_releases_df.toPandas().astype({'date': 'datetime64[s]'
 genre_releases_cumsum_df = genre_releases_cumsum_df.toPandas().astype({'date': 'datetime64[s]'})
 
 ##
-genre_releases_df.show()
+genre_releases_df
 
 ##
 genre_releases_cumsum_df
@@ -1002,7 +1030,7 @@ fig6.legend(handles=polys, labels=genre_releases_df.columns[1:].to_list(),
 plt.show()
 
 """
-Figure 7 shows stack plots of monthly genre releases (left panel) and cumulated releases (right panel) over time.
+Figure 6 shows stack plots of monthly genre releases (left panel) and cumulated releases (right panel) over time.
 The counts are larger than the number of games since the latter can have multiple genres. The incresaing trend
 in game releases appear to be balanced between all the major genres. No genre is gaining interest over time.
 """
@@ -1126,12 +1154,12 @@ cum_platform_monthly_releases = platform_releases_df \
     .toPandas().astype({'date': 'datetime64[s]'}) \
     .set_index('date')
 
-
+# %%
 ##
 fig7, axs7 = plt.subplots(
     nrows=1, ncols=2, figsize=(8, 3.8), dpi=200,
     gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.83, 'bottom': 0.13, 'wspace': 0.25})
-fig7.suptitle('Figure 7: Evolution of game releases in different platforms', x=0.02, ha='left')
+# fig7.suptitle('Figure 7: Evolution of game releases in different platforms', x=0.02, ha='left')
 
 polys = axs7[0].stackplot(platform_monthly_releases.index, platform_monthly_releases.T)
 axs7[0].set_xlim(12410, 19730)
@@ -1152,15 +1180,66 @@ axs7[1].set_xlabel('Date')
 axs7[1].set_ylabel('Cumulative game releases (x 1000)')
 
 fig7.legend(handles=polys, labels=platform_monthly_releases.columns.to_list(),
-            ncols=3, loc=(0.3, 0.86))
-
+            ncols=3, loc=(0.1, 0.86))
+fig7.savefig('platforms_release.png')
 plt.show()
 
 """
-Figure 7 shows stack plots of monthly game releases over time (left panel) and their cumulated number (right panel).
+Figure 7 shows stack plots of monthly game releases over time (left panel) and their cumulated number (right panel),
+stacked by platform availability.
 The trend is stable over time. The different pLatforms availability does not change significantly over time.
 No platform seems to be taking over the others.
 """
+
+# %%
+
+# !!! DELETE
+from matplotlib.patches import Patch
+
+fig6, axs6 = plt.subplots(
+    nrows=1, ncols=2, figsize=(7, 3.2), dpi=200,
+    gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.94, 'bottom': 0.16,
+                 'wspace': 0.18})
+
+# axs6[0].axis('off')
+handles = [Patch(facecolor=COLORS[2], alpha=1, label='Action'),
+           Patch(facecolor=COLORS[3], alpha=1, label='Adventure'),
+           Patch(facecolor=COLORS[6], alpha=1, label='Casual'),
+           Patch(facecolor=COLORS[13], alpha=1, label='Indie')]
+polys1 = axs6[0].stackplot(
+    genre_releases_df['date'], genre_releases_df.iloc[:, 1:].T,
+    colors=COLORS)
+axs6[0].set_xlim(12410, 19730)
+axs6[0].xaxis.set_major_locator(mdates.YearLocator(4))
+axs6[0].set_ylim(0, 2500)
+axs6[0].set_yticks(np.linspace(0, 2500, 6), np.linspace(0, 2.5, 6))
+axs6[0].grid(visible=True)
+axs6[0].set_ylabel('Monthly releases (x 1000)', fontsize=14, labelpad=7)
+axs6[0].legend(handles=handles,
+            ncols=1, loc=(0.01, 0.52), fontsize=11,
+            title='Genres',
+            title_fontproperties={'weight': 'bold'})
+
+polys2 = axs6[1].stackplot(platform_monthly_releases.index, platform_monthly_releases.T)
+axs6[1].set_xlim(12410, 19730)
+axs6[1].xaxis.set_major_locator(mdates.YearLocator(4))
+axs6[1].set_ylim(0, 1200)
+axs6[1].set_yticks(np.linspace(0, 1200, 7), ['0', '0.2', '0.4', '0.6', '0.8', '1', '1.2'])
+axs6[1].grid(visible=True)
+axs6[1].legend(handles=polys2, labels=platform_monthly_releases.columns.to_list(),
+            ncols=1, loc=(0.01, 0.62), fontsize=11,
+            title='Platforms',
+            title_fontproperties={'weight': 'bold'})
+
+# axs6[1].set_xlabel('Date', fontsize=14)
+# axs6[1].set_ylabel('Monthly releases (x 1000)', fontsize=14, labelpad=7)
+
+fig6.text(0.5, 0.02, 'Date', fontsize=14)
+
+
+fig6.savefig('releases.png')
+plt.show()
+
 
 # %% Conclusion
 """
