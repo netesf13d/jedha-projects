@@ -111,22 +111,6 @@ We are in the presence of garments descriptions. However, we note the proeminenc
 ubiquitous words such as 'oz' (referring to the weight), 'fabric', 'recyclable', 'common', etc.
 """
 
-# %%
-# !!! DELETE
-
-corpus_wc = create_wordcloud(' '.join(corpus), width=800, height=520)
-xy_ratio = corpus_wc.shape[0] / corpus_wc.shape[1]
-
-wc_fig1 = plt.figure(figsize=(6, 6*xy_ratio), dpi=200)
-wc_ax1 = wc_fig1.add_axes(rect=(0, 0, 1, 1))
-
-wc_ax1.axis('off')
-wc_ax1.imshow(corpus_wc, interpolation='bilinear')
-
-wc_fig1.savefig('desc_wc.png')
-plt.show()
-
-
 # %%% TF-IDF
 """
 ### Construction of the TF-IDF matrix
@@ -234,55 +218,6 @@ Parameter values that fall in these domains must be rejected. The parameters val
 be at the intersection of the colored regions of both maps. This imposes `0.68 <= eps <= 0.78`
 and `1 <= min_samples <= 5`.
 """
-
-# %%
-
-# !!! DELETE
-
-fig1, axs1 = plt.subplots(
-    nrows=2, ncols=2, sharex=False, sharey=True, figsize=(5.6, 2.4), dpi=200,
-    gridspec_kw={'left': 0.09, 'right': 0.97, 'top': 1, 'bottom': 0.2,
-                 'height_ratios': [0.07, 1], 'hspace': 0.04, 'wspace': 0.08})
-# fig1.suptitle("Figure 1: Maps of numbers of clusters and outliers for the grid search",
-#               x=0.02, ha='left', fontsize=12)
-
-axs1[0, 0].axis('off')
-axs1[0, 1].axis('off')
-
-
-axs1[1, 0].set_aspect('equal')
-cmap1 = plt.get_cmap('tab20b').copy()
-cmap1.set_extremes(under='0.1', over='0.9')
-heatmap1 = axs1[1, 0].pcolormesh(nb_clusters, cmap=cmap1, vmin=4.5, vmax=24.5,
-                                 edgecolors='0.15', linewidth=0.05)
-
-axs1[1, 0].set_xticks(np.linspace(0.5, 20.5, 5), eps_vals[::5])
-axs1[1, 0].set_yticks(np.linspace(0.5, 14.5, 8), min_samples_vals[::2])
-axs1[1, 0].set_ylabel('`min_samples`', fontsize=11)
-fig1.text(0.5, 0.04, 'max neighbor distance (`eps`)', fontsize=11, ha='center')
-
-# fig1.colorbar(heatmap1, cax=axs1[0, 0], orientation='horizontal', ticklocation='top')
-# axs1[0, 0].tick_params(pad=1)
-# axs1[0, 0].set_xticks(np.linspace(5, 23, 10), np.arange(5, 24, 2))
-# axs1[0, 0].set_title('Number of clusters')
-
-
-axs1[1, 1].set_aspect('equal')
-cmap2 = plt.get_cmap('plasma').copy()
-cmap2.set_extremes(under='0.1', over='0.9')
-heatmap2 = axs1[1, 1].pcolormesh(nb_outliers, cmap=cmap2, vmin=0, vmax=100,
-                                 edgecolors='0.15', linewidth=0.1)
-
-axs1[1, 1].set_xticks(np.linspace(0.5, 20.5, 5), eps_vals[::5])
-axs1[1, 1].set_yticks(np.linspace(0.5, 14.5, 8), min_samples_vals[::2])
-
-# fig1.colorbar(heatmap2, cax=axs1[0, 1], orientation='horizontal', ticklocation='top')
-# axs1[0, 1].tick_params(pad=1)
-# axs1[0, 1].set_title('Number of outliers')
-fig1.savefig('dbscan_params.png')
-
-plt.show()
-
 
 #%%
 
@@ -450,65 +385,6 @@ Both clustering methods capture well these clusters. The data at the center is t
 for both DBSCAN and HDBSCAN, although the latter produce more outliers. Finally, contrary to DBSCAN,
 HDBSCAN is able to distinguish some satellite agreagates as distinct clusters (see data on top left).
 """
-# %%
-# !!! DELETE
-
-fig2, axs2 = plt.subplots(
-    nrows=1, ncols=2, sharex=True, sharey=True, figsize=(5.6, 3.6), dpi=100,
-    gridspec_kw={'left': 0.04, 'right': 0.96, 'top': 0.9, 'bottom': 0.1, 'wspace': 0.1})
-# fig2.suptitle("Figure 2: t-SNE representation of the clusterized descriptions",
-#               x=0.02, ha='left', fontsize=12)
-
-# # legend
-# alpha = 0.8
-# handles = [Patch(facecolor='k', alpha=alpha, label='Outliers')]
-# handles += [Patch(facecolor=COLORS[k], alpha=alpha, label=f'Cluster {k}')
-#             for k in range(max(nb_dbc, nb_hdbc))]
-# fig2.legend(handles=handles, ncols=6, loc=(0.028, 0.75), alignment='center',
-#             handlelength=1.8, handletextpad=0.6)
-
-# display outliers
-idx = np.nonzero(dbc_labels == -1)[0]
-line, = axs2[0].plot(embedded_tfidf[idx, 0], embedded_tfidf[idx, 1],
-                     marker='.', linestyle='', color='k', alpha=alpha,
-                     markersize=8, markeredgecolor='none')
-
-# display clusters
-for k in range(max(nb_dbc, nb_hdbc)):
-    idx = np.nonzero(dbc_labels == k)[0]
-    line, = axs2[0].plot(embedded_tfidf[idx, 0], embedded_tfidf[idx, 1],
-                         marker='.', linestyle='', color=COLORS[k], alpha=alpha,
-                         markersize=8, markeredgecolor='none')
-
-axs2[0].tick_params(direction='in', labelleft=False, right=True,
-                    labelbottom=False, top=True)
-axs2[0].grid(visible=True, linewidth=0.5)
-axs2[0].set_xlim(-70, 70)
-axs2[0].set_ylim(-75, 75)
-axs2[0].set_title(f'DBSCAN ({nb_dbc} clusters)', y=-0.12)
-
-
-# display outliers
-outlier_idx = np.nonzero(hdbc_labels == -1)[0]
-axs2[1].plot(embedded_tfidf[outlier_idx, 0], embedded_tfidf[outlier_idx, 1],
-             marker='.', linestyle='', color='k', alpha=alpha,
-             markersize=8, markeredgecolor='none')
-# display clusters
-for k in range(max(nb_dbc, nb_hdbc)):
-    idx = np.nonzero(new_hdbc_labels == k)[0]
-    axs2[1].plot(embedded_tfidf[idx, 0], embedded_tfidf[idx, 1],
-                 marker='.', linestyle='', color=COLORS[k], alpha=alpha,
-                 markersize=8, markeredgecolor='none')
-
-axs2[1].tick_params(direction='in', labelleft=False, right=True,
-                    labelbottom=False, top=True)
-axs2[1].grid(visible=True, linewidth=0.5)
-axs2[1].set_title(f'HDBSCAN ({nb_hdbc} clusters)', y=-0.12)
-
-fig2.savefig('tsne.png')
-plt.show()
-
-
 
 #%%
 """
@@ -517,8 +393,8 @@ To get insights on the actual word content of each cluster, we display the assoc
 
 ## Mask the bottom left to display the cluster number
 mask = np.full((500, 1000), 0x0, dtype=int)
-# mask[420:, :110] = 0xff
-# !!!
+mask[420:, :110] = 0xff
+
 ## Compute word clouds for each cluster
 clusters_wc = []
 for k in range(-1, nb_dbc):
@@ -569,29 +445,6 @@ which kind of items are considered outliers.
 - The other cluster are more vague, containing more generic words. This is the case for instance of cluster 1 (the largest one),
 which word cloud is dominated by `'pocket'`. It certainly represents garments with pockets in general.
 """
-
-# %%
-# !!! DELETE
-wc = clusters_wc[0]
-xy_ratio = wc.shape[0] / wc.shape[1]
-
-wc = clusters_wc[5]
-fig = plt.figure(figsize=(6, 6*xy_ratio), dpi=200)
-ax = fig.add_axes(rect=(0, 0, 1, 1))
-
-ax.axis('off')
-ax.imshow(wc, interpolation='bilinear')
-
-# fig.savefig('outliers.png')
-# fig.savefig('largest_cluster.png')
-fig.savefig('brim.png')
-# fig.savefig('bra.png')
-plt.show()
-
-
-
-
-
 
 # %% recommender system
 """
@@ -730,27 +583,6 @@ hot weather ('sun', 'UPF') against cold weather ('fleece', 'handwarmer').
 We finally note an intertwining of different semantic fields within topics. Garment elements ('pocket', 'zipper', 'button')
 are mixed with fabric materials ('cotton', 'merino', 'spandex') and types of garments ('shirt', 'bra', 'jean').
 """
-
-# %%
-# !!! DELETE
-wc = topic_wordclouds_pos[0]
-xy_ratio = wc.shape[0] / wc.shape[1]
-
-
-wc = topic_wordclouds_pos[5]
-fig = plt.figure(figsize=(6, 6*xy_ratio), dpi=200)
-ax = fig.add_axes(rect=(0, 0, 1, 1))
-
-ax.axis('off')
-ax.imshow(wc, interpolation='bilinear')
-
-# fig.savefig('natural_pos.png')
-# fig.savefig('synthetic_neg.png')
-# fig.savefig('cold_pos.png')
-# fig.savefig('hot_neg.png')
-fig.savefig('hot_pos.png')
-# fig.savefig('cold_neg.png')
-plt.show()
 
 
 

@@ -550,40 +550,6 @@ for the two checkin methods, as previously observed (see figure 3).
 """
 
 # %%
-
-# !!! DELETE
-##
-fig4, ax4 = plt.subplots(
-    nrows=1, ncols=1, figsize=(6, 4), dpi=200,
-    gridspec_kw={'left': 0.1, 'right': 0.97, 'top': 0.94, 'bottom': 0.13,
-                 'wspace': 0.24})
-
-
-l1, = ax4.plot(waiting_times, cancel_prob2['mobile'], color='tab:blue')
-fill1 = ax4.fill_between(waiting_times, cancel_prob2['mobile']-cancel_prob2_std['mobile'],
-                         cancel_prob2['mobile']+cancel_prob2_std['mobile'],
-                         color='tab:blue', alpha=0.2)
-
-l2, = ax4.plot(waiting_times, cancel_prob2['connect'], color='tab:orange')
-fill2 = ax4.fill_between(waiting_times,
-                         cancel_prob2['connect']-cancel_prob2_std['connect'],
-                         cancel_prob2['connect']+cancel_prob2_std['connect'],
-                         color='tab:orange', alpha=0.2)
-
-ax4.grid(visible=True, linewidth=0.4)
-ax4.set_xlim(-450, 450)
-ax4.set_xticks(np.linspace(-400, 400, 9))
-ax4.set_xlabel("Waiting time $t$ (min)", fontsize=12)
-ax4.set_ylim(-0.005, 1.005)
-ax4.set_ylabel("Cancellation probability", fontsize=12)
-ax4.legend(handles=[(l1, fill1), (l2, fill2)],
-           labels=['Mobile checkin', 'Getaround connect checkin'], fontsize=11)
-
-fig4.savefig('cancelprob.png')
-plt.show()
-
-
-# %%
 r"""
 ## <a id="delay"></a> Introducing a delay between rentals
 
@@ -896,62 +862,6 @@ cancellation rate that remains constant at around 9%.
 A delay of about 2h leads to an absolute decrease of about 0.7% (4.5% relative).
 This corresponds to 5 to 6 cancellations in the pool of 791 rentals considered here.
 """
-# %%
-
-# !!! DELETE
-##
-fig6, axs6 = plt.subplots(
-    nrows=2, ncols=1, figsize=(6.2, 6), dpi=200, sharex=True,
-    gridspec_kw={'left': 0.12, 'right': 0.88, 'top': 0.97, 'bottom': 0.08,
-                 'hspace': 0.12})
-axs6_twin = [ax.twinx() for ax in axs6]
-
-labels = ['Baseline', 'With rental delay']
-
-
-l0 = axs6[0].axhline(p0_cancel['mobile'], color='k', linestyle='--', linewidth=1)
-l1, = axs6[0].plot(rental_delays, mobile_cancel_frac)
-
-axs6_twin[0].set_ylim(0.08*mobile_n_cars, 0.14*mobile_n_cars)
-axs6_twin[0].set_ylabel('Rental cancellations', fontsize=12,
-                        rotation=270, labelpad=18)
-
-axs6[0].grid(visible=True, linewidth=0.4)
-axs6[0].grid(visible=True, linewidth=0.3, which='minor')
-axs6[0].set_xlim(-120, 300)
-axs6[0].set_xticks(np.linspace(-120, 300, 8), np.arange(-2, 6))
-axs6[0].set_xticks(np.linspace(-90, 270, 7), minor=True)
-axs6[0].set_ylim(0.08, 0.12)
-axs6[0].set_yticks(np.linspace(0.08, 0.12, 5))
-axs6[0].set_yticks(np.linspace(0.085, 0.115, 4), minor=True)
-axs6[0].set_ylabel("Rental cancellation fraction", fontsize=12, labelpad=7)
-axs6[0].legend(handles=[l0, l1], labels=labels,
-               title='Mobile checkin',
-               title_fontproperties={'weight': 'bold'}, fontsize=11)
-
-
-l0 = axs6[1].axhline(p0_cancel['connect'], color='k', linestyle='--', linewidth=1)
-l1, = axs6[1].plot(rental_delays, connect_cancel_frac, color='tab:orange')
-
-axs6_twin[1].set_ylim(0.14*connect_n_cars, 0.18*connect_n_cars)
-axs6_twin[1].set_ylabel('Rental cancellations', fontsize=12,
-                        rotation=270, labelpad=18)
-
-axs6[1].grid(visible=True, linewidth=0.4)
-axs6[1].grid(visible=True, linewidth=0.3, which='minor')
-axs6[1].set_xlim(-120, 300)
-axs6[1].set_xlabel("Rental delay (h)", fontsize=11, labelpad=4)
-axs6[1].set_ylim(0.14, 0.18)
-axs6[1].set_yticks(np.linspace(0.14, 0.18, 5))
-axs6[1].set_yticks(np.linspace(0.145, 0.175, 4), minor=True)
-axs6[1].set_ylabel("Rental cancellation fraction", fontsize=12, labelpad=7)
-axs6[1].legend(handles=[l0, l1], labels=labels,
-               title='Getaround connect checkin',
-               title_fontproperties={'weight': 'bold'}, fontsize=11)
-
-fig6.savefig('rental_delay.png')
-plt.show()
-
 
 # %%
 r"""
