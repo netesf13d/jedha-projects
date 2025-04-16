@@ -27,7 +27,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 """
 ## <a id="loading"></a> Data loading
 
-The dataset conatining the features relevant to rental car princing is stored
+The dataset conataining the features relevant to rental car princing is stored
 in the csv file `get_around_pricing_project.csv`.
 """
 
