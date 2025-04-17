@@ -14,12 +14,12 @@ Table transactions {
   time_id bigint
   merchant_id bigint
   customer_id bigint
-  currency_code Char(3) // ISO 4217
+  currency_code text // ISO 4217
   ip_geo_id bigint
   amount decimal(10, 2)
-  payment_method varchar(16)
-  payment_status varchar(16)
-  device_type varchar(16)
+  payment_method text
+  payment_status text
+  device_type text
 }
 
 
@@ -38,14 +38,14 @@ Table transaction_time {
 
 Table merchants {
   merchant_id bigint [primary key]
-  merchant_name varchar(255)
-  country_code char(2) // ISO 3166-1 2-letter
+  merchant_name text
+  country_code text // ISO 3166-1 2-letter
   // ...
 }
 
 Table customers {
   customer_id bigint [primary key]
-  country_code char(2) // ISO 3166-1 2-letter
+  country_code text // ISO 3166-1 2-letter
   // ...
 }
 
@@ -60,8 +60,8 @@ Table ip_geography {
   ip_geo_id bigint [primary key]
   latitude float
   longitude float
-  country_code char(2) // ISO 3166-1 2-letter
-  province varchar(255)
+  country_code text // ISO 3166-1 2-letter
+  province text
   // ...
 }
 
@@ -69,39 +69,39 @@ Table ip_geography {
 ///// Reference tables /////
 
 Table currencies {
-  currency_code char(3) [primary key] // ISO 4217
-  currency_name varchar(255) [unique]
+  currency_code text [primary key] // ISO 4217
+  currency_name text [unique]
   usd_change_rate decimal(6,4)
 }
 
 Table countries {
-  country_code char(2) [primary key] // ISO 3166-1 alpha-2
-  currency_name varchar(255) [unique]
+  country_code text [primary key] // ISO 3166-1 alpha-2
+  currency_name text [unique]
 }
 
 Table payment_methods {
   payment_method_id integer [primary key]
-  payment_method varchar(16) [unique] // credit_card, ...
+  payment_method text [unique] // credit_card, ...
 }
 
 Table payment_statuses {
   payment_status_id integer [primary key]
-  payment_status varchar(16) [unique] // successful, failed, refunded, ...
+  payment_status text [unique] // successful, failed, refunded, ...
 }
 
 Table device_types {
   device_type_id integer [primary key]
-  device_type varchar(16) [unique] // mobile, desktop, ...
+  device_type text [unique] // mobile, desktop, ...
 }
 
 Table months {
   month tinyint [primary key]
-  month_name varchar(9) [unique]
+  month_name text [unique]
 }
 
 Table week_days {
   week_day tinyint [primary key]
-  week_day_name varchar(9) [unique]
+  week_day_name text [unique]
 }
 
 

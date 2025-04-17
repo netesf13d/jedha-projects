@@ -15,27 +15,27 @@ Table transactions {
   customer_id bigint
   timestamp datetime
   amount decimal(10, 2)
-  currency_code char(3) // ISO 4217
-  payment_method varchar(16)
-  payment_status varchar(16)
-  device_type varchar(16)
+  currency_code text // ISO 4217
+  payment_method text
+  payment_status text
+  device_type text
   ip_latitude float
   ip_longitude float
 }
 
 Table merchants {
   merchant_id bigint [primary key, unique]
-  name varchar(255)
-  iban varchar(34)
-  country_code char(2) // ISO 3166-1 alpha-2
+  name text
+  iban text
+  country_code text // ISO 3166-1 alpha-2
   // ...
 }
 
 Table customers {
   customer_id bigint [primary key, unique]
-  name varchar(255)
-  iban varchar(34)
-  country_code char(2) // ISO 3166-1 alpha-2
+  name text
+  iban text
+  country_code text // ISO 3166-1 alpha-2
   // ...
 }
 

@@ -10,27 +10,27 @@ CREATE TABLE transactions.transactions (
   customer_id BIGINT FOREIGN KEY
   timestamp DATETIME
   amount DECIMAL(10, 2)
-  currency_code CHAR(3) -- ISO 4217
-  payment_method VARCHAR(16)
-  payment_status VARCHAR(16)
-  device_type VARCHAR(16)
+  currency_code TEXT -- ISO 4217
+  payment_method TEXT
+  payment_status TEXT
+  device_type TEXT
   ip_latitude FLOAT
   ip_longitude FLOAT
 );
 
 CREATE TABLE transactions.merchants (
   merchant_id BIGINT PRIMARY KEY
-  name VARCHAR(255)
-  iban VARCHAR(34)
-  country_code CHAR(2) -- ISO 3166-1 alpha-2
+  name TEXT
+  iban TEXT
+  country_code TEXT -- ISO 3166-1 alpha-2
   -- ...
 );
 
 CREATE TABLE transactions.customers (
   customer_id BIGINT PRIMARY KEY
-  name VARCHAR(255)
-  iban VARCHAR(34)
-  country_code CHAR(2) -- ISO 3166-1 alpha-2
+  name TEXT
+  iban TEXT
+  country_code TEXT -- ISO 3166-1 alpha-2
   -- ...
 );
 
