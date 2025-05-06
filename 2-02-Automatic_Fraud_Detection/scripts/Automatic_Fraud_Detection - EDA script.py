@@ -34,10 +34,10 @@ https://www.kaggle.com/datasets/kartik2112/fraud-detection/
 """
 
 ##
-df = pd.read_csv('../data/fraudTest.csv')
-df = df.drop('Unnamed: 0', axis=1)
+raw_df = pd.read_csv('../data/fraudTest.csv')
+raw_df = raw_df.drop('Unnamed: 0', axis=1)
 
-print(df.describe(include='all'))
+print(raw_df.describe(include='all'))
 
 r"""
 The dataset has 555715 rows, each corresponds to a transaction
@@ -77,68 +77,68 @@ detection:
 """
 
 ## cast the quantitative variable to float, for better handling of missing values
-df = df.astype({'trans_date_trans_time': 'datetime64[s]'})
-
-
-customer_ids = 0
-
-merchant_ids = 0
-
-dt = df['trans_date_trans_time'].dt
-
-proc_df = pd.DataFrame({
-    'merchant_id': 0,
-    'customer_id': 0,
-    'month': dt.month,
-    'weekday': dt.weekday,
-    'time': df['trans_date_trans_time'] - dt.floor('D'),
-    'amt': df['amt'],
-    'cust_fraudster': 0,
-    'merch_fraud_victim': df.loc[:, ['merchant', 'is_fraud']].groupby('merchant').any()
-                        })
+raw_df = raw_df.astype({'trans_date_trans_time': 'datetime64[s]'})
 
 ## discard the 'fraud_' string before each merchant value
-df['merchant'] = df['merchant'].apply(lambda x: x.strip('fraud_'))
+raw_df['merchant'] = raw_df['merchant'].apply(lambda x: x.strip('fraud_'))
 
 ##
-cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
+customers = [' '.join(cust)
+             for cust in raw_df.loc[:, ['first', 'last']].to_numpy()]
+customer_ids = dict(zip(set(customers), range(len(customers))))
+raw_df = raw_df.assign(customer=customers)
+customer_fraud = raw_df.loc[:, ['customer', 'is_fraud']].groupby('customer').any()
+customer_fraud = dict(customer_fraud['is_fraud'].items())
 
-bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
-             'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
-             'winter_tires']
+## 
+merchant_ids = dict(zip(set(raw_df['merchant']), range(len(raw_df))))
+merchant_fraud = raw_df.loc[:, ['merchant', 'is_fraud']].groupby('merchant').any()
+merchant_fraud = dict(merchant_fraud['is_fraud'].items())
 
-quant_vars = ['mileage', 'engine_power']
+##
+dt = raw_df['trans_date_trans_time'].dt
 
-sys.exit()
+
+##
+df = pd.DataFrame({
+    'merchant_id': raw_df['merchant'].map(merchant_ids),
+    'customer_id': raw_df['customer'].map(customer_ids),
+    'month': dt.month,
+    'weekday': dt.weekday,
+    'time': raw_df['trans_date_trans_time'] - dt.floor('D'),
+    'amt': raw_df['amt'],
+    'cust_fraudster': raw_df['customer'].map(customer_fraud),
+    'merch_fraud_victim': raw_df['merchant'].map(merchant_fraud),
+    'is_fraud': raw_df['is_fraud']
+    })
+
+
+##
+cat_vars = ['month', 'weekday']
+bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+quant_vars = ['time', 'amt']
+
 # %% EDA
 """
 ## <a id="eda"></a> Preliminary data analysis
 
-We begin with the usual exploratory data analysis, to gather insight and determine our preprocessing
-policy.
-"""
-print(df['car_type'].value_counts())
-
-
-print(df['fuel'].value_counts())
-
-
-print(df['paint_color'].value_counts())
-
-
-print(df['model_key'].value_counts())
 
 """
-We note the presence of underrepresented categories for `fuel`, `paint_color` and `model_key`.
-This could be a problem during model training and evaluation, or worse, in production.
-For instance, in a train-test split, a given category could be absent from the train sample
-and thus would not be recognized during testing.
+print(df.describe(include='all'))
+
+
+"""
+!!!
 """
 
 # %%
 """
-### Rental prices distributions vs car options
+### Distribution of transfered amounts
 """
+
+bins = np.linspace(0, 600, 151)
+hist = np.histogram(df['amt'], bins=bins)
+
 
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(7, 4.2), dpi=100,
@@ -146,52 +146,26 @@ fig1, ax1 = plt.subplots(
 fig1.suptitle("Figure 1: Comparison of rental prices vs various car options",
               x=0.02, ha='left')
 
+ax1.hist(df['amt'], bins=bins, density=False)
 
-vdata, vpos = [], []
-vdata_true, vdata_false = [], []
-for i, item in enumerate(bool_vars):
-    for is_, gdf in df.groupby(item):
-        if is_:
-            vdata_true.append(gdf['rental_price_per_day'].to_numpy())
-        else:
-            vdata_false.append(gdf['rental_price_per_day'].to_numpy())
-
-vplot_false = ax1.violinplot(vdata_false, positions=np.linspace(-0.2, i-0.2, i+1),
-                             widths=0.36, showmeans=True, bw_method=0.05)
-for elt in vplot_false['bodies']:
-    elt.set_facecolor('#1F77B480')
-for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-    vplot_false[elt].set_edgecolor('tab:blue')
-
-vplot_true = ax1.violinplot(vdata_true, positions=np.linspace(0.2, i+0.2, i+1),
-                            widths=0.36, showmeans=True, bw_method=0.05)
-for elt in vplot_true['bodies']:
-    elt.set_facecolor('#FF7F0E80')
-for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-    vplot_true[elt].set_edgecolor('tab:orange')
-
-
-ax1.set_xlim(-0.5, i+0.5)
-ticks = ['Private\nparking', 'GPS', 'Air\nConditioning', 'Automatic\nCar',
-         'Getaround\nConnect', 'Speed\nRegulator', 'Winter\nTires']
-ax1.set_xticks(np.arange(0, len(ticks)), ticks, rotation=0)
-ax1.set_ylim(0, 480)
-ax1.set_yticks(np.arange(50, 500, 50), minor=True)
+ax1.set_xlim(-0.5, 600)
+# ticks = ['Private\nparking', 'GPS', 'Air\nConditioning', 'Automatic\nCar',
+#          'Getaround\nConnect', 'Speed\nRegulator', 'Winter\nTires']
+# ax1.set_xticks(np.arange(0, len(ticks)), ticks, rotation=0)
+# ax1.set_ylim(0, 480)
+# ax1.set_yticks(np.arange(50, 500, 50), minor=True)
 ax1.set_ylabel('Rental price ($/day)', labelpad=5)
 ax1.grid(visible=True, axis='y', linewidth=0.3)
 ax1.grid(visible=True, axis='y', which='minor', linewidth=0.2)
 
-handles = [Patch(facecolor='#1F77B480', edgecolor='k', linewidth=0.5),
-           Patch(facecolor='#FF7F0E80', edgecolor='k', linewidth=0.5)]
-ax1.legend(handles=handles, labels=['False', 'True'], ncols=2)
+# handles = [Patch(facecolor='#1F77B480', edgecolor='k', linewidth=0.5),
+#            Patch(facecolor='#FF7F0E80', edgecolor='k', linewidth=0.5)]
+# ax1.legend(handles=handles, labels=['False', 'True'], ncols=2)
 
 plt.show()
 
 """
-Figure 1 presents violin plots of car rental price as a function of various car options.
-The presence of an option, such as a GPS or private parking affects the price positively,
-with an average price increase of about 10-20%. The only exception is that of winter tires,
-their presence do not affect the rental price.
+Figure 1 presents 
 """
 
 # %%
@@ -200,14 +174,14 @@ their presence do not affect the rental price.
 """
 
 ## Correlation matrix
-df_ = df.loc[:, ['rental_price_per_day'] + quant_vars + bool_vars]
+df_ = df.loc[:, ['is_fraud'] + quant_vars + bool_vars]
 corr_df = df_.corr().to_numpy()
 
 ##
 fig2, ax2 = plt.subplots(
-    nrows=1, ncols=1, figsize=(6.6, 5.6), dpi=100,
-    gridspec_kw={'left': 0.12, 'right': 0.88, 'top': 0.76, 'bottom': 0.04, 'wspace': 0.24})
-cax2 = fig2.add_axes((0.87, 0.04, 0.03, 0.72))
+    nrows=1, ncols=1, figsize=(5.6, 4.6), dpi=100,
+    gridspec_kw={'left': 0.15, 'right': 0.86, 'top': 0.72, 'bottom': 0.04, 'wspace': 0.24})
+cax2 = fig2.add_axes((0.87, 0.04, 0.03, 0.68))
 fig2.suptitle("Figure 2: Correlation matrix",
               x=0.02, ha='left')
 
@@ -215,15 +189,16 @@ fig2.suptitle("Figure 2: Correlation matrix",
 ax2.set_aspect('equal')
 cmap2 = plt.get_cmap('coolwarm').copy()
 cmap2.set_extremes(under='0.9', over='0.5')
-heatmap = ax2.pcolormesh(corr_df[::-1]*100, cmap=cmap2, vmin=-70, vmax=70,
+heatmap = ax2.pcolormesh(corr_df[::-1]*100, cmap=cmap2, vmin=-20, vmax=20,
                              edgecolors='0.2', linewidth=0.5)
 
 ax2.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
-ticklabels = ['Rental price', 'Mileage', 'Engine power',
-              'Priv. parking', 'GPS', 'Air cond.', 'Automatic car',
-              'Getaround conn.', 'Speed reg.', 'Winter tires']
-ax2.set_xticks(np.linspace(0.5, 9.5, 10), ticklabels, rotation=50, ha='left')
-ax2.set_yticks(np.linspace(9.5, 0.5, 10), ticklabels, rotation=0)
+ticklabels = ['Is fraud', 'Transaction\ntime', 'Transaction\namount',
+              'Fraudster\ncustomer', 'Merchant\nvictim']
+ax2.set_xticks(np.linspace(0.5, 4.5, 5), ticklabels, rotation=50,
+               ha='center', fontsize=11)
+ax2.set_yticks(np.linspace(4.5, 0.5, 5), ticklabels, rotation=0,
+               ha='right', fontsize=11)
 
 for (i, j), c in np.ndenumerate(corr_df[::-1]*100):
     ax2.text(j+0.52, i+0.45, f'{c:.1f}', ha='center', va='center', fontsize=9)
@@ -239,23 +214,13 @@ cax2.text(1.4, 1.03, 'Correlation\ncoef. (%)', fontsize=11, ha='center',
 plt.show()
 
 """
-Figure 2 present the correlation matrix for non-categorical variables. The correlations
-are expressed in percents (%).
-The rental price is strongly correlated to the engine power, and in general with
-all additional car options, except winter tires. This result is intuitive: these
-features are associated to a higher car price, which directly reflects on the rental price.
-On the other hand, the car mileage is negatively correlated with rental price. A higher mileage
-means that the car is probably older, thus a higher risk of issues during rental.
-It is interesting to note that the mileage is not correlated to car options.
+Figure 2 presents
 """
 
 # %%
 """
-### Distribution of rental prices for the various categories
+### Fraud probability vs time
 
-We now study the rental price distributions for each category. As mentioned above,
-some category are underrepresented. For each feature, we aggregate those categories
-with count less than 30 into an infrequent category `other`.
 """
 
 ## Agregate categories with count < 30 into infrequent category `other`
@@ -266,7 +231,7 @@ df_ = pd.concat([df_.mask(value_counts < 30, 'other'),
 
 ##
 fig3, axs3 = plt.subplots(
-    nrows=4, ncols=1, figsize=(6, 9.8), dpi=100,
+    nrows=3, ncols=1, figsize=(6, 9.8), dpi=100,
     gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.965, 'bottom': 0.06,
                  'hspace': 0.34})
 fig3.suptitle("Figure 3: Rental price distributions for the various car categories",

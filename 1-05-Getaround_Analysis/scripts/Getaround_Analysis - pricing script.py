@@ -195,7 +195,7 @@ cax2.text(1.4, 1.03, 'Correlation\ncoef. (%)', fontsize=11, ha='center',
 plt.show()
 
 """
-Figure 2 present the correlation matrix for non-categorical variables. The correlations
+Figure 2 presents the correlation matrix for non-categorical variables. The correlations
 are expressed in percents (%).
 The rental price is strongly correlated to the engine power, and in general with
 all additional car options, except winter tires. This result is intuitive: these
