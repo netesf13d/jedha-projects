@@ -7,7 +7,7 @@ GO
 
 CREATE TABLE transactions.transactions (
   transaction_id BIGINT PRIMARY KEY
-  time_id BIGINT FOREIGN KEY
+  timestamp DATETIME FOREIGN KEY
   merchant_id BIGINT FOREIGN KEY
   customer_id BIGINT FOREIGN KEY
   currency_code TEXT FOREIGN KEY -- ISO 4217
@@ -18,9 +18,8 @@ CREATE TABLE transactions.transactions (
   amount DECIMAL(10, 2)
 );
 
-CREATE TABLE transactions.time {
-  time_id BIGINT PRIMARY KEY
-  timestamp DATETIME NOT NULL
+CREATE TABLE transactions.times {
+  timestamp DATETIME PRIMARY KEY
   timezone INTEGER
   date DATE NOT NULL
   time TIME NOT NULL
@@ -65,6 +64,7 @@ CREATE TABLE transactions.currencies {
   currency_code TEXT PRIMARY KEY -- ISO 4217
   currency_name TEXT NOT NULL
   usd_change_rate decimal(6,4)
+  -- ...
 }
 
 CREATE TABLE transactions.countries {
