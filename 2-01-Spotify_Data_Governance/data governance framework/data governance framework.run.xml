@@ -44,11 +44,11 @@
   <internal package="biblatex" priority="9" active="0">
     <generic>latex</generic>
     <provides type="dynamic">
-      <file>Spotify_data.aux</file>
-      <file>Spotify_data-blx.bib</file>
+      <file>"data governance framework".aux</file>
+      <file>data_governance_framework-blx.bib</file>
     </provides>
     <requires type="dynamic">
-      <file>Spotify_data.bbl</file>
+      <file>"data governance framework".bbl</file>
     </requires>
     <requires type="static">
       <file>blx-dm.def</file>
@@ -70,20 +70,20 @@
     <cmdline>
       <binary>bibtex</binary>
       <option>-min-crossrefs 2</option>
-      <infile>Spotify_data</infile>
+      <infile>"data governance framework"</infile>
     </cmdline>
     <input>
-      <file>Spotify_data.aux</file>
+      <file>"data governance framework".aux</file>
     </input>
     <output>
-      <file>Spotify_data.bbl</file>
+      <file>"data governance framework".bbl</file>
     </output>
     <provides type="dynamic">
-      <file>Spotify_data.bbl</file>
+      <file>"data governance framework".bbl</file>
     </provides>
     <requires type="dynamic">
-      <file>Spotify_data.aux</file>
-      <file>Spotify_data-blx.bib</file>
+      <file>"data governance framework".aux</file>
+      <file>data_governance_framework-blx.bib</file>
     </requires>
     <requires type="editable">
     </requires>
