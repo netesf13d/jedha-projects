@@ -16,7 +16,8 @@ Table transactions {
   customer_id bigint
   currency_code text // ISO 4217
   ip_geo_id bigint
-  amount decimal(10, 2)
+  amount float
+  fee float
   payment_method text
   payment_status text
   device_type text

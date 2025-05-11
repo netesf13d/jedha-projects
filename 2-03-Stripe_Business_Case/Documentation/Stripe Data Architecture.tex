@@ -45,7 +45,7 @@ maxbibnames=10
 \newcommand{\code}{\texttt}
 
 %%
-\title{A Proposal for Stripe's Data Architecture}
+\title{Stripe Data Architecture}
 \date{}
 
 
@@ -69,7 +69,20 @@ Les données recueillies sont transférées depuis l'API de paiement utilisée p
 \end{itemize}
 
 
-\section*{Online Transaction Processing Model}
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.93]{./figures/pipeline}
+	\caption{Proposed data pipeline.}
+	\label{fig:pipeline}
+\end{figure}
+
+
+\section*{Reference Database}
+
+Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification.
+
+
+\section*{Online Transaction Processing (OLTP) Data Model}
 
 Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. The core of the database is a registry of all financial transactions occurring within Stripe scope. Additional tables contain information about merchants and customers. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators do not originate from the same source as transactions, and are not produced at the same time.
 
@@ -125,7 +138,7 @@ Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. T
 \end{table}
 
 
-\section*{Online Analytical Processing Model}
+\section*{Online Analytical Processing (OLAP) Data Model}
 
 Pour l'analyse et la préparation de features pour la détection de fraude, on utilisera une base 
 
@@ -250,9 +263,9 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 \end{table}
 
 
-\section*{NoSQL Model}
+\section*{NoSQL Data Model}
 
-L'entreprise doit aussi gérer des données semi-structurées telles que les fichiers de log, les reçus de transactions ou encore la télémétrie effectuée sur la plateforme de paiement. Les contraintes pour chaque catégorie de données sont diverses et on adoptera une solution adaptée à chacune.
+L'entreprise doit aussi gérer des données semi-structurées telles que les fichiers de log, les reçus de transactions ou encore la télémétrie effectuée sur la plateforme de paiement. Les contraintes pour chaque catégorie de données sont diverses et on adoptera une solution basée sur une document-based NoSQL database.
 
 \begin{itemize}
 	\item Les informations de session ayant principalement des contraintes de disponibilité associée à des requêtes simples, on s'orientera vers une database de type key-value.
@@ -277,7 +290,6 @@ Enfin, un système de log est mis en place afin d'enregistrer toutes les connexi
 
 
 \section*{Machine learning integration}
-
 
 
 
