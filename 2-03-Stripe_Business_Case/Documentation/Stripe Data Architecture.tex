@@ -21,6 +21,7 @@
 \usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage[flushleft]{threeparttable}
+\usepackage{enumitem}
 
 %%% Graphics packages
 \usepackage{graphicx}
@@ -55,36 +56,93 @@ maxbibnames=10
 
 \vspace{-10mm}
 
-Stripe is a financial services company which provides payment processing solutions through APIs that web developers can use in their websites or mobile applications. The company processes billions of transactions annually, supporting millions of merchants worldwide.
-
-The sensitive nature of the data managed by Stripe, along with the need of efficient
+Stripe is a leading global financial technology company, founded in 2010, that powers online payment processing for millions of businesses across over 120 countries. With billions of transactions processed annually and clients ranging from startups to Fortune 500 companies, Stripe operates at massive scale and complexity. As its operations have grown, Stripe's data architecture has become a strategic priority, requiring the integration in a single system of a large variety of data. This proposal outlines a comprehensive data infrastructure designed to ensure performance, consistency, and compliance while enabling advanced use cases such as fraud detection, customer insights, and predictive analytics.
 
 
-\section*{Data Pipeline}
+\section*{Architecture Overview}
 
-Les données recueillies sont transférées depuis l'API de paiement utilisée par les sites marchands. On en distingue deux types:
-\begin{itemize}
-	\item A chaque transaction bancaire effectuée, un relevé est envoyé 
-	\item Des données de télémétrie sont transférées
+The data integration architecture is presented in figure~\ref{fig:architecture}. It follows a hybrid model combining real-time streaming and batch processing, supporting low-latency data sync for operational use cases (e.g., fraud detection) and high-throughput batch processing for analytics.
+\begin{itemize}[itemsep=5pt, parsep=0pt]
+	\item Data streams originating from Stripe API (e.g. bank transaction information, telemetry) are pipelined to the relevant database systems using kafka streams.
+	\item A reference database holds slowly changing reference data such as country and currency codes, merchant information of currency exchange rates. Any change in this data is reflected to the systems that depend on it through change data capture (CDC).
+	\item Data is archived periodically in a data lake, with batch processing managed by Apache Airflow.
+	\item The loading of less time-sensitive data such as audit logs or customer feedback is handled by Airflow batches.
 \end{itemize}
 
 
 \begin{figure}[h]
 	\centering
-	\includegraphics[scale=0.93]{./figures/pipeline}
-	\caption{Proposed data pipeline.}
-	\label{fig:pipeline}
+	\includegraphics[scale=0.93]{./figures/architecture}
+	\caption{Overview of the proposed data architecture. The description is given in the text. The lock symbols in the OLTP and Reference databases indicate that the security of these systems is critical.}
+	\label{fig:architecture}
 \end{figure}
 
 
+We present in table~\ref{table:providers} a list of possible providers for the various systems of our architecture.
+
+\begin{table}[ht]
+	\centering
+	\begin{threeparttable}
+		\caption{Proposed providers for the various systems of the architecture.}
+		\label{table:providers}
+		\begin{tabularx}{0.99\textwidth}{c >{\centering\arraybackslash}X}
+			\toprule
+			System & Provider  \\
+			\midrule
+			OLTP/OLAP & Snowflake, Redshift \\
+			NoSQL & MongoDB, DynamoDB \\
+			Data Lake & Amazon S3, Azure Data Lake \\
+			\bottomrule
+		\end{tabularx}
+	\end{threeparttable}
+\end{table}
+
 \section*{Reference Database}
 
-Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification.
+Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification. We present in table~~\ref{table:ReferenceDataDict} a data dictionary for some tables in the reference database.
+
+\begin{table}[ht]
+	\centering
+	\begin{threeparttable}
+		\caption{Data dictionary for the \code{transactions} OLTP schema.}
+		\label{table:ReferenceDataDict}
+		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+			\toprule
+			Field Name & Type & Description & Example  \\
+			\midrule
+			\multicolumn{4}{c}{\code{countries} table}\\
+			\code{country\_code} & \code{char(3)} & Country code (ISO 3166-1 2-letter) & \code{'GB'} \\
+			\code{country\_name} & \code{text} & Country name & \code{'United Kingdom'} \\
+			
+			\midrule
+			\multicolumn{4}{c}{\code{currencies} table}\\
+			\code{currency\_code} & \code{char(3)} & Currency code (ISO 4217) & \code{'EUR'} \\
+			\code{currency\_name} & \code{text} & Currency name & \code{'Euro'} \\
+			\code{usd\_change\_rate} & \code{char(2)} & Currency to USD change rate & \code{1.08} \\
+			
+			\midrule
+			\multicolumn{4}{c}{\code{merchants} table}\\
+			\code{merchant\_id} & \code{bigint} & Unique merchant id & \code{12345} \\
+			\code{name} & \code{text} & Merchant name & \code{'Amazon UK'} \\
+			\code{iban} & \code{text} & Merchant IBAN & \code{'GB82WEST12345678765432'} \\
+			\code{country\_code} & \code{char(2)} & Merchant registration country code & \code{'GB'} \\
+			
+			\midrule
+			\multicolumn{4}{c}{\code{customers} table}\\
+			\code{customer\_id} & \code{bigint} & Unique customer id & \code{234567} \\
+			\code{name} & \code{text} & Customer name & \code{'John Doe'} \\
+			\code{iban} & \code{text} & Customer IBAN & \code{'GB82WEST12345678765432'} \\
+			\code{country\_code} & \code{char(2)} & Customer country code  & \code{'GB'} \\
+			
+			\bottomrule
+		\end{tabularx}
+	\end{threeparttable}
+\end{table}
 
 
 \section*{Online Transaction Processing (OLTP) Data Model}
 
-Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. The core of the database is a registry of all financial transactions occurring within Stripe scope. Additional tables contain information about merchants and customers. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators do not originate from the same source as transactions, and are not produced at the same time.
+Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. The core of the database is a registry of all financial transactions occurring within Stripe scope. Tables containing information about merchants and customers are cached from the reference database. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators originate from a different pipeline (e.g. the AI pipeline).
 
 
 \begin{figure}
@@ -108,26 +166,16 @@ Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. T
 			\code{transaction\_id} & \code{bigint} & Unique transaction id & \code{123456789} \\
 			\code{merchant\_id} & \code{bigint} & Merchant id & \code{12345} \\
 			\code{customer\_id} & \code{bigint} & Customer id & \code{234567} \\
-			\code{time} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
-			\code{amount} & \code{decimal(10,2)} & Transaction amount (in currency unit) & \code{43.15} \\
+			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
+			\code{amount} & \code{float} & Transaction amount (in currency unit) & \code{43.15} \\
+			\code{fee} & \code{float} & Transaction fee (in currency unit) & \code{0.53} \\
 			\code{currency\_code} & \code{char(3)} & Currency code (ISO 4217) & \code{'GBP'} \\
-			\code{payment\_method} & \code{varchar(16)} & Payment method & \code{'credit\_card'} \\
-			\code{device\_type} & \code{varchar(16)} & Device used for payment & \code{'mobile'} \\
-			\code{status} & \code{varchar(16)} & Transaction status & \code{'sucess'} \\
+			\code{payment\_method} & \code{text} & Payment method & \code{'credit\_card'} \\
+			\code{payment\_status} & \code{text} & Transaction status & \code{'sucess'} \\
+			\code{device\_type} & \code{text} & Device used for payment & \code{'mobile'} \\
 			\code{ip\_latitude} & \code{float} & IP-based geolocation latitude & \code{49.6833300} \\
 			\code{ip\_longitude} & \code{float} & IP-based geolocation longitude & \code{10.5333300} \\
-			\midrule
-			\multicolumn{4}{c}{\code{merchants} table}\\
-			\code{merchant\_id} & \code{bigint} & Unique merchant id & \code{12345} \\
-			\code{name} & \code{varchar} & Merchant name & \code{'Amazon UK'} \\
-			\code{iban} & \code{varchar} & Merchant IBAN & \code{'GB82WEST12345678765432'} \\
-			\code{country\_code} & \code{char(2)} & Merchant registration country code & \code{'GB'} \\
-			\midrule
-			\multicolumn{4}{c}{\code{customers} table}\\
-			\code{customer\_id} & \code{bigint} & Unique customer id & \code{234567} \\
-			\code{name} & \code{varchar} & Customer name & \code{'John Doe'} \\
-			\code{iban} & \code{varchar} & Customer IBAN & \code{'GB82WEST12345678765432'} \\
-			\code{country\_code} & \code{char(2)} & Customer country code  & \code{'GB'} \\
+			
 			\midrule
 			\multicolumn{4}{c}{\code{fraud\_indicators} table}\\
 			\code{transaction\_id} & \code{bigint} & Transaction id & \code{123456789} \\
@@ -145,7 +193,7 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 
 \begin{figure}
 	\centering
-	\includegraphics[scale=0.46]{./figures/OLAP}
+	\includegraphics[scale=0.56]{./figures/OLAP}
 	\caption{Proposed OLAP database structure.}
 	\label{fig:OLAP}
 \end{figure}
@@ -162,19 +210,20 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 			\midrule
 			\multicolumn{4}{c}{\code{transactions} table}\\
 			\code{transaction\_id} & \code{bigint} & Unique transaction id & \code{123456789} \\
-			\code{time\_id} & \code{bigint} & Transaction time id & \code{123456789} \\
 			\code{merchant\_id} & \code{bigint} & Merchant id & \code{12345} \\
 			\code{customer\_id} & \code{bigint} & Customer id & \code{234567} \\
+			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
+			\code{amount} & \code{float} & Transaction amount (in currency unit) & \code{43.15} \\
+			\code{fee} & \code{float} & Transaction fee (in currency unit) & \code{0.53} \\
 			\code{currency\_code} & \code{char(3)} & Currency code (ISO 4217) & \code{'GBP'} \\
-			\code{ip\_geo\_id} & \code{bigint} & IP geolocalization id & \code{1234567} \\
 			\code{payment\_method\_id} & \code{integer} & Payment method id & \code{1} \\
 			\code{payment\_status\_id} & \code{integer} & Payment status id & \code{2} \\
 			\code{device\_type\_id} & \code{integer} & Device id & \code{3} \\
-			\code{amount} & \code{decimal(10,2)} & Transaction amount (in currency unit) & \code{43.15} \\
+			\code{ip\_geo\_id} & \code{bigint} & IP geolocation id & \code{123456} \\
+			
 			
 			\midrule
-			\multicolumn{4}{c}{\code{time} table}\\
-			\code{time\_id} & \code{bigint} & Unique transaction time id & \code{123456789} \\
+			\multicolumn{4}{c}{\code{datetimes} table}\\
 			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
 			\code{timezone} & \code{integer} & Timezone offset in minutes & \code{-120} for UTC-02:00 \\
 			\code{date} & \code{date} & Transaction date & \code{2023-11-18} \\
@@ -185,77 +234,17 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 			\code{quarter} & \code{tinyint} & Transaction quarter & \code{4} \\
 			
 			\midrule
-			\multicolumn{4}{c}{\code{merchants} table}\\
-			\code{merchant\_id} & \code{bigint} & Unique merchant id & \code{12345} \\
-			\code{country\_code} & \code{char(2)} & Merchant registration country code & \code{'GB'} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{customers} table}\\
-			\code{customer\_id} & \code{bigint} & Unique customer id & \code{234567} \\
-			\code{country\_code} & \code{char(2)} & Customer country code & \code{'GB'} \\
-			
-			\midrule
 			\multicolumn{4}{c}{\code{fraud\_indicators} table}\\
 			\code{transaction\_id} & \code{bigint} & Transaction id & \code{123456789} \\
 			\code{fraud\_probability} & \code{float} & Fraud probability & \code{0.12} \\
 			
 			\midrule
 			\multicolumn{4}{c}{\code{ip\_geography} table}\\
-			\code{ip\_geo\_id} & \code{bigint} & Geolocation id & \code{123456789} \\
+			\code{ip\_geo\_id} & \code{bigint} & IP geolocation id & \code{123456} \\
 			\code{latitude} & \code{float} & IP-based geolocation latitude & \code{49.6833300} \\
 			\code{longitude} & \code{float} & IP-based geolocation longitude & \code{10.5333300} \\
 			\code{country\_code} & \code{char(2)} & country code (ISO 3166-1 alpha-2) & \code{'DE'} \\
-			\code{province} & \code{varchar(255)} & Province name & \code{'Darmstadt'} \\
-			
-			\bottomrule
-		\end{tabularx}
-	\end{threeparttable}
-\end{table}
-
-
-\begin{table}[ht]
-	\centering
-	\begin{threeparttable}
-		\caption{Data dictionary for the reference tables in \code{transactions} OLAP schema.}
-		\label{table:OLAP_ref}
-		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
-			\toprule
-			Field Name & Type & Description & Example  \\
-			\midrule
-			\multicolumn{4}{c}{\code{currencies} table}\\
-			\code{currency\_code} & \code{char(3)} & Currency code (ISO 4217) & \code{'GBP'} \\
-			\code{currency\_name} & \code{varchar(255)} & Currency name & \code{'Pound sterling'} \\
-			\code{usd\_change\_rate} & \code{decimal(6,4)} & currency/USD change rate & \code{1.2479} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{countries} table}\\
-			\code{country\_code} & \code{char(3)} & Country code (ISO 3166-1 alpha-2) & \code{'GB'} \\
-			\code{country\_name} & \code{varchar(255)} & Country name & \code{'United Kingdom'} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{payment\_methods} table}\\
-			\code{payment\_method\_id} & \code{integer} & Unique payment method id & \code{1} \\
-			\code{payment\_method} & \code{varchar(16)} & Payment method & \code{'credit\_card'} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{payment\_statuses} table}\\
-			\code{payment\_status\_id} & \code{integer} & Unique payment status id & \code{1} \\
-			\code{payment\_status} & \code{varchar(16)} & Payment status & \code{'sucessful'} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{device\_types} table}\\
-			\code{device\_type\_id} & \code{integer} & Unique device type id & \code{1} \\
-			\code{device\_type} & \code{varchar(16)} & Device type & \code{'mobile'} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{months} table}\\
-			\code{month} & \code{tinyint} & Month number & \code{11} \\
-			\code{payment\_status} & \code{varchar(9)} & Month name & \code{'november'} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{week\_days} table}\\
-			\code{week\_day} & \code{tinyint} & Week day number & \code{6} \\
-			\code{week\_day\_name} & \code{varchar(9)} & Day name & \code{'saturday'} \\
+			\code{province} & \code{text} & Province name & \code{'Darmstadt'} \\
 			
 			\bottomrule
 		\end{tabularx}
@@ -287,6 +276,22 @@ On distinguera les fichiers selon leurs contraintes en termes de sécurité. Les
 Des backups chiffrés sont mis à jour à intervalles réguliers afin d'assurer le rétablissement du service en cas d'incident majeur.
 
 Enfin, un système de log est mis en place afin d'enregistrer toutes les connexions aux serveurs, les accès aux données, les requêtes effectuées, etc. Un service additionnel peut être mis en place afin de détecter les anomalies en temps réel.
+
+-----
+
+Stripe handles highly sensitive user data, including banking and payment information. Securing this data is critical for two main reasons: first, to comply with international and regional regulations such as GDPR and PCI-DSS; and second, to preserve customer trust. A breach of the latter could result in reputational damage and potential revenue loss.
+
+To minimize the attack surface, sensitive data is isolated within the OLTP system, where it is encrypted both at rest and in transit. This system serves as the primary and most secure repository for confidential information.
+
+Some of this data must be made available for analytical purposes, such as detecting financial crimes (e.g., fraud or money laundering). To mitigate risks, the OLAP system only stores anonymized or tokenized derivatives of sensitive fields, such as bank location or institution name, with no direct identifiers. These fields are not encrypted to preserve query performance, but access is strictly controlled through role-based permissions and secure data transfer protocols.
+
+The NoSQL system does not store any sensitive information. Instead, it is used for storing and indexing semi-structured and unstructured data, such as logs or behavioral metadata, none of which poses regulatory risks if properly managed.
+
+Files are handled according to their security classification. Highly sensitive files, like bank receipts, are stored in a dedicated, access-restricted data lake and are indexed only through the OLTP system (not represented in the main architecture diagram). All other files are similarly stored in a general-purpose data lake and indexed via the NoSQL system.
+
+Encrypted backups are created and refreshed at regular intervals to ensure disaster recovery capabilities in the event of a major incident.
+
+Finally, a centralized logging system tracks all server connections, data accesses, and queries. Anomaly detection mechanisms can be integrated to identify and alert on suspicious activities in real time.
 
 
 \section*{Machine learning integration}

@@ -11,26 +11,25 @@ Project Stripe_OLAP {
 
 Table transactions {
   transaction_id bigint [primary key]
-  time_id bigint
+  timestamp datetime 
   merchant_id bigint
   customer_id bigint
-  currency_code text // ISO 4217
+  currency_code char(3) // ISO 4217
   ip_geo_id bigint
   amount float
   fee float
-  payment_method text
-  payment_status text
-  device_type text
+  payment_method_id integer
+  payment_status_id integer
+  device_type_id integer
 }
 
 
-Table transaction_time {
-  time_id bigint [primary key] 
-  timestamp datetime
+Table datetimes {
+  timestamp datetime [primary key] 
   timezone integer
   date date
   time time
-  year mediumint
+  year integer
   month tinyint
   week_day tinyint
   quarter tinyint
@@ -40,13 +39,13 @@ Table transaction_time {
 Table merchants {
   merchant_id bigint [primary key]
   merchant_name text
-  country_code text // ISO 3166-1 2-letter
+  country_code char(2) // ISO 3166-1 2-letter
   // ...
 }
 
 Table customers {
   customer_id bigint [primary key]
-  country_code text // ISO 3166-1 2-letter
+  country_code char(2) // ISO 3166-1 2-letter
   // ...
 }
 
@@ -61,7 +60,7 @@ Table ip_geography {
   ip_geo_id bigint [primary key]
   latitude float
   longitude float
-  country_code text // ISO 3166-1 2-letter
+  country_code char(2) // ISO 3166-1 2-letter
   province text
   // ...
 }
@@ -70,13 +69,13 @@ Table ip_geography {
 ///// Reference tables /////
 
 Table currencies {
-  currency_code text [primary key] // ISO 4217
+  currency_code char(3) [primary key] // ISO 4217
   currency_name text [unique]
-  usd_change_rate decimal(6,4)
+  usd_change_rate float
 }
 
 Table countries {
-  country_code text [primary key] // ISO 3166-1 alpha-2
+  country_code char(2) [primary key] // ISO 3166-1 alpha-2
   currency_name text [unique]
 }
 
@@ -109,21 +108,21 @@ Table week_days {
 ///// Relationships /////
 
 // 1st level
-Ref: transactions.time_id > time.time_id
+Ref: transactions.timestamp > datetimes.timestamp
 Ref: transactions.merchant_id > merchants.merchant_id
 Ref: transactions.customer_id > customers.customer_id
-Ref: transactions.currency_id > currencies.currency_id
+Ref: transactions.currency_code > currencies.currency_code
 Ref: transactions.ip_geo_id > ip_geography.ip_geo_id
 Ref: transactions.transaction_id - fraud_indicators.transaction_id
 
 // 2nd level
-Ref: merchants.country_id > countries.country_id
-Ref: customers.country_id > countries.country_id
-Ref: ip_geography.country_id > countries.country_id
+Ref: merchants.country_code > countries.country_code
+Ref: customers.country_code > countries.country_code
+Ref: ip_geography.country_code > countries.country_code
 
 // Relations to ref tables
-Ref: transactions.payment_method > payment_methods_ref.payment_method
-Ref: transactions.payment_status > payment_statuses_ref.payment_status
-Ref: transactions.device_type > device_types_ref.device_type
-Ref: time.month > months_ref.month
-Ref: time.week_day > week_days_ref.week_day
+Ref: transactions.payment_method_id > payment_methods.payment_method_id
+Ref: transactions.payment_status_id > payment_statuses.payment_status_id
+Ref: transactions.device_type_id > device_types.device_type_id
+Ref: datetimes.month > months.month
+Ref: datetimes.week_day > week_days.week_day
