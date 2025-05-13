@@ -11,7 +11,6 @@
 	]{geometry}
 
 
-
 %%% Typeface packages
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -26,23 +25,15 @@
 %%% Graphics packages
 \usepackage{graphicx}
 
+%%
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=false,
+	hidelinks=true,
+}
 
 
 %%
-
-\usepackage[
-sorting=none,
-backend=bibtex,
-style=nature,
-url=false,        
-doi=false,         
-isbn=false,
-minbibnames=1,  
-maxbibnames=10
-]{biblatex} 
-
-%%
-%\newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
 \newcommand{\code}{\texttt}
 
 %%
@@ -111,7 +102,7 @@ Slowly changing or static reference data (e.g. country reference, merchant infor
 			Field Name & Type & Description & Example  \\
 			\midrule
 			\multicolumn{4}{c}{\code{countries} table}\\
-			\code{country\_code} & \code{char(3)} & Country code (ISO 3166-1 2-letter) & \code{'GB'} \\
+			\code{country\_code} & \code{char(2)} & ISO 3166-1 2-letter & \code{'GB'} \\
 			\code{country\_name} & \code{text} & Country name & \code{'United Kingdom'} \\
 			
 			\midrule
@@ -125,7 +116,7 @@ Slowly changing or static reference data (e.g. country reference, merchant infor
 			\code{merchant\_id} & \code{bigint} & Unique merchant id & \code{12345} \\
 			\code{name} & \code{text} & Merchant name & \code{'Amazon UK'} \\
 			\code{iban} & \code{text} & Merchant IBAN & \code{'GB82WEST12345678765432'} \\
-			\code{country\_code} & \code{char(2)} & Merchant registration country code & \code{'GB'} \\
+			\code{country\_code} & \code{char(2)} & Merchant registration country & \code{'GB'} \\
 			
 			\midrule
 			\multicolumn{4}{c}{\code{customers} table}\\
@@ -142,7 +133,7 @@ Slowly changing or static reference data (e.g. country reference, merchant infor
 
 \section*{Online Transaction Processing (OLTP) Data Model}
 
-Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. The core of the database is a registry of all financial transactions occurring within Stripe scope. Tables containing information about merchants and customers are cached from the reference database. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators originate from a different pipeline (e.g. the AI pipeline).
+Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. The core of the database is a registry of all financial transactions occurring within Stripe scope. Tables containing information about merchants and customers are cached from the reference database. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators originate from a different pipeline (e.g. reports after bank investigation).
 
 
 \begin{figure}
@@ -166,9 +157,9 @@ Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. T
 			\code{transaction\_id} & \code{bigint} & Unique transaction id & \code{123456789} \\
 			\code{merchant\_id} & \code{bigint} & Merchant id & \code{12345} \\
 			\code{customer\_id} & \code{bigint} & Customer id & \code{234567} \\
-			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
-			\code{amount} & \code{float} & Transaction amount (in currency unit) & \code{43.15} \\
-			\code{fee} & \code{float} & Transaction fee (in currency unit) & \code{0.53} \\
+			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18T17:43:02.4} \\
+			\code{amount} & \code{float} & Transaction amount & \code{43.15} \\
+			\code{fee} & \code{float} & Transaction fee & \code{0.53} \\
 			\code{currency\_code} & \code{char(3)} & Currency code (ISO 4217) & \code{'GBP'} \\
 			\code{payment\_method} & \code{text} & Payment method & \code{'credit\_card'} \\
 			\code{payment\_status} & \code{text} & Transaction status & \code{'sucess'} \\
@@ -179,7 +170,7 @@ Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. T
 			\midrule
 			\multicolumn{4}{c}{\code{fraud\_indicators} table}\\
 			\code{transaction\_id} & \code{bigint} & Transaction id & \code{123456789} \\
-			\code{fraud\_probability} & \code{float} & Fraud probability & \code{0.12} \\
+			\code{is\_fraud} & \code{boolean} & Is the transaction a fraud ? & \code{false} \\
 			\bottomrule
 		\end{tabularx}
 	\end{threeparttable}
@@ -212,38 +203,38 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 			\code{transaction\_id} & \code{bigint} & Unique transaction id & \code{123456789} \\
 			\code{merchant\_id} & \code{bigint} & Merchant id & \code{12345} \\
 			\code{customer\_id} & \code{bigint} & Customer id & \code{234567} \\
-			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
-			\code{amount} & \code{float} & Transaction amount (in currency unit) & \code{43.15} \\
-			\code{fee} & \code{float} & Transaction fee (in currency unit) & \code{0.53} \\
+			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18T17:43:02.4} \\
+			\code{amount} & \code{float} & Transaction amount & \code{43.15} \\
+			\code{fee} & \code{float} & Transaction fee & \code{0.53} \\
 			\code{currency\_code} & \code{char(3)} & Currency code (ISO 4217) & \code{'GBP'} \\
 			\code{payment\_method\_id} & \code{integer} & Payment method id & \code{1} \\
 			\code{payment\_status\_id} & \code{integer} & Payment status id & \code{2} \\
 			\code{device\_type\_id} & \code{integer} & Device id & \code{3} \\
 			\code{ip\_geo\_id} & \code{bigint} & IP geolocation id & \code{123456} \\
 			
-			
 			\midrule
 			\multicolumn{4}{c}{\code{datetimes} table}\\
-			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18 17:43:02.4} \\
+			\code{timestamp} & \code{datetime} & UTC transaction timestamp & \code{2023-11-18T17:43:02.4} \\
 			\code{timezone} & \code{integer} & Timezone offset in minutes & \code{-120} for UTC-02:00 \\
 			\code{date} & \code{date} & Transaction date & \code{2023-11-18} \\
 			\code{time} & \code{time} & UTC transaction time & \code{17:43:02.4} \\
 			\code{year} & \code{mediumint} & Transaction year & \code{2023} \\
 			\code{month} & \code{tinyint} & Transaction month & \code{11} \\
-			\code{week\_day} & \code{tinyint} & Transaction week day (\code{0} is sunday) & \code{6} (saturday) \\
+			\code{week\_day} & \code{tinyint} & Transaction week day & \code{6} (saturday) \\
 			\code{quarter} & \code{tinyint} & Transaction quarter & \code{4} \\
 			
 			\midrule
 			\multicolumn{4}{c}{\code{fraud\_indicators} table}\\
 			\code{transaction\_id} & \code{bigint} & Transaction id & \code{123456789} \\
-			\code{fraud\_probability} & \code{float} & Fraud probability & \code{0.12} \\
+			\code{is\_fraud} & \code{boolean} & Is the transaction a fraud ? & \code{false} \\
+			\code{fraud\_score} & \code{float} & Predicted fraud probability & \code{0.12} \\
 			
 			\midrule
 			\multicolumn{4}{c}{\code{ip\_geography} table}\\
 			\code{ip\_geo\_id} & \code{bigint} & IP geolocation id & \code{123456} \\
-			\code{latitude} & \code{float} & IP-based geolocation latitude & \code{49.6833300} \\
-			\code{longitude} & \code{float} & IP-based geolocation longitude & \code{10.5333300} \\
-			\code{country\_code} & \code{char(2)} & country code (ISO 3166-1 alpha-2) & \code{'DE'} \\
+			\code{latitude} & \code{float} & IP-based geolocation lat. & \code{49.6833300} \\
+			\code{longitude} & \code{float} & IP-based geolocation long. & \code{10.5333300} \\
+			\code{country\_code} & \code{char(2)} & ISO 3166-1 alpha-2 & \code{'DE'} \\
 			\code{province} & \code{text} & Province name & \code{'Darmstadt'} \\
 			
 			\bottomrule
@@ -256,6 +247,26 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 
 L'entreprise doit aussi gérer des données semi-structurées telles que les fichiers de log, les reçus de transactions ou encore la télémétrie effectuée sur la plateforme de paiement. Les contraintes pour chaque catégorie de données sont diverses et on adoptera une solution basée sur une document-based NoSQL database.
 
+Stripe must handle semi-structured and unstructured data not well-suited to relational models:
+\begin{itemize}[itemsep=5pt, parsep=0pt]
+	\item \textbf{Telemetry}. Click stream events, user interactions, session data from the payment API.
+	\item \textbf{Customer feedback}. Surveys responses, reviews, support transcripts.
+	\item \textbf{Log data}. Access and error logs, API usage.
+	\item \textbf{Machine learning features}. Generated or derived features used in model inference.
+\end{itemize}
+
+We recommend the use of a document-based NoSQL database, such as MongoDB, due to its flexibility in handling nested and heterogeneous data structures.
+
+///The model will follow a domain-oriented, loosely coupled design with a focus on performance and future extensibility.
+
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.66]{./figures/NoSQL}
+	\caption{Illustration of the NoSQL database structure. The schema is made using \href{https://hackolade.com/}{Hackolade} .}
+	\label{fig:NoSQL}
+\end{figure}
+
+
 \begin{itemize}
 	\item Les informations de session ayant principalement des contraintes de disponibilité associée à des requêtes simples, on s'orientera vers une database de type key-value.
 	\item Les fichiers de log sont structurés comme une succession d'évènements. Ceux-ci doivent être stockés de façon à pouvoir alimenter en temps réel des algorithmes de détection d'anomalies, afin d'assurer une réponse rapide en cas d'incident. Il est aussi nécessaire qu'ils soient lisibles par un humain pour une analyse approfondie. On s'orientera donc naturellement vers une document-based NoSQL database pour ce cas d'usage.
@@ -267,21 +278,9 @@ L'entreprise doit aussi gérer des données semi-structurées telles que les fic
 
 \section*{Security and Compliance}
 
-The company stores sensitive user data such as banking information. Il est important de sécuriser ces donnees pour deux raisons. D'une part, pour etre en accord avec la legislation locale (eg GDPR). D'autre part, la fuite de ces données impacterait la confiance accordée à l'entreprise par ses clients, avec en conséquence une baisse potentielle des revenus. Afin de limiter la surface d'attaque possible, les données sensibles sont confinées dans la base OLTP, et chiffrées à l'interieur de celle-ci.
+Stripe handles highly sensitive user data, including banking and payment information. Securing this data is critical for two main reasons: first, to comply with international and regional regulations such as GDPR and PCI-DSS; and second, to preserve customer trust. A data breach could result in reputational damage and potential revenue loss.
 
-Il est nécessaire de reporter en partie de ces données dans la base OLAP, notamment pour l'étude des délits financiers (fraude, blanchiment, etc). Afin de limiter les risques, la base OLAP ne continent que des éléments anonymisés de ces données, telles que la localisation ou le nom de la banque. Afin de maintenir la performance du système, ces données ne sont pas chiffrées et on se limitera à en sécuriser l'accès et le transfert (définition de roles pour limiter l'accès, etc). De la même façon, aucune donnée sensible n'est stockée directement dans la base NoSQL.
-
-On distinguera les fichiers selon leurs contraintes en termes de sécurité. Les fichiers sensibles tels que les reçus bancaires seront stockés dans un datalake dédié avec un accès restreint. Ils seront indexés exclusivement dans la base OLTP (non indiqué sur le schéma). Les autres fichiers seront de la même façon enregistrés dans un datalake et indexés dans la base NoSQL dédiée.
-
-Des backups chiffrés sont mis à jour à intervalles réguliers afin d'assurer le rétablissement du service en cas d'incident majeur.
-
-Enfin, un système de log est mis en place afin d'enregistrer toutes les connexions aux serveurs, les accès aux données, les requêtes effectuées, etc. Un service additionnel peut être mis en place afin de détecter les anomalies en temps réel.
-
------
-
-Stripe handles highly sensitive user data, including banking and payment information. Securing this data is critical for two main reasons: first, to comply with international and regional regulations such as GDPR and PCI-DSS; and second, to preserve customer trust. A breach of the latter could result in reputational damage and potential revenue loss.
-
-To minimize the attack surface, sensitive data is isolated within the OLTP system, where it is encrypted both at rest and in transit. This system serves as the primary and most secure repository for confidential information.
+To minimize the attack surface, sensitive data is isolated within the OLTP system, where it is encrypted both at rest and in transit. Along with the reference database, this system serves as the primary and most secure repository for confidential information.
 
 Some of this data must be made available for analytical purposes, such as detecting financial crimes (e.g., fraud or money laundering). To mitigate risks, the OLAP system only stores anonymized or tokenized derivatives of sensitive fields, such as bank location or institution name, with no direct identifiers. These fields are not encrypted to preserve query performance, but access is strictly controlled through role-based permissions and secure data transfer protocols.
 
@@ -294,9 +293,16 @@ Encrypted backups are created and refreshed at regular intervals to ensure disas
 Finally, a centralized logging system tracks all server connections, data accesses, and queries. Anomaly detection mechanisms can be integrated to identify and alert on suspicious activities in real time.
 
 
-\section*{Machine learning integration}
+\section*{Machine Learning Integration}
 
+Machine learning (ML) plays a critical role in Stripe’s data ecosystem, enabling real-time fraud detection, customer segmentation, and predictive analytics. These use cases require a tightly integrated ML pipeline that supports both batch and real-time processing, and can handle structured as well as unstructured data. The pipeline fulfills three primary functions:
+\begin{itemize}
+	\item \textbf{Feature extraction and model training}. Features are extracted from OLAP and NoSQL systems, with orchestration handled by tools such as Apache Airflow. Models are trained in cloud-based environments (e.g., AWS EC2) and managed using a model registry (e.g., MLflow) to ensure traceability and version control.
+	\item \textbf{Real time inference}. Models are exposed via APIs and queried asynchronously, typically by the OLTP system, to support real-time decision-making (e.g., fraud scoring). Inference responses can trigger automated actions such as alerts or transaction blocks. Models are deployed within a high-availability infrastructure (e.g., Kubernetes) to ensure scalability and low-latency responses under high transaction loads.
+	\item \textbf{Batch predictions}. Models are also executed on a scheduled basis to generate insights for use cases like churn prediction or personalization. The resulting predictions are written back to OLAP or NoSQL systems, depending on their usage, and are consumed by recommendation engines or business intelligence tools.
+\end{itemize}
 
+Monitoring tools are deployed to track data drift, feature distribution changes, and prediction accuracy over time. Alerts are triggered when drift exceeds defined thresholds. Retraining can be initiated either on a fixed schedule or manually by an operator based on monitoring insights.
 
 
 \end{document}

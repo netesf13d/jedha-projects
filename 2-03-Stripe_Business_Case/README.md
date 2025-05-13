@@ -8,8 +8,9 @@ We design design detailed data models for OLTP, OLAP, and NoSQL systems, develop
 ## Structure of the project
 
 This project repository is structured as follows.
-- The Jupyter notebook `Walmart_sales.ipynb` presents the results or our study. This is the main deliverable for this project.
-- The directory `scripts` contains the study as a python script.
-- The directory `data` contains the relevant data for the project.
-- The file `requirements.txt` gives the list of the project dependencies. 
+- The directory `Documentation` contains the documentation about the proposed data model for Stripe.
+- The directory `NoSQL_system` contains the NoSQL database schema.
+- The directory `OLTP_system` contains the OLTP database schema and a SQL creation script.
+- The directory `OLAP_system` contains the OLAP database schema and a SQL creation script.
+- The directory `Example queries` contains example NoSQL and SQL queries illustrating key use cases.
 - The directory `presentation` contains the slideshow for the exam, in both `odp` and `pdf` formats.

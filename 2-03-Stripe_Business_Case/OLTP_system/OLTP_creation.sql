@@ -9,8 +9,9 @@ CREATE TABLE transactions.transactions (
   merchant_id BIGINT FOREIGN KEY
   customer_id BIGINT FOREIGN KEY
   timestamp DATETIME
-  amount DECIMAL(10, 2)
-  currency_code TEXT -- ISO 4217
+  amount FLOAT
+  fee FLOAT
+  currency_code CHAR(3) -- ISO 4217
   payment_method TEXT
   payment_status TEXT
   device_type TEXT
@@ -22,7 +23,7 @@ CREATE TABLE transactions.merchants (
   merchant_id BIGINT PRIMARY KEY
   name TEXT
   iban TEXT
-  country_code TEXT -- ISO 3166-1 alpha-2
+  country_code CHAR(2) -- ISO 3166-1 alpha-2
   -- ...
 );
 
@@ -30,12 +31,12 @@ CREATE TABLE transactions.customers (
   customer_id BIGINT PRIMARY KEY
   name TEXT
   iban TEXT
-  country_code TEXT -- ISO 3166-1 alpha-2
+  country_code CHAR(2) -- ISO 3166-1 alpha-2
   -- ...
 );
 
 CREATE TABLE transactions.fraud_indicators (
-  transaction_id BIGINT FOREIGN KEY
-  fraud_probability FLOAT
+  transaction_id BIGINT PRIMARY KEY
+  is_fraud BOOLEAN
   -- ...
 );
