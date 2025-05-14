@@ -646,11 +646,11 @@ which is not available in this dataset.
 game_releases_df = spark.sql(
     """
     SELECT
-      TRUNC(release_date, "month") as date,
+      TRUNC(release_date, 'month') as date,
       COUNT (*) AS nb_releases,
       SUM (COUNT (*)) OVER (
         ORDER BY
-          TRUNC(release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
+          TRUNC(release_date, 'month') ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_releases
     FROM
@@ -658,7 +658,7 @@ game_releases_df = spark.sql(
     WHERE
       release_date IS NOT NULL
     GROUP BY
-      TRUNC(release_date, "month")
+      TRUNC(release_date, 'month')
     """
 )
 game_releases_df.show()
@@ -1083,23 +1083,23 @@ Independent and strategy games have a larger availability on Mac and Linux platf
 platform_releases_df = spark.sql(
     """
     SELECT
-      TRUNC(d.release_date, "month") as date,
+      TRUNC(d.release_date, 'month') as date,
       SUM (CAST(platforms.linux AS INTEGER)) AS linux,
       SUM (CAST(platforms.mac AS INTEGER)) AS mac,
       SUM (CAST(platforms.windows AS INTEGER)) AS windows,
       SUM (SUM (CAST(platforms.linux AS INTEGER))) OVER (
         ORDER BY
-          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
+          TRUNC(d.release_date, 'month') ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_linux,
       SUM (SUM (CAST(platforms.mac AS INTEGER))) OVER (
         ORDER BY
-          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
+          TRUNC(d.release_date, 'month') ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_mac,
       SUM (SUM (CAST(platforms.windows AS INTEGER))) OVER (
         ORDER BY
-          TRUNC(d.release_date, "month") ROWS BETWEEN UNBOUNDED PRECEDING
+          TRUNC(d.release_date, 'month') ROWS BETWEEN UNBOUNDED PRECEDING
         AND CURRENT ROW
       ) AS cum_windows
     FROM
@@ -1108,7 +1108,7 @@ platform_releases_df = spark.sql(
     WHERE
       d.release_date IS NOT NULL
     GROUP BY
-      TRUNC(d.release_date, "month")
+      TRUNC(d.release_date, 'month')
     ORDER BY
       date
     """
