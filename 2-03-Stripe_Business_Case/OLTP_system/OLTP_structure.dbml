@@ -3,7 +3,7 @@
 
 Project Stripe_OLTP {
   database_type: 'PostgreSQL'
-  Note: 'Stripe\'s OLTP database proposal'
+  Note: 'Stripe OLTP database proposal'
 }
 
 

@@ -17,9 +17,12 @@ CREATE TABLE transactions.transactions (
   payment_method_id INTEGER FOREIGN KEY
   payment_status_id INTEGER FOREIGN KEY
   device_type_id INTEGER FOREIGN KEY
+  is_fraud BOOLEAN 
+  fraud_probability FLOAT
+  -- ...
 );
 
-CREATE TABLE transactions.times {
+CREATE TABLE transactions.datetimes {
   timestamp DATETIME PRIMARY KEY
   timezone INTEGER
   date DATE NOT NULL
@@ -40,13 +43,6 @@ CREATE TABLE transactions.merchants (
 CREATE TABLE transactions.customers (
   customer_id BIGINT PRIMARY KEY
   country_code TEXT FOREIGN KEY -- ISO 3166-1 alpha-2
-  -- ...
-);
-
-CREATE TABLE transactions.fraud_indicators (
-  transaction_id BIGINT PRIMARY KEY
-  is_fraud BOOLEAN 
-  fraud_probability FLOAT
   -- ...
 );
 

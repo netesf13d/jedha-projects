@@ -61,7 +61,7 @@ The data integration architecture is presented in figure~\ref{fig:architecture}.
 \end{itemize}
 
 
-\begin{figure}[h]
+\begin{figure}[!htb]
 	\centering
 	\includegraphics[scale=0.93]{./figures/architecture}
 	\caption{Overview of the proposed data architecture. The description is given in the text. The lock symbols in the OLTP and Reference databases indicate that the security of these systems is critical.}
@@ -71,7 +71,7 @@ The data integration architecture is presented in figure~\ref{fig:architecture}.
 
 We present in table~\ref{table:providers} a list of possible providers for the various systems of our architecture.
 
-\begin{table}[ht]
+\begin{table}[!htb]
 	\centering
 	\begin{threeparttable}
 		\caption{Proposed providers for the various systems of the architecture.}
@@ -88,11 +88,14 @@ We present in table~\ref{table:providers} a list of possible providers for the v
 	\end{threeparttable}
 \end{table}
 
+
+
+\clearpage
 \section*{Reference Database}
 
-Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification. We present in table~~\ref{table:ReferenceDataDict} a data dictionary for some tables in the reference database.
+Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification. We present in table~\ref{table:ReferenceDataDict} a data dictionary for some tables in the reference database.
 
-\begin{table}[ht]
+\begin{table}[!htb]
 	\centering
 	\begin{threeparttable}
 		\caption{Data dictionary for the \code{transactions} OLTP schema.}
@@ -131,12 +134,15 @@ Slowly changing or static reference data (e.g. country reference, merchant infor
 \end{table}
 
 
+\clearpage
 \section*{Online Transaction Processing (OLTP) Data Model}
 
-Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. The core of the database is a registry of all financial transactions occurring within Stripe scope. Tables containing information about merchants and customers are cached from the reference database. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators originate from a different pipeline (e.g. reports after bank investigation).
+The OLTP data model is designed to handle core transactional operations with high integrity, performance, and reliability. This includes payment processing, refunds, subscriptions, and fraud indicators. Given the high volume and critical nature of this data, the schema follows normalization principles (3NF) to reduce redundancy and enforce consistency across distributed systems.
+
+Our proposed OLTP architecture is presented in figure~\ref{fig:OLTP}, with the associated data dictionary in table~\ref{table:OLTPDataDict}. The core of the database is the \code{transactions} table, a registry of all financial transactions occurring within Stripe scope. Tables containing information about merchants and customers are cached from the reference database. Fraud indicators are stored in a dedicated table in a one-to-one correspondence with the main transactions table. The rationale behind this choice is that fraud indicators originate from a different pipeline (e.g. reports after bank investigation).
 
 
-\begin{figure}
+\begin{figure}[!htb]
 	\centering
 	\includegraphics[scale=0.7]{./figures/OLTP}
 	\caption{Proposed OLTP database structure.}
@@ -144,11 +150,11 @@ Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. T
 \end{figure}
 
 
-\begin{table}[ht]
+\begin{table}[!htb]
 	\centering
 	\begin{threeparttable}
-		\caption{Data dictionary for the \code{transactions} OLTP schema.}
-		\label{table:OLTP}
+		\caption{Data dictionary for the \code{transactions} OLTP schema. The reference tables (e.g. \code{customers}) are described in table~\ref{table:ReferenceDataDict}.}
+		\label{table:OLTPDataDict}
 		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
 			\toprule
 			Field Name & Type & Description & Example  \\
@@ -177,24 +183,34 @@ Our proposed OLTP database architecture is presented in figure~\ref{fig:OLTP}. T
 \end{table}
 
 
+To support ACID properties and minimize latency, the system uses row-level locking and optimized indexing (e.g., on transaction date or status). Partitioning strategies (e.g., by region or time) are considered for scalability, and real-time replication mechanisms are in place to ensure high availability and failover support.
+
+This OLTP model serves as the authoritative source of truth and is tightly integrated with analytical and NoSQL systems via change data capture (CDC) pipelines, ensuring that derived systems always reflect the most current transactional state.
+
+
+\clearpage
 \section*{Online Analytical Processing (OLAP) Data Model}
 
-Pour l'analyse et la préparation de features pour la détection de fraude, on utilisera une base 
+The OLAP data model is designed to support complex analytical queries and business intelligence use cases at Stripe, such as revenue tracking, fraud trend analysis, customer segmentation, and regulatory reporting. The model follows a star schema architecture, centered around well-defined fact tables and surrounded by dimension tables to enable fast aggregations and multidimensional analysis, as shown in figure~\ref{fig:OLAP}.
+
+The primary fact table, \code{transactions}, records individual transactional data including metrics such as total amount, fee (Stripe revenue), refund counts, location, fraud status, etc. It links to several dimension tables such as \code{customers}, \code{merchants}, \code{datetimes}, \code{ip\_geography}, \code{payment\_methods}, etc. These dimensions provide the context needed for slicing and dicing the data across various business axes like time, location, customer attributes, or payment types. To optimize performance, pre-aggregated summary tables (e.g., daily or weekly rollups) and materialized views are implemented for high-frequency queries, such as monthly revenue per merchant or fraud rates per region (not represented on figure~\ref{fig:OLAP}).
+
+The OLAP model is refreshed from the OLTP system using Change Data Capture (CDC) and transformed to fit the analytical schema. Role-based access controls and data anonymization are applied to ensure sensitive data remains secure and compliant with privacy regulations.
 
 
-\begin{figure}
+\begin{figure}[!htb]
 	\centering
-	\includegraphics[scale=0.56]{./figures/OLAP}
-	\caption{Proposed OLAP database structure.}
+	\includegraphics[scale=0.58]{./figures/OLAP}
+	\caption{Proposed OLAP database structure. The star-schema is centered around the \code{transactions} fact table. Additional pre-aggregated tables (e.g. monthly revenues) are not shown.}
 	\label{fig:OLAP}
 \end{figure}
 
 
-\begin{table}[ht]
+\begin{table}[!htb]
 	\centering
 	\begin{threeparttable}
-		\caption{Data dictionary for the main tables in \code{transactions} OLAP schema.}
-		\label{table:OLAP_main}
+		\caption{Data dictionary for the main tables in \code{transactions} OLAP schema. The reference tables (e.g. \code{customers}) are described in table~\ref{table:ReferenceDataDict}.}
+		\label{table:OLAPDataDict}
 		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
 			\toprule
 			Field Name & Type & Description & Example  \\
@@ -211,6 +227,8 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 			\code{payment\_status\_id} & \code{integer} & Payment status id & \code{2} \\
 			\code{device\_type\_id} & \code{integer} & Device id & \code{3} \\
 			\code{ip\_geo\_id} & \code{bigint} & IP geolocation id & \code{123456} \\
+			\code{is\_fraud} & \code{boolean} & Is the transaction a fraud ? & \code{false} \\
+			\code{fraud\_score} & \code{float} & Predicted fraud probability & \code{0.12} \\
 			
 			\midrule
 			\multicolumn{4}{c}{\code{datetimes} table}\\
@@ -222,12 +240,6 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 			\code{month} & \code{tinyint} & Transaction month & \code{11} \\
 			\code{week\_day} & \code{tinyint} & Transaction week day & \code{6} (saturday) \\
 			\code{quarter} & \code{tinyint} & Transaction quarter & \code{4} \\
-			
-			\midrule
-			\multicolumn{4}{c}{\code{fraud\_indicators} table}\\
-			\code{transaction\_id} & \code{bigint} & Transaction id & \code{123456789} \\
-			\code{is\_fraud} & \code{boolean} & Is the transaction a fraud ? & \code{false} \\
-			\code{fraud\_score} & \code{float} & Predicted fraud probability & \code{0.12} \\
 			
 			\midrule
 			\multicolumn{4}{c}{\code{ip\_geography} table}\\
@@ -243,11 +255,10 @@ Pour l'analyse et la préparation de features pour la détection de fraude, on u
 \end{table}
 
 
+\clearpage
 \section*{NoSQL Data Model}
 
-L'entreprise doit aussi gérer des données semi-structurées telles que les fichiers de log, les reçus de transactions ou encore la télémétrie effectuée sur la plateforme de paiement. Les contraintes pour chaque catégorie de données sont diverses et on adoptera une solution basée sur une document-based NoSQL database.
-
-Stripe must handle semi-structured and unstructured data not well-suited to relational models:
+Stripe must handle large volumes semi-structured and unstructured data that do not fit well into traditional relational models:
 \begin{itemize}[itemsep=5pt, parsep=0pt]
 	\item \textbf{Telemetry}. Click stream events, user interactions, session data from the payment API.
 	\item \textbf{Customer feedback}. Surveys responses, reviews, support transcripts.
@@ -255,27 +266,22 @@ Stripe must handle semi-structured and unstructured data not well-suited to rela
 	\item \textbf{Machine learning features}. Generated or derived features used in model inference.
 \end{itemize}
 
-We recommend the use of a document-based NoSQL database, such as MongoDB, due to its flexibility in handling nested and heterogeneous data structures.
+The recommended model follows a document-based schema, implemented with tools such as MongoDB. This choice allows for flexibility in handling nested and heterogeneous data structures. Some key collections of the database are presented in figure~\ref{fig:NoSQL}.
 
-///The model will follow a domain-oriented, loosely coupled design with a focus on performance and future extensibility.
-
-\begin{figure}
+\begin{figure}[!htb]
 	\centering
 	\includegraphics[scale=0.66]{./figures/NoSQL}
-	\caption{Illustration of the NoSQL database structure. The schema is made using \href{https://hackolade.com/}{Hackolade} .}
+	\caption{Some key collections of the NoSQL system: \code{logs}, \code{session\_data} and \code{customer\_feedback}. Schema made with \href{https://hackolade.com/}{Hackolade} .}
 	\label{fig:NoSQL}
 \end{figure}
 
 
-\begin{itemize}
-	\item Les informations de session ayant principalement des contraintes de disponibilité associée à des requêtes simples, on s'orientera vers une database de type key-value.
-	\item Les fichiers de log sont structurés comme une succession d'évènements. Ceux-ci doivent être stockés de façon à pouvoir alimenter en temps réel des algorithmes de détection d'anomalies, afin d'assurer une réponse rapide en cas d'incident. Il est aussi nécessaire qu'ils soient lisibles par un humain pour une analyse approfondie. On s'orientera donc naturellement vers une document-based NoSQL database pour ce cas d'usage.
-	\item Les fichiers non sensibles peuvent être stockés dans un espace approprié (Amazon S3) et indexés par une document-based database qui contiendra aussi les métadonnées.
-	\item La télémétrie dans une column database
-	\item Les features pour le machine learning peuvent être stockés dans une graph database.
-\end{itemize}
+Relationships between documents are managed using a mix of embedding (for tightly coupled data like session actions) and referencing (for scalable lookups, e.g., user ID to transaction history). Indexing strategies are applied on common query fields like timestamps, customer IDs, and event types to optimize performance.
+
+The NoSQL database supports real-time analytics by integrating with data streaming tools (e.g., Apache Kafka or MongoDB Change Streams) and serves as a critical component in powering ML pipelines, recommendation engines, and monitoring dashboards. Sensitive data is either excluded or anonymized, and access is restricted via roles to ensure compliance and reduce exposure risk.
 
 
+\clearpage
 \section*{Security and Compliance}
 
 Stripe handles highly sensitive user data, including banking and payment information. Securing this data is critical for two main reasons: first, to comply with international and regional regulations such as GDPR and PCI-DSS; and second, to preserve customer trust. A data breach could result in reputational damage and potential revenue loss.

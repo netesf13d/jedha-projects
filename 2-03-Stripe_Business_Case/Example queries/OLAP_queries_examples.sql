@@ -1,47 +1,103 @@
------ This file contains sample SQL queries to get common analytics from our OLAP database -----
+----- This file contains sample SQL queries to get common analytics from the OLAP database -----
 
 
--- Get all transactions pertaining to a given merchant
+-- Top merchants by Stripe revenue in @year
 
-SELECT 
-  t.transaction_id,
-  t.time_id,
-  t.customer_id,
-  t.currency_code,
-  t.ip_geo_id,
-  t.payment_method_id,
-  t.payment_status_id,
-  t.device_type_id,
-  t.amount
+DECLARE @year INTEGER = 2024;
+
+SELECT
+  merchant_id,
+  merchants.merchant_name,
+  merchants.country_code,
+  nb_transactions,
+  total_amount,
+  total_revenue
 FROM
-  transactions AS t
+  (
+    SELECT 
+      merchant_id,
+      COUNT(merchant_id) AS nb_transactions,
+      SUM(amount) AS total_amount,
+      SUM(fee) AS total_revenue -- this is stripe actual revenue
+    FROM
+      transactions
+    JOIN
+      datetimes
+    ON
+      timestamp = datetimes.timestamp
+    WHERE
+      datetimes.year = @year
+    GROUP BY
+      merchant_id
+  )
 JOIN
   merchants
 ON
-  t.merchant_id = merchants.merchant_id
-WHERE
-  merchants.merchant_name = @merchant_name
+  merchants.merchant_id == merchant_id
+ORDER by
+  total_revenue
 
 
--- Get quaterly transaction volume for each year in the USA
+-- Get monthly transaction info in @country
+
+DECLARE @country TEXT = 'US';
 
 SELECT 
-  TRUNC()
+  TRUNC(timestamp, 'month') as date,
+  COUNT(amount) AS monthly_transaction_count,
+  SUM(amount) AS monthly_amount,
+  SUM(fee) AS monthly_revenue
 FROM
   transactions
-JOIN
-  merchants
-ON
-  transactions.merchant_id = merchants.merchant_id
 WHERE
-  merchants.merchant_name = @merchant_name
+  country_code = @country
+GROUP BY
+  TRUNC(timestamp, 'month')
+ORDER BY
+  date
 
 
+-- Get average hourly transaction volume in @country
 
--- Get monthly transaction volume and transaction number for each currency
+DECLARE @country TEXT = 'FR';
+
+SELECT 
+  hour,
+  SUM(hourly_transactions) / COUNT(hourly_transactions) AS avg_hourly_transactions,
+  SUM(hourly_amount) / COUNT(hourly_amount) AS avg_hourly_amount,
+  SUM(hourly_revenue) / Count(hourly_revenue) AS avg_hourly_revenue
+FROM
+  (
+    SELECT 
+      HOUR(timestamp) as hour,
+      COUNT(amount) AS hourly_transactions,
+      SUM(amount) AS hourly_amount,
+      SUM(fee) AS hourly_revenue
+    FROM
+      transactions
+    WHERE
+      country_code = @country
+    GROUP BY
+      DATE_TRUNC(HOUR, timestamp)
+  )
+GROUP BY
+  hour
+ORDER BY
+  hour
 
 
--- Get average amount per transaction yearly (expressed in USD)
+-- monthly fraud rate in @country
 
+DECLARE @country TEXT = 'GB';
 
--- Get average hourly transaction volume (with timezone adjustment)
+SELECT 
+  TRUNC(timestamp, 'month') as date,
+  SUM(CAST(is_fraud AS FLOAT)) / COUNT(is_fraud) AS fraud_rate,
+FROM
+  transactions
+WHERE
+  country_code = @country
+GROUP BY
+  TRUNC(timestamp, 'month')
+ORDER BY
+  date

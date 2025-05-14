@@ -3,7 +3,7 @@
 
 Project Stripe_OLAP {
   database_type: 'PostgreSQL'
-  Note: 'Stripe\'s OLAP database proposal'
+  Note: 'Stripe OLAP database proposal'
 }
 
 
@@ -21,6 +21,9 @@ Table transactions {
   payment_method_id integer
   payment_status_id integer
   device_type_id integer
+  is_fraud boolean [null]
+  fraud_score float [null]
+  // ...
 }
 
 
@@ -46,14 +49,6 @@ Table merchants {
 Table customers {
   customer_id bigint [primary key]
   country_code char(2) // ISO 3166-1 2-letter
-  // ...
-}
-
-
-Table fraud_indicators {
-  transaction_id bigint [primary key]
-  is_fraud boolean [null]
-  fraud_score float [null]
   // ...
 }
 
@@ -114,7 +109,6 @@ Ref: transactions.merchant_id > merchants.merchant_id
 Ref: transactions.customer_id > customers.customer_id
 Ref: transactions.currency_code > currencies.currency_code
 Ref: transactions.ip_geo_id > ip_geography.ip_geo_id
-Ref: transactions.transaction_id - fraud_indicators.transaction_id
 
 // 2nd level
 Ref: merchants.country_code > countries.country_code
