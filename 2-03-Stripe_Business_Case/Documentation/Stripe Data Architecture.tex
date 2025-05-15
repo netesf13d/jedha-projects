@@ -76,9 +76,9 @@ We present in table~\ref{table:providers} a list of possible providers for the v
 	\begin{threeparttable}
 		\caption{Proposed providers for the various systems of the architecture.}
 		\label{table:providers}
-		\begin{tabularx}{0.99\textwidth}{c >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.6\textwidth}{c >{\centering\arraybackslash}X}
 			\toprule
-			System & Provider  \\
+			\multicolumn{1}{c}{\textbf{System}} & \multicolumn{1}{c}{\textbf{Provider}} \\
 			\midrule
 			OLTP/OLAP & Snowflake, Redshift \\
 			NoSQL & MongoDB, DynamoDB \\
@@ -100,9 +100,9 @@ Slowly changing or static reference data (e.g. country reference, merchant infor
 	\begin{threeparttable}
 		\caption{Data dictionary for the \code{transactions} OLTP schema.}
 		\label{table:ReferenceDataDict}
-		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{l c >{\arraybackslash}X >{\arraybackslash}X}
 			\toprule
-			Field Name & Type & Description & Example  \\
+			\multicolumn{1}{c}{\textbf{Field Name}} & \multicolumn{1}{c}{\textbf{Type}} & \multicolumn{1}{c}{\textbf{Description}} & \multicolumn{1}{c}{\textbf{Example}} \\
 			\midrule
 			\multicolumn{4}{c}{\code{countries} table}\\
 			\code{country\_code} & \code{char(2)} & ISO 3166-1 2-letter & \code{'GB'} \\
@@ -155,9 +155,9 @@ Our proposed OLTP architecture is presented in figure~\ref{fig:OLTP}, with the a
 	\begin{threeparttable}
 		\caption{Data dictionary for the \code{transactions} OLTP schema. The reference tables (e.g. \code{customers}) are described in table~\ref{table:ReferenceDataDict}.}
 		\label{table:OLTPDataDict}
-		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{l c >{\arraybackslash}X >{\arraybackslash}X}
 			\toprule
-			Field Name & Type & Description & Example  \\
+			\multicolumn{1}{c}{\textbf{Field Name}} & \multicolumn{1}{c}{\textbf{Type}} & \multicolumn{1}{c}{\textbf{Description}} & \multicolumn{1}{c}{\textbf{Example}} \\
 			\midrule
 			\multicolumn{4}{c}{\code{transactions} table}\\
 			\code{transaction\_id} & \code{bigint} & Unique transaction id & \code{123456789} \\
@@ -211,9 +211,9 @@ The OLAP model is refreshed from the OLTP system using Change Data Capture (CDC)
 	\begin{threeparttable}
 		\caption{Data dictionary for the main tables in \code{transactions} OLAP schema. The reference tables (e.g. \code{customers}) are described in table~\ref{table:ReferenceDataDict}.}
 		\label{table:OLAPDataDict}
-		\begin{tabularx}{0.99\textwidth}{c c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{l c >{\arraybackslash}X >{\arraybackslash}X}
 			\toprule
-			Field Name & Type & Description & Example  \\
+			\multicolumn{1}{c}{\textbf{Field Name}} & \multicolumn{1}{c}{\textbf{Type}} & \multicolumn{1}{c}{\textbf{Description}} & \multicolumn{1}{c}{\textbf{Example}} \\
 			\midrule
 			\multicolumn{4}{c}{\code{transactions} table}\\
 			\code{transaction\_id} & \code{bigint} & Unique transaction id & \code{123456789} \\
