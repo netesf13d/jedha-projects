@@ -276,7 +276,7 @@ The recommended model follows a document-based schema, implemented with tools su
 \end{figure}
 
 
-Relationships between documents are managed using a mix of embedding (for tightly coupled data like session actions) and referencing (for scalable lookups, e.g., user ID to transaction history). Indexing strategies are applied on common query fields like timestamps, customer IDs, and event types to optimize performance.
+Relationships between documents are managed using a mix of embedding (for tightly coupled data like session actions) and referencing (for scalable lookups, e.g., \code{customer\_id} to feedback history). Indexing strategies are applied on common query fields like timestamps, customer IDs, and event types to optimize performance.
 
 The NoSQL database supports real-time analytics by integrating with data streaming tools (e.g., Apache Kafka or MongoDB Change Streams) and serves as a critical component in powering ML pipelines, recommendation engines, and monitoring dashboards. Sensitive data is either excluded or anonymized, and access is restricted via roles to ensure compliance and reduce exposure risk.
 
@@ -304,7 +304,7 @@ Finally, a centralized logging system tracks all server connections, data access
 Machine learning (ML) plays a critical role in Stripe’s data ecosystem, enabling real-time fraud detection, customer segmentation, and predictive analytics. These use cases require a tightly integrated ML pipeline that supports both batch and real-time processing, and can handle structured as well as unstructured data. The pipeline fulfills three primary functions:
 \begin{itemize}
 	\item \textbf{Feature extraction and model training}. Features are extracted from OLAP and NoSQL systems, with orchestration handled by tools such as Apache Airflow. Models are trained in cloud-based environments (e.g., AWS EC2) and managed using a model registry (e.g., MLflow) to ensure traceability and version control.
-	\item \textbf{Real time inference}. Models are exposed via APIs and queried asynchronously, typically by the OLTP system, to support real-time decision-making (e.g., fraud scoring). Inference responses can trigger automated actions such as alerts or transaction blocks. Models are deployed within a high-availability infrastructure (e.g., Kubernetes) to ensure scalability and low-latency responses under high transaction loads.
+	\item \textbf{Real time inference}. Models are exposed via APIs and queried asynchronously, typically by the OLAP system, to support real-time decision-making (e.g., fraud scoring). Inference responses can trigger automated actions such as alerts or transaction blocks. Models are deployed within a high-availability infrastructure (e.g., Kubernetes) to ensure scalability and low-latency responses under high transaction loads.
 	\item \textbf{Batch predictions}. Models are also executed on a scheduled basis to generate insights for use cases like churn prediction or personalization. The resulting predictions are written back to OLAP or NoSQL systems, depending on their usage, and are consumed by recommendation engines or business intelligence tools.
 \end{itemize}
 
