@@ -68,9 +68,9 @@ In the context of this organizational model, both full-code and low/no-code solu
 	\begin{threeparttable}
 		\caption{Recommended technology tools to support Spotify data governance framework.}
 		\label{table:tools}
-		\begin{tabularx}{0.99\textwidth}{c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{l >{\arraybackslash}X >{\arraybackslash}X}
 			\toprule
-			Category & Purpose & Examples \\
+			\multicolumn{1}{c}{\textbf{Category}} & \multicolumn{1}{c}{\textbf{Purpose}} & \multicolumn{1}{c}{\textbf{Examples}} \\
 			\midrule
 			Data cataloging & Central metadata management, data discovery & \href{https://www.alation.com/}{Alation}, \href{https://atlas.apache.org/}{Apache Atlas}, \href{https://atlan.com/}{Atlan}, \href{https://www.collibra.com/}{Collibra} \\
 			Data quality & Automate data profiling, validation, alerts & \href{https://www.ataccama.com/}{Ataccama}, \href{https://www.informatica.com/products/data-quality.html}{Informatica Data Quality}, \href{https://www.soda.io/}{Soda}, \href{https://www.talend.com/products/data-integrity-governance/}{Talend} \\
@@ -90,7 +90,7 @@ It is of course recommended to avoid redundancy by selecting a single tool for a
 \subsection*{Overview of the Pilot Implementation}
 
 \textbf{Objective of the Pilot:}\\
-To validate the effectiveness of Spotify’s new Data Governance Framework by applying it to the User Engagement Data domain. The rationale behind this choice is that user data is central to key components of the governance plan: compliance, quality and security. This dataset includes user interactions such as play history, search behavior, and playlist creation. The pilot aims to enhance data quality, ensure GDPR/CCPA compliance, and improve internal accessibility and reliability of engagement insights.
+To validate the effectiveness of the new Data Governance Framework of Spotify by applying it to the user data domain. The rationale behind this choice is that user data is central to key components of the governance plan: compliance, quality and security. This dataset includes user interactions such as play history, search behavior, and playlist creation. The pilot aims to enhance data quality, ensure GDPR/CCPA compliance, and improve internal accessibility and reliability of engagement insights.
 
 \textbf{Scope of the Pilot:}\\
 The pilot will focus on the User Engagement Data used by the Product, Marketing, and Analytics teams to assess content performance and drive personalization strategies.
@@ -113,9 +113,9 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 	\begin{threeparttable}
 		%\caption{}
 		\label{table:roles}
-		\begin{tabularx}{0.99\textwidth}{c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{c l >{\arraybackslash}X}
 			\toprule
-			Team member & Role & Responsibilities \\
+			\multicolumn{1}{c}{\textbf{Team member}} & \multicolumn{1}{c}{\textbf{Role}} & \multicolumn{1}{c}{\textbf{Responsibilities}} \\
 			\midrule
 			- & Pilot Project Manager & Oversees pilot execution, coordination, and reporting \\
 			- & Data Steward & Manages quality and documentation of engagement data \\
@@ -135,9 +135,9 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 	\begin{threeparttable}
 		%\caption{}
 		\label{table:milestones}
-		\begin{tabularx}{0.99\textwidth}{c >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{c >{\arraybackslash}X >{\arraybackslash}X}
 			\toprule
-			Milestone & Target date & Responsible \\
+			\multicolumn{1}{c}{\textbf{Milestone}} & \multicolumn{1}{c}{\textbf{Target date}} & \multicolumn{1}{c}{\textbf{Responsible}} \\
 			\midrule
 			Kick-off meeting & asap & Project Manager \\
 			Data Assessment and Cleansing & +1 month & Data Steward \\
@@ -182,9 +182,9 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 	\begin{threeparttable}
 		%\caption{}
 		\label{table:risks}
-		\begin{tabularx}{0.99\textwidth}{>{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{>{\arraybackslash}X c c >{\arraybackslash}X}
 			\toprule
-			Risk & Likelihood & Impact & Mitigation Strategy \\
+			\multicolumn{1}{c}{\textbf{Risk}} & \multicolumn{1}{c}{\textbf{Likelihood}} & \multicolumn{1}{c}{\textbf{Impact}} & \multicolumn{1}{c}{\textbf{Mitigation Strategy}} \\
 			\midrule
 			Non-compliance with regulations & Medium & High & Weekly audits and DPO signoff \\
 			Team resistance to new processes & High & Medium & Stakeholder workshops and clear benefit framing \\

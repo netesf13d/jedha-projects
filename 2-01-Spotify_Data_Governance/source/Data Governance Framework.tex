@@ -57,7 +57,7 @@ In this document we provide a unified approach to managing data across all funct
 The data governance framework aims to:
 \begin{itemize}[itemsep=5pt, parsep=0pt]
 	\item Improve data quality in accordance with ISO 8000. Enhance interoperability across departments.
-	\item Ensure ongoing compliance with GDPR, CCPA, and emerging privacy regulations.
+	\item Ensure ongoing compliance with regulations (GDPR, CCPA, etc), and emerging privacy regulations.
 	\item Build user trust through privacy protection and transparency.
 	\item Improve data accessibility ad integration. Enable consistent, data-driven decisions company-wide.
 \end{itemize}
@@ -65,13 +65,13 @@ The data governance framework aims to:
 
 \section*{Data Governance Principles}
 
-The following principles serve as the foundation of Spotify’s Data Governance Framework. They are designed to ensure that data across the organization is managed ethically, securely, and in compliance with global regulations, while also supporting business innovation and operational excellence. These principles guide all data-related decisions, from collection and processing to quality control and user privacy.
+The following principles serve as the foundation of the Data Governance Framework of Spotify. They are designed to ensure that data across the organization is managed ethically, securely, and in compliance with global regulations, while also supporting business innovation and operational excellence. These principles guide all data-related decisions, from collection and processing to quality control and user privacy.
 
 \begin{itemize}[itemsep=5pt, parsep=0pt]
 	\item \textbf{Accountability}. Spotify assigns clear data ownership and stewardship across teams. The Chief Data Officer and Data Protection Officer oversee compliance and governance implementation.
 	\item \textbf{Transparency}. Users must understand how their data is collected and used. Spotify ensures clear privacy notices and visible consent options in line with GDPR and CCPA.
-	\item \textbf{Data Security}. Sensitive data is protected using strong encryption, access controls, and PCI-DSS-aligned practices to safeguard against breaches.
-	\item \textbf{Data Quality}. Spotify ensures data is accurate, consistent, and complete, using ISO 8000-aligned standards, audits, and automated validation.
+	\item \textbf{Data Security}. Sensitive data is protected using strong encryption, access controls, and practices aligned with PCI-DSS to safeguard against breaches.
+	\item \textbf{Data Quality}. Spotify ensures data is accurate, consistent, and complete, using standards aligned with ISO 8000, audits, and automated validation.
 	\item \textbf{Compliance}. All data practices comply with GDPR, CCPA, and other global regulations. Spotify monitors legal changes and updates processes accordingly.
 	\item \textbf{Data Minimization}. Only necessary data is collected and retained. Unused or excess data is regularly purged to reduce risk.
 	\item \textbf{User Rights}. Spotify provides tools for users to access, correct, or delete their data and opt out of data sharing or sale.
@@ -83,16 +83,16 @@ The following principles serve as the foundation of Spotify’s Data Governance 
 
 \section*{Regulatory Compliance}
 
-Spotify’s compliance framework integrates legal and ethical requirements using the Compliance Checklist. The key mechanisms are presented in table~\ref{table:compliance}
+The compliance framework of Spotify integrates legal and ethical requirements using the Compliance Checklist. Key mechanisms are presented in table~\ref{table:compliance}
 
 \begin{table}[h!]
 	\centering
 	\begin{threeparttable}
 		\caption{Compliance checklist}
 		\label{table:compliance}
-		\begin{tabularx}{0.99\textwidth}{>{\centering\arraybackslash}X c >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{>{\arraybackslash}X c >{\arraybackslash}X}
 			\toprule
-			Requirement & Regulation & Implementation  \\
+			\multicolumn{1}{c}{\textbf{Requirement}} & \multicolumn{1}{c}{\textbf{Regulation}} & \multicolumn{1}{c}{\textbf{Implementation}} \\
 			\midrule
 			Data processing principles & GDPR & Transparent, user-friendly notices in every market \\
 			User Rights & GDPR & Portal for access, deletion, and correction requests \\
@@ -104,8 +104,8 @@ Spotify’s compliance framework integrates legal and ethical requirements using
 			Non-discrimination for Exercising Rights & CCPA & Ensure no discrimination against users for exercising their rights \\
 			Secure Network and Systems & PCI-DSS & Implement security measures such as firewalls \\
 			Protect Cardholder Data & PCI-DSS & Setup encryption and secure storage \\
-			Maintain Vulnerability Management Program & PCI-DSS & Perform regular security audits, ensure systems are up-to-date \\
-			Access Control Measures & PCI-DSS & Define access rules for the different data domains and limit access authorized personel \\
+			Vulnerability Management Program & PCI-DSS & Perform regular security audits, ensure systems are up-to-date \\
+			Access Control Measures & PCI-DSS & Define access rules for the different data domains and limit access authorized personnel \\
 			Networks Monitoring and Testing & PCI-DSS & Assess security through pentesting, ensure proper logging \\
 			Information Security Policy & PCI-DSS & Create and maintain a definite information security policy, ensure regular training of the teams \\
 			\bottomrule
@@ -123,14 +123,14 @@ Effective data governance at Spotify requires clearly defined roles and responsi
 	\begin{threeparttable}
 		\caption{Roles and Responsibilities summary.}
 		\label{table:roles}
-		\begin{tabularx}{0.99\textwidth}{c >{\centering\arraybackslash}X}
+		\begin{tabularx}{0.99\textwidth}{l >{\arraybackslash}X}
 			\toprule
-			Role & Key Responsibilities  \\
+			\multicolumn{1}{c}{\textbf{Role}} & \multicolumn{1}{c}{\textbf{Key Responsibilities}} \\
 			\midrule
 			Chief Data Officer (CDO) & Leads data governance strategy, policies, and KPIs. \\
-			Data Protection Officer (DPO) & Ensures compliance with GDPR/CCPA, handles breaches, data subject access requests (DSARs). \\
+			Data Protection Officer (DPO) & Ensures compliance with regulations (GDPR, CCPA, etc), handles breaches, data subject access requests (DSARs). \\
 			Head of Engineering & Builds systems to support secure, governed data access. \\
-			Marketting Director & Uses the data to drive marketting campaigns or get insight about the platform usage. \\
+			Marketing Director & Uses the data to drive marketing campaigns or get insight about the platform usage. \\
 			Data Stewards & Manage data definitions, quality, access control, and metadata within domains. \\
 			Legal Counsel & Advises on compliance risks and regulatory interpretation. \\
 			Product \& Marketing Leads & Ensure responsible use of user data and accurate analytics. \\
@@ -139,7 +139,7 @@ Effective data governance at Spotify requires clearly defined roles and responsi
 	\end{threeparttable}
 \end{table}
 
-The framework is governed by Spotify’s Data Governance Committee, reviewed regularly, and updated to reflect new regulatory changes and updates, along with change in Spotify platform.
+The framework is governed by the Data Governance Committee of Spotify, reviewed regularly, and updated to reflect new regulatory changes and updates, along with change in Spotify platform.
 
 
 \end{document}
