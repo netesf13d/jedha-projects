@@ -71,6 +71,7 @@ to use (eg the address). Moreover, some can be considered as personal data, and 
 legal to use in a realistic context. We therefore produce a new set of features for fraud
 detection:
 - `month`, `weekday`, `day_time`, date and time of the transaction
+- 'cos_day_time', 'sin_day_time'
 - `amt`, the transaction amount
 - 'cust_fraudster', indicates whether the customer has already commited fraud
 - 'merch_fraud_victim', indicated whether the merchant has already been victim of fraud
@@ -105,7 +106,7 @@ df = pd.DataFrame({
     'customer_id': raw_df['customer'].map(customer_ids),
     'month': dt.month,
     'weekday': dt.weekday,
-    'time': raw_df['trans_date_trans_time'] - dt.floor('D'),
+    'day_time': (raw_df['trans_date_trans_time'] - dt.floor('D')).dt.seconds,
     'amt': raw_df['amt'],
     'cust_fraudster': raw_df['customer'].map(customer_fraud),
     'merch_fraud_victim': raw_df['merchant'].map(merchant_fraud),
@@ -113,10 +114,13 @@ df = pd.DataFrame({
     })
 
 
+# !!! make cos and sin time
+# !!! cos and sin weekday
+
 ##
 cat_vars = ['month', 'weekday']
 bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['time', 'amt']
+quant_vars = ['day_time', 'amt']
 
 # %% EDA
 """
@@ -141,30 +145,26 @@ hist = np.histogram(df['amt'], bins=bins)
 
 
 fig1, ax1 = plt.subplots(
-    nrows=1, ncols=1, figsize=(7, 4.2), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.91, 'bottom': 0.11, 'hspace': 0.08})
-fig1.suptitle("Figure 1: Comparison of rental prices vs various car options",
+    nrows=1, ncols=1, figsize=(6, 4), dpi=100,
+    gridspec_kw={'left': 0.11, 'right': 0.94, 'top': 0.89, 'bottom': 0.14})
+fig1.suptitle("Figure 1: Distribution of amounts spent in transactions",
               x=0.02, ha='left')
 
 ax1.hist(df['amt'], bins=bins, density=False)
 
 ax1.set_xlim(-0.5, 600)
-# ticks = ['Private\nparking', 'GPS', 'Air\nConditioning', 'Automatic\nCar',
-#          'Getaround\nConnect', 'Speed\nRegulator', 'Winter\nTires']
-# ax1.set_xticks(np.arange(0, len(ticks)), ticks, rotation=0)
-# ax1.set_ylim(0, 480)
-# ax1.set_yticks(np.arange(50, 500, 50), minor=True)
-ax1.set_ylabel('Rental price ($/day)', labelpad=5)
+ax1.set_xlabel('Amount spent')
+ax1.set_ylim(0, 70000)
+ax1.set_yticks(np.linspace(0, 70000, 8), np.arange(0, 80, 10))
+ax1.set_ylabel('Counts (x1000)', labelpad=5)
 ax1.grid(visible=True, axis='y', linewidth=0.3)
 ax1.grid(visible=True, axis='y', which='minor', linewidth=0.2)
 
-# handles = [Patch(facecolor='#1F77B480', edgecolor='k', linewidth=0.5),
-#            Patch(facecolor='#FF7F0E80', edgecolor='k', linewidth=0.5)]
-# ax1.legend(handles=handles, labels=['False', 'True'], ncols=2)
 
 plt.show()
 
 """
+!!!
 Figure 1 presents 
 """
 
@@ -182,8 +182,7 @@ fig2, ax2 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.6, 4.6), dpi=100,
     gridspec_kw={'left': 0.15, 'right': 0.86, 'top': 0.72, 'bottom': 0.04, 'wspace': 0.24})
 cax2 = fig2.add_axes((0.87, 0.04, 0.03, 0.68))
-fig2.suptitle("Figure 2: Correlation matrix",
-              x=0.02, ha='left')
+fig2.suptitle("Figure 2: Correlation matrix", x=0.02, ha='left')
 
 
 ax2.set_aspect('equal')
@@ -215,6 +214,7 @@ plt.show()
 
 """
 Figure 2 presents
+!!!
 """
 
 # %%
@@ -223,124 +223,187 @@ Figure 2 presents
 
 """
 
-## Agregate categories with count < 30 into infrequent category `other`
-df_ = df.loc[:, cat_vars]
-value_counts = df_.apply(lambda x: x.map(x.value_counts()))
-df_ = pd.concat([df_.mask(value_counts < 30, 'other'),
-                 df['rental_price_per_day']], axis=1)
+## Fraud probability vs month
+df_ = df[['month', 'is_fraud']].assign(count=1).groupby('month').sum()
+
+months = df_.index.to_numpy()
+is_fraud = df_['is_fraud'].to_numpy()
+count = df_['count'].to_numpy()
+
+month_fprob = is_fraud / count
+month_fprob_err = month_fprob * (1 - month_fprob) / np.sqrt(count)
+
+
+## Fraud probability vs week day
+df_ = df[['weekday', 'is_fraud']].assign(count=1).groupby('weekday').sum()
+
+weekdays = df_.index.to_numpy()
+is_fraud = df_['is_fraud'].to_numpy()
+count = df_['count'].to_numpy()
+
+day_fprob = is_fraud / count
+day_fprob_err = day_fprob * (1 - day_fprob) / np.sqrt(count)
+
+
+## Fraud probability vs hour
+df_ = df[['day_time', 'is_fraud']]
+df_ = df_.assign(count=1, hour=df_['day_time'] // 3600)
+df_ = df_.groupby('hour').sum()
+
+hours = df_.index.to_numpy()
+is_fraud = df_['is_fraud'].to_numpy()
+count = df_['count'].to_numpy()
+
+hour_fprob = is_fraud / count
+hour_fprob_err = hour_fprob * (1 - hour_fprob) / np.sqrt(count)
+
+
 
 ##
 fig3, axs3 = plt.subplots(
-    nrows=3, ncols=1, figsize=(6, 9.8), dpi=100,
-    gridspec_kw={'left': 0.1, 'right': 0.975, 'top': 0.965, 'bottom': 0.06,
-                 'hspace': 0.34})
-fig3.suptitle("Figure 3: Rental price distributions for the various car categories",
-              x=0.02, y=0.991, ha='left')
+    nrows=1, ncols=3, figsize=(10, 3.8), dpi=100, sharey=True,
+    gridspec_kw={'left': 0.065, 'right': 0.95, 'top': 0.87, 'bottom': 0.16,
+                 'wspace': 0.06})
+fig3.suptitle("Figure 3: Time-dependence of the fraud probability",
+              x=0.02, y=0.97, ha='left')
 
-cat_titles = ['Car brand (`model_key`)', 'Fuel type (`fuel`)',
-                'Color (`paint_color`)', 'Body style (`car_type`)']
-for title, item, ax in zip(cat_titles, cat_vars, axs3):
-    ax.set_title(title, y=0.84)
-    vdata, categories = [], []
-    for category, gdf in df_.loc[:, ['rental_price_per_day', item]].groupby(item):
-        vdata.append(gdf['rental_price_per_day'].to_numpy())
-        categories.append(category)
+axs3[0].errorbar(months, 100*month_fprob, yerr=100*month_fprob_err,
+                 color='tab:orange', linestyle='', marker='o', markersize=4)
+axs3[0].tick_params(which='both', direction='in', top=True, right=True)
+axs3[0].set_xlim(0, 13)
+axs3[0].set_xticks(np.arange(1, 13))
+axs3[0].set_xlabel('Month')
+axs3[0].set_ylim(0, 2.)
+axs3[0].set_yticks(np.linspace(0, 2, 5))
+axs3[0].set_yticks(np.linspace(0.25, 1.75, 4), minor=True)
+axs3[0].grid(visible=True, linewidth=0.3)
+axs3[0].grid(visible=True, which='minor', linewidth=0.2)
 
-    n = len(categories)
-    vplot = ax.violinplot(vdata, positions=np.linspace(0, n-1, n),
-                          widths=0.8, showmeans=True, bw_method=0.2)
-    for elt in vplot['bodies']:
-        elt.set_facecolor('plum')
-    for elt in ['cbars', 'cmaxes', 'cmins', 'cmeans']:
-        vplot[elt].set_edgecolor('plum')
-    ax.set_xlim(-0.6-0.5/n, n-0.4+1/n)
-    ax.set_xticks(np.arange(0, len(categories)), categories, fontsize=10,
-                  rotation=30, ha='right')
-    ax.set_ylim(0, 450)
-    ax.grid(visible=True, axis='y', linewidth=0.3)
 
-fig3.text(0.02, 0.51, 'Rental price ($/day)', rotation=90, fontsize=11,
+axs3[1].errorbar(weekdays, 100*day_fprob, yerr=100*day_fprob_err,
+                 color='tab:orange', linestyle='', marker='o', markersize=4)
+axs3[1].tick_params(which='both', direction='in', top=True, right=True)
+axs3[1].set_xlim(-0.5, 6.5)
+axs3[1].set_xticks(np.arange(7),
+                   ['Mon.', 'Tue.', 'Wed.', 'Thu.', 'Fri.', 'Sat.', 'Sun.'])
+axs3[1].set_xlabel('Week day', labelpad=8)
+axs3[1].grid(visible=True, linewidth=0.3)
+axs3[1].grid(visible=True, which='minor', linewidth=0.2)
+
+
+axs3[2].errorbar(hours, 100*hour_fprob, yerr=100*hour_fprob_err,
+                 color='tab:orange', linestyle='', marker='o', markersize=4)
+axs3[2].tick_params(which='both', direction='in', top=True,
+                    right=True, labelright=True)
+axs3[2].set_xlim(-1.5, 24.5)
+axs3[2].set_xticks(np.arange(0, 24, 2))
+axs3[2].set_xticks(np.arange(1, 24, 2), minor=True)
+axs3[2].set_xlabel('Hour')
+axs3[2].grid(visible=True, linewidth=0.3)
+axs3[2].grid(visible=True, which='minor', linewidth=0.2)
+
+
+fig3.text(0.02, 0.51, 'Fraud probability (%)', rotation=90, fontsize=11,
           ha='center', va='center')
 
 
 plt.show()
 
 """
-Figure 3 presents violin plots of the rental prices distribution for the various
-car categories. We note that the aggregated categories (`other`) tend to have more
-inhomogeneous distributions than the others. See for instance for the car `fuel`, the
-infrequent category contains hybrid and electric cars, with a distribution composed of two blobs.
-This graph reveals that the car brand is most influencial factor for the rental price.
+Figure 3 presents
+!!!
+
+Strong non-linearity in the time dependence of the fraud -> choose non-linear model
+such as decision tree.
 """
 
 
 # %%
 """
-### Joint probability distributions of quantitative variables with rental price
+### Joint probability distributions
+
+!!!
 """
 
-## Rental price observations and 1D histogram bins
-rental_price = df['rental_price_per_day'].to_numpy()
-rp_bins = np.linspace(0, 450, 91)
+## Transaction amounts and 1D histogram bins
+amount = df['amt'].to_numpy()
+amt_bins = np.linspace(0, 1200, 121)
 
-## Mileage observations and 1D histogram bins
-mileage = df['mileage'].to_numpy()
-m_bins = np.linspace(-10_000, 1_050_000, 107)
+## Day time observations and 1D histogram bins
+day_time = df['day_time'].to_numpy()
+time_bins = np.linspace(0, 86400, 49)
 
-## Engine power observations and 1D histogram bins
-engine_power = df['engine_power'].to_numpy()
-ep_bins = np.linspace(0, 450, 46)
+## distrib
+yx = np.meshgrid(time_bins, amt_bins, indexing='ij')
+time_amt_hist = np.histogram2d(day_time, amount, bins=[time_bins, amt_bins])[0]
+
+## fraud probability
+is_fraud = df['is_fraud'].to_numpy()
+amt_j = np.digitize(amount, amt_bins) - 1
+time_i = np.digitize(day_time, time_bins) - 1
+fraud_prob = np.zeros((len(time_bins)-1, len(amt_bins)-1))
+for i in range(len(time_bins)-1):
+    idx_i = (time_i == i)
+    for j in range(len(amt_bins)-1):
+        fraud_prob[i, j] = np.mean(is_fraud[(amt_j == j) * idx_i])
+# for i, j in np.ndindex(fraud_prob.shape):
 
 
+# %%
 ##
 fig4, axs4 = plt.subplots(
-    nrows=1, ncols=2, figsize=(8.8, 4.2), dpi=100,
-    gridspec_kw={'left': 0.07, 'right': 0.89, 'top': 0.88, 'bottom': 0.12,
-                 'wspace': 0.18})
-cax4 = fig4.add_axes((0.915, 0.12, 0.025, 0.76))
+    nrows=1, ncols=2, figsize=(8.8, 4.4), dpi=100,
+    gridspec_kw={'left': 0.07, 'right': 0.89, 'top': 0.87, 'bottom': 0.11,
+                 'wspace': 0.34})
 fig4.suptitle("Figure 4: Joint probability distribution of rental price with quantitative variables",
               x=0.02, ha='left')
 
 
 
-cmap4 = plt.get_cmap('hot').copy()
-cmap4.set_extremes(under='0.7', over='0.5')
+cmap4_0 = plt.get_cmap('hot').copy()
+cmap4_0.set_extremes(bad='0.6', under=(0.0416, 0.0, 0.0, 1.0), over='0.6')
+heatmap = axs4[0].pcolormesh(*yx, np.log(time_amt_hist),
+                             cmap=cmap4_0, vmin=1, vmax=10)
 
-heatmap = axs4[0].pcolormesh(
-    *np.meshgrid(m_bins, rp_bins, indexing='ij'),
-    np.histogram2d(mileage, rental_price, bins=[m_bins, rp_bins])[0],
-    cmap=cmap4, vmin=0.5, vmax=50)
-
-axs4[0].set_xticks(np.linspace(1e5, 1e6, 10), minor=True)
-axs4[0].set_xlabel('Mileage', fontsize=11)
+axs4[0].set_xlim(0, np.max(time_bins))
+axs4[0].set_xticks(np.linspace(0, 86400, 13), np.arange(0, 25, 2))
+axs4[0].set_xlabel('Hour', fontsize=11)
+axs4[0].set_ylim(0, np.max(amt_bins))
 axs4[0].set_yticks(np.arange(50, 500, 100), minor=True)
 axs4[0].set_ylabel('Rental price', fontsize=11)
 axs4[0].set_title('Mileage x Rental price')
 
-heatmap = axs4[1].pcolormesh(
-    *np.meshgrid(ep_bins, rp_bins, indexing='ij'),
-    np.histogram2d(engine_power, rental_price, bins=[ep_bins, rp_bins])[0],
-    cmap=cmap4, vmin=0.5, vmax=200)
-axs4[1].set_xlim(0, 450)
-axs4[1].set_xticks(np.arange(50, 500, 100), minor=True)
-axs4[1].set_xlabel('Engine power', fontsize=11)
-axs4[1].set_title('Engine power x Rental price')
+cax4_0 = fig4.add_axes((0.415, 0.12, 0.025, 0.76))
+fig4.colorbar(heatmap, cax=cax4_0, orientation="vertical", ticklocation="right")
+cax4_0.set_yticks(np.linspace(1, 10, 10))
+cax4_0.text(1.1, -0.09, 'Counts', fontsize=11, ha='center',
+            transform=cax4_0.transAxes)
 
-fig4.colorbar(heatmap, cax=cax4, orientation="vertical", ticklocation="right")
-cax4.set_yticks(np.linspace(0, 200, 9))
-cax4.text(1.1, -0.09, 'Counts', fontsize=11, ha='center', transform=cax4.transAxes)
+
+cmap4_1 = plt.get_cmap('hot').copy()
+cmap4_1.set_extremes(bad='0.6', under='0.7', over='0.5')
+heatmap = axs4[1].pcolormesh(*yx, fraud_prob,
+                             cmap=cmap4_1, vmin=0, vmax=1.1)
+axs4[1].set_xlim(0, 86400)
+axs4[1].set_xticks(np.linspace(0, 86400, 13), np.arange(0, 25, 2))
+axs4[1].set_xlabel('Hour', fontsize=11)
+axs4[0].set_ylim(0, np.max(amt_bins))
+
+cax4_1 = fig4.add_axes((0.915, 0.12, 0.025, 0.76))
+fig4.colorbar(heatmap, cax=cax4_1, orientation="vertical", ticklocation="right")
+cax4_1.set_yticks(np.linspace(0, 1, 6))
+cax4_1.text(1.1, -0.09, 'Counts', fontsize=11, ha='center',
+            transform=cax4_1.transAxes)
+
+axs4[1].set_title('Fraud probability')
+
+
 
 plt.show()
 
 """
-Figure 4 presents the joint probability distribution with the rental price
-of the two quantitative variables `mileage` (left panel) and `engine_power` (right panel).
-The grey area represents the region with no observations. Most of the distribution
-is confined in a small region with our choices of axes limits. However, this choice
-highlights clearly the outliers of the distributions. We note in particular two values
-with high rental price, and the very high mileage car mentioned above.
-The correlations with the rental price, negative for `mileage` and positive for `engine_power`,
-appear clearly on the graphs.
+Figure 4 presents
+!!!
 """
 
 
@@ -348,9 +411,37 @@ appear clearly on the graphs.
 r"""
 ## <a id="preproc_utils"></a> Data preprocessing and utilities
 
+!!!
 Before moving on to model construction and training, we must first setup dataset
 preprocessing and preparation.
 We also introduce here some utilities relevant to model evaluation carried later on.
+
+
+### Model evaluation utilities
+
+We evaluate our model using the following metrics:
+
+"""
+
+def eval_metrics(cm: np.ndarray,
+                  print_cm: bool = True,
+                  print_precrec: bool = True)-> None:
+    """
+    !!!
+    Print metrics related to the confusion matrix: precision, recall, F1-score.
+    """
+    t = np.sum(cm, axis=1)[1]
+    recall = (cm[1, 1] / t) if t != 0 else 1.
+    t = np.sum(cm, axis=0)[1]
+    prec = (cm[1, 1] / t) if t != 0 else 1.
+    if print_cm:
+        print("Confusion matrix\n", cm / np.sum(cm))
+    if print_precrec:
+        print(f'Precision: {prec:.8}; recall: {recall:.8}')
+    print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
+
+
+"""
 
 ### Data preprocessing
 
@@ -364,6 +455,33 @@ the values above, since the quantities are positive by definition.
 We also setup here the preprocessing pipeline that will be part of the pricing models:
 one-hot encoding of categorical variables and scaling of quantitative variables.
 """
+
+
+
+
+
+## data preparation
+y = df['is_fraud']
+X = df.drop(['is_fraud', 'merchant_id', 'customer_id'], axis=1)
+
+## train-test split
+X_tr, X_test, y_tr, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=1234)
+
+
+
+
+
+
+
+
+
+
+
+
+# %%
+
+
 
 ## Remove outliers
 q1, q2 = 0.25, 0.75
@@ -382,9 +500,7 @@ processed_df.describe(include='all')
 y = processed_df['rental_price_per_day']
 X = processed_df.drop('rental_price_per_day', axis=1)
 
-## train-test split
-X_tr, X_test, y_tr, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=1234)
+
 
 ## column preprocessing
 cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
@@ -446,6 +562,22 @@ We introduce L2 regularization to the model because of the large number of categ
 In order to select the appropriate value for the regularization parameter $\alpha$, we perform a grid search
 with cross validation.
 """
+
+## column preprocessing
+cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
+bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
+             'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
+             'winter_tires']
+quant_vars = ['mileage', 'engine_power']
+col_preproc = ColumnTransformer(
+    [('cat_ohe',
+      OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.005),
+      cat_vars),
+     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)])
+
+
+
 
 ## Grid search of the regularization parameter with cross validation
 scoring = ('neg_mean_squared_error',  'neg_root_mean_squared_error', 'r2',
