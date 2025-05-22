@@ -28,6 +28,14 @@ def check_environment_vars()-> None:
                        ' `AWS_SECRET_ACCESS_KEY` is not set')
 
 
+def process_input():
+    """
+    Process API output to model input
+    """
+    pass
+    # TODO
+
+
 def fetch_models(mlflow_tracking_uri: str)-> dict:
     """
     Fetch available pricing optimization models from the MLflow server.

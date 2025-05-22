@@ -8,20 +8,18 @@ import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 
 from sklearn.compose import ColumnTransformer
-from sklearn.metrics import (mean_squared_error,
-                             r2_score,
-                             mean_absolute_error,
-                             mean_absolute_percentage_error)
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder,
+                                   OrdinalEncoder,
                                    StandardScaler,
                                    FunctionTransformer)
-from sklearn.linear_model import Ridge
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import (RandomForestClassifier,
+                              HistGradientBoostingClassifier)
 
 
 # %% Loading
@@ -71,8 +69,8 @@ to use (eg the address). Moreover, some can be considered as personal data, and 
 legal to use in a realistic context. We therefore produce a new set of features for fraud
 detection:
 - `month`, `weekday`, `day_time`, date and time of the transaction
-- 'cos_day_time', 'sin_day_time'
 - `amt`, the transaction amount
+- `state`, the merchant or customer state
 - 'cust_fraudster', indicates whether the customer has already commited fraud
 - 'merch_fraud_victim', indicated whether the merchant has already been victim of fraud
 """
@@ -108,19 +106,36 @@ df = pd.DataFrame({
     'weekday': dt.weekday,
     'day_time': (raw_df['trans_date_trans_time'] - dt.floor('D')).dt.seconds,
     'amt': raw_df['amt'],
+    'state': raw_df['state'],
     'cust_fraudster': raw_df['customer'].map(customer_fraud),
     'merch_fraud_victim': raw_df['merchant'].map(merchant_fraud),
     'is_fraud': raw_df['is_fraud']
     })
 
+r"""
+!!!
+In addition, since the day time and week day are cyclic (e.g., 1h is as close to 23h
+as 15h is close to 13h), we create derived features by taking the sine and cosine of
+these variables.
 
-# !!! make cos and sin time
-# !!! cos and sin weekday
+$$\cos \left( 2 k \pi X / T(X) \right), \quad \cos \left( 2 k \pi X / T(X) \right)$$
+
+
+To keep thins simple, we limit ourselves to $k=1$ to capture simple periodic structures.
+This gives, for instance, in the case of `day_time`, the two features
+$$\cos(2 \pi \mathrm{day_time} / \mathrm{24h}), \quad \cos(2 \pi \mathrm{day_time} / \mathrm{24h})$$
+"""
+
+## Add cosine and sine of periodic features
+df = df.assign(cos_day_time=np.cos(2*np.pi*df['day_time']/86400),
+               sin_day_time=np.sin(2*np.pi*df['day_time']/86400),)
+               # cos_weekday=np.cos(2*np.pi*df['weekday']/7),
+               # sin_weekday=np.sin(2*np.pi*df['weekday']/7))
 
 ##
-cat_vars = ['month', 'weekday']
+cat_vars = ['month', 'weekday', 'state']
 bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['day_time', 'amt']
+quant_vars = ['day_time', 'amt', 'cos_day_time', 'sin_day_time']
 
 # %% EDA
 """
@@ -140,32 +155,35 @@ print(df.describe(include='all'))
 ### Distribution of transfered amounts
 """
 
-bins = np.linspace(0, 600, 151)
-hist = np.histogram(df['amt'], bins=bins)
+##
+amt_vals = np.logspace([0], [5], 101)
+amt_icdf = np.sum(df['amt'].to_numpy() > amt_vals, axis=1) / len(df['amt'])
 
-
+##
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(6, 4), dpi=100,
     gridspec_kw={'left': 0.11, 'right': 0.94, 'top': 0.89, 'bottom': 0.14})
 fig1.suptitle("Figure 1: Distribution of amounts spent in transactions",
               x=0.02, ha='left')
 
-ax1.hist(df['amt'], bins=bins, density=False)
+ax1.plot(amt_vals, amt_icdf, linestyle='', marker='+', markersize=5)
 
-ax1.set_xlim(-0.5, 600)
+ax1.set_xscale('log')
+ax1.set_xlim(1, 1e5)
 ax1.set_xlabel('Amount spent')
-ax1.set_ylim(0, 70000)
-ax1.set_yticks(np.linspace(0, 70000, 8), np.arange(0, 80, 10))
+ax1.set_yscale('log')
+ax1.set_ylim(1e-6, 1)
 ax1.set_ylabel('Counts (x1000)', labelpad=5)
-ax1.grid(visible=True, axis='y', linewidth=0.3)
-ax1.grid(visible=True, axis='y', which='minor', linewidth=0.2)
+ax1.grid(visible=True, linewidth=0.3)
+ax1.grid(visible=True, which='minor', linewidth=0.2)
 
 
 plt.show()
 
 """
 !!!
-Figure 1 presents 
+Figure 1 presents the distribution of transaction amounts. Most values are below
+200.
 """
 
 # %%
@@ -175,45 +193,49 @@ Figure 1 presents
 
 ## Correlation matrix
 df_ = df.loc[:, ['is_fraud'] + quant_vars + bool_vars]
-corr_df = df_.corr().to_numpy()
+corr = df_.corr().to_numpy()
 
 ##
 fig2, ax2 = plt.subplots(
     nrows=1, ncols=1, figsize=(5.6, 4.6), dpi=100,
     gridspec_kw={'left': 0.15, 'right': 0.86, 'top': 0.72, 'bottom': 0.04, 'wspace': 0.24})
 cax2 = fig2.add_axes((0.87, 0.04, 0.03, 0.68))
-fig2.suptitle("Figure 2: Correlation matrix", x=0.02, ha='left')
+fig2.suptitle("Figure 2: Correlation between non-categorical features",
+              x=0.02, ha='left')
 
 
 ax2.set_aspect('equal')
-cmap2 = plt.get_cmap('coolwarm').copy()
-cmap2.set_extremes(under='0.9', over='0.5')
-heatmap = ax2.pcolormesh(corr_df[::-1]*100, cmap=cmap2, vmin=-20, vmax=20,
+cmap2 = plt.get_cmap('bwr').copy()
+cmap2.set_extremes(under='0.4', over='0.4')
+heatmap = ax2.pcolormesh(corr[::-1]*100, cmap=cmap2, vmin=-20, vmax=20,
                              edgecolors='0.2', linewidth=0.5)
 
 ax2.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
 ticklabels = ['Is fraud', 'Transaction\ntime', 'Transaction\namount',
+              'cosine\ntrans. time', 'sine\ntrans. time',
               'Fraudster\ncustomer', 'Merchant\nvictim']
-ax2.set_xticks(np.linspace(0.5, 4.5, 5), ticklabels, rotation=50,
+ax2.set_xticks(np.linspace(0.5, 6.5, 7), ticklabels, rotation=50,
                ha='center', fontsize=11)
-ax2.set_yticks(np.linspace(4.5, 0.5, 5), ticklabels, rotation=0,
+ax2.set_yticks(np.linspace(6.5, 0.5, 7), ticklabels, rotation=0,
                ha='right', fontsize=11)
 
-for (i, j), c in np.ndenumerate(corr_df[::-1]*100):
-    ax2.text(j+0.52, i+0.45, f'{c:.1f}', ha='center', va='center', fontsize=9)
+for (i, j), c in np.ndenumerate(corr[::-1]*100):
+    ax2.text(j+0.52, i+0.45, f'{c:.1f}', color='w' if abs(c) > 50 else 'k',
+             ha='center', va='center', fontsize=9)
 
 pos = ax2.get_position().bounds
 x, y = pos[0], pos[1] + pos[3]
 
 fig2.colorbar(heatmap, cax=cax2, orientation="vertical", ticklocation="right")
-cax2.text(1.4, 1.03, 'Correlation\ncoef. (%)', fontsize=11, ha='center',
+cax2.text(1.4, 1.07, 'Correlation\ncoef. (%)', fontsize=11, ha='center',
           transform=cax2.transAxes)
 
 
 plt.show()
 
 """
-Figure 2 presents
+Figure 2 shows the correlation matrix of non-categorical variables.
+The linear correlation between fraud events and other variables is rather weak.
 !!!
 """
 
@@ -327,7 +349,7 @@ such as decision tree.
 
 ## Transaction amounts and 1D histogram bins
 amount = df['amt'].to_numpy()
-amt_bins = np.linspace(0, 1200, 121)
+amt_bins = np.linspace(0, 1800, 91)
 
 ## Day time observations and 1D histogram bins
 day_time = df['day_time'].to_numpy()
@@ -352,31 +374,34 @@ for i in range(len(time_bins)-1):
 # %%
 ##
 fig4, axs4 = plt.subplots(
-    nrows=1, ncols=2, figsize=(8.8, 4.4), dpi=100,
-    gridspec_kw={'left': 0.07, 'right': 0.89, 'top': 0.87, 'bottom': 0.11,
-                 'wspace': 0.34})
+    nrows=1, ncols=2, figsize=(8.8, 4.4), dpi=100, sharex=True,
+    gridspec_kw={'left': 0.07, 'right': 0.91, 'top': 0.87, 'bottom': 0.11,
+                 'wspace': 0.48})
 fig4.suptitle("Figure 4: Joint probability distribution of rental price with quantitative variables",
               x=0.02, ha='left')
-
-
 
 cmap4_0 = plt.get_cmap('hot').copy()
 cmap4_0.set_extremes(bad='0.6', under=(0.0416, 0.0, 0.0, 1.0), over='0.6')
 heatmap = axs4[0].pcolormesh(*yx, np.log(time_amt_hist),
-                             cmap=cmap4_0, vmin=1, vmax=10)
+                             cmap=cmap4_0, vmin=1, vmax=9)
 
 axs4[0].set_xlim(0, np.max(time_bins))
 axs4[0].set_xticks(np.linspace(0, 86400, 13), np.arange(0, 25, 2))
 axs4[0].set_xlabel('Hour', fontsize=11)
 axs4[0].set_ylim(0, np.max(amt_bins))
-axs4[0].set_yticks(np.arange(50, 500, 100), minor=True)
-axs4[0].set_ylabel('Rental price', fontsize=11)
-axs4[0].set_title('Mileage x Rental price')
+axs4[0].set_yticks(np.arange(0, 1900, 200),
+                   [f'{x:.1f}' for x in np.linspace(0, 1.8, 10)])
+axs4[0].set_ylabel('Transaction amount (x1000)', fontsize=11)
+axs4[0].set_title('Time x transaction amount')
 
-cax4_0 = fig4.add_axes((0.415, 0.12, 0.025, 0.76))
+cax4_0 = fig4.add_axes((axs4[0]._position.get_points()[1, 0]+0.02,
+                        axs4[0]._position.y0,
+                        0.02,
+                        axs4[0]._position.height))
 fig4.colorbar(heatmap, cax=cax4_0, orientation="vertical", ticklocation="right")
-cax4_0.set_yticks(np.linspace(1, 10, 10))
-cax4_0.text(1.1, -0.09, 'Counts', fontsize=11, ha='center',
+cax4_0.set_yticks(np.linspace(1, 9, 9),
+                  [rf'$10^{x}$' for x in np.arange(1, 10)])
+cax4_0.text(1.1, -0.07, 'Counts', fontsize=11, ha='center', va='center',
             transform=cax4_0.transAxes)
 
 
@@ -387,17 +412,21 @@ heatmap = axs4[1].pcolormesh(*yx, fraud_prob,
 axs4[1].set_xlim(0, 86400)
 axs4[1].set_xticks(np.linspace(0, 86400, 13), np.arange(0, 25, 2))
 axs4[1].set_xlabel('Hour', fontsize=11)
-axs4[0].set_ylim(0, np.max(amt_bins))
+axs4[1].set_yticks(np.arange(0, 1900, 200),
+                   [f'{x:.1f}' for x in np.linspace(0, 1.8, 10)])
+axs4[1].set_ylabel('Transaction amount (x1000)', fontsize=11)
 
-cax4_1 = fig4.add_axes((0.915, 0.12, 0.025, 0.76))
+cax4_1 = fig4.add_axes((axs4[1]._position.get_points()[1, 0]+0.02,
+                        axs4[1]._position.y0,
+                        0.02,
+                        axs4[1]._position.height))
 fig4.colorbar(heatmap, cax=cax4_1, orientation="vertical", ticklocation="right")
+cax4_1.set_ylim(0, 1)
 cax4_1.set_yticks(np.linspace(0, 1, 6))
-cax4_1.text(1.1, -0.09, 'Counts', fontsize=11, ha='center',
+cax4_1.text(1.1, -0.12, 'Fraud\n prob.', fontsize=11, ha='center',
             transform=cax4_1.transAxes)
 
 axs4[1].set_title('Fraud probability')
-
-
 
 plt.show()
 
@@ -406,13 +435,14 @@ Figure 4 presents
 !!!
 """
 
-
 # %% Preprocessing and utilities
 r"""
 ## <a id="preproc_utils"></a> Data preprocessing and utilities
 
 !!!
-Before moving on to model construction and training, we must first setup dataset
+Before moving on to model constructicat_vars = ['month', 'weekday']
+bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+quant_vars = ['day_time', 'amt', 'cos_day_time', 'sin_day_time']on and training, we must first setup dataset
 preprocessing and preparation.
 We also introduce here some utilities relevant to model evaluation carried later on.
 
@@ -420,29 +450,47 @@ We also introduce here some utilities relevant to model evaluation carried later
 ### Model evaluation utilities
 
 We evaluate our model using the following metrics:
+- The confusion matrix
+- The precision
+- The recall
+- The F1 score
 
 """
 
-def eval_metrics(cm: np.ndarray,
-                  print_cm: bool = True,
-                  print_precrec: bool = True)-> None:
+def eval_metrics(y_true: np.ndarray,
+                 y_pred: np.ndarray,
+                 print_cm: bool = False,
+                 print_f1: bool = False)-> None:
     """
-    !!!
-    Print metrics related to the confusion matrix: precision, recall, F1-score.
+    Helper function that evaluates and return the relevant evaluation metrics:
+        confusion matrix, precision, recall, F1-score
     """
+    cm = confusion_matrix(y_true, y_pred)
+    
     t = np.sum(cm, axis=1)[1]
     recall = (cm[1, 1] / t) if t != 0 else 1.
     t = np.sum(cm, axis=0)[1]
     prec = (cm[1, 1] / t) if t != 0 else 1.
+    f1 = 2*prec*recall/(prec+recall)
+    
     if print_cm:
         print("Confusion matrix\n", cm / np.sum(cm))
-    if print_precrec:
+    if print_f1:
         print(f'Precision: {prec:.8}; recall: {recall:.8}')
-    print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
+        print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
+    
+    return cm, prec, recall, f1
 
+
+## Dataframe to hold the results
+metric_names = ['precision', 'recall', 'F1-score']
+index = pd.MultiIndex.from_product(
+    [('Log reg', 'RF', 'HGB'), ('train', 'test')],
+    names=['model', 'eval. set'])
+evaluation_df = pd.DataFrame(
+    np.full((6, 3), np.nan), index=index, columns=metric_names)
 
 """
-
 ### Data preprocessing
 
 The preprocessing of the dataset consists in the removal of outliers. We choose to remove those
@@ -457,101 +505,18 @@ one-hot encoding of categorical variables and scaling of quantitative variables.
 """
 
 
-
-
-
 ## data preparation
 y = df['is_fraud']
 X = df.drop(['is_fraud', 'merchant_id', 'customer_id'], axis=1)
 
 ## train-test split
 X_tr, X_test, y_tr, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=1234)
+    X, y, test_size=0.2, stratify=y, random_state=1234)
 
 
-
-
-
-
-
-
-
-
-
-
-# %%
-
-
-
-## Remove outliers
-q1, q2 = 0.25, 0.75
-k = 6 # exclusion factor
-quantiles = df.loc[:, ['mileage', 'rental_price_per_day']].quantile([q1, q2])
-iqr_mil, iqr_pr = quantiles.iloc[1] - quantiles.iloc[0]
-med_mil, med_pr = df.loc[:, ['mileage', 'rental_price_per_day']].median()
-
-loc = ((df['mileage'] < med_mil + k*iqr_mil)
-       * (df['rental_price_per_day'] < med_pr + k*iqr_pr))
-processed_df = df.loc[loc]
-
-processed_df.describe(include='all')
-
-## data preparation
-y = processed_df['rental_price_per_day']
-X = processed_df.drop('rental_price_per_day', axis=1)
-
-
-
-## column preprocessing
-cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
-bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
-             'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
-             'winter_tires']
-quant_vars = ['mileage', 'engine_power']
-col_preproc = ColumnTransformer(
-    [('cat_ohe',
-      OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.005),
-      cat_vars),
-     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
-
-
-"""
-### Model evaluation utilities
-
-We evaluate our model using the following metrics:
-- The mean squared error (MSE), the standard evaluation of the prediction accuracy.
-- The root mean squared error (RMSE), the square root of the MSE, which measures the predicition accuracy.
-- The coefficient of determination $R^2$, which represent the proportion of the target variance explained by the model.
-- The mean absolute error (MAE), another measure of the prediction accuracy, less sensitive to outliers.
-- The mean absolute percentage error (MAPE), which measures the relative prediction accuracy.
-"""
-
-## Evaluation metrics helper function
-def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
-    """
-    Helper function that evaluates the relevant evaluation metrics:
-        MSE, RMSE, R-squared, MAE, MAPE
-    """
-    mse = mean_squared_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
-    mae = mean_absolute_error(y_true, y_pred)
-    mape = 100 * mean_absolute_percentage_error(y_true, y_pred)
-    return mse, np.sqrt(mse), r2, mae, mape
-
-
-## Dataframe to hold the results
-metric_names = ['MSE', 'RMSE', 'R2', 'MAE', 'MAPE (%)']
-index = pd.MultiIndex.from_product(
-    [('Ridge', 'GBM'), ('train', 'test')],
-    names=['model', 'eval. set'])
-evaluation_df = pd.DataFrame(
-    np.full((4, 5), np.nan), index=index, columns=metric_names)
-
-
-# %% Ridge
+# %% Logistic regression
 r"""
-## <a id="linreg"></a> Ridge regression
+## <a id="logreg"></a> Logistic regression
 
 We first begin by training a baseline ridge regression model.
 
@@ -561,14 +526,15 @@ We first begin by training a baseline ridge regression model.
 We introduce L2 regularization to the model because of the large number of categorical features.
 In order to select the appropriate value for the regularization parameter $\alpha$, we perform a grid search
 with cross validation.
+
+!!!
 """
 
 ## column preprocessing
-cat_vars = ['model_key', 'fuel', 'paint_color', 'car_type']
-bool_vars = ['private_parking_available', 'has_gps', 'has_air_conditioning',
-             'automatic_car', 'has_getaround_connect', 'has_speed_regulator',
-             'winter_tires']
-quant_vars = ['mileage', 'engine_power']
+cat_vars = ['month', 'weekday', 'state']
+bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+quant_vars = ['amt', 'cos_day_time', 'sin_day_time']
+
 col_preproc = ColumnTransformer(
     [('cat_ohe',
       OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.005),
@@ -578,75 +544,69 @@ col_preproc = ColumnTransformer(
 
 
 
-
 ## Grid search of the regularization parameter with cross validation
-scoring = ('neg_mean_squared_error',  'neg_root_mean_squared_error', 'r2',
-           'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error')
-alphas = np.logspace(-1, 5, 61)
-reg = Pipeline(
+scoring = ('precision',  'recall', 'f1')
+Cs = np.logspace(-1, 4, 11)
+logreg = LogisticRegression(penalty='l2')
+clf = Pipeline(
     [('column_preprocessing', col_preproc),
-     ('regressor', GridSearchCV(Ridge(), param_grid={'alpha': alphas},
-                                scoring=scoring, refit=False, cv=10))]
+     ('classifier', GridSearchCV(logreg, param_grid={'C': Cs},
+                                 scoring=scoring, refit=False, cv=5))]
 )
-
-reg.fit(X_tr, y_tr)
+clf.fit(X_tr, y_tr)
 
 
 ## Extract the relevant metrics
-cv_res = reg['regressor'].cv_results_
-rmse = -cv_res['mean_test_neg_root_mean_squared_error']
-r2 = cv_res['mean_test_r2']
-mae = -cv_res['mean_test_neg_mean_absolute_error']
-mape = -cv_res['mean_test_neg_mean_absolute_percentage_error']
+cv_res = clf['classifier'].cv_results_
+prec = cv_res['mean_test_precision']
+std_prec = cv_res['std_test_precision']
+recall = cv_res['mean_test_recall']
+std_recall = cv_res['std_test_recall']
+f1 = cv_res['mean_test_f1']
+std_f1 = cv_res['std_test_f1']
 
-#%%
+
+# %%
+
 ##
-fig5, axs5 = plt.subplots(
-    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(8.8, 3.6), dpi=120,
-    gridspec_kw={'left': 0.06, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
+fig5, ax5 = plt.subplots(
+    nrows=1, ncols=1, sharex=True, sharey=False, figsize=(6, 4), dpi=120,
+    gridspec_kw={'left': 0.11, 'right': 0.95, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
 fig5.suptitle("Figure 5: Scoring metrics vs ridge regularization parameter",
               x=0.02, ha='left')
 
 # RMSE and MAE
-axs5[0].plot(alphas, rmse, color='C0', label='Root mean sq. err.')
-axs5[0].plot(alphas, mae, color='C1', label='Mean abs. err')
-axs5[0].set_xscale('log')
-axs5[0].set_xlim(1, 1e5)
-axs5[0].set_xticks(np.logspace(0, 5, 6))
-axs5[0].set_xticks(
-    np.concatenate([np.linspace(10**i, 10**(i+1), 10) for i in range(-1, 5)]),
+ax5.plot(Cs, prec, color='C0', label='Precision')
+ax5.fill_between(Cs, prec-std_prec, prec+std_prec,
+                 color='C0', alpha=0.2)
+ax5.plot(Cs, recall, color='C1', label='Recall')
+ax5.fill_between(Cs, recall-std_recall, recall+std_recall,
+                 color='C1', alpha=0.2)
+ax5.plot(Cs, f1, color='C2', label='F1-score')
+ax5.fill_between(Cs, f1-std_f1, f1+std_f1,
+                 color='C2', alpha=0.2)
+
+
+ax5.set_xscale('log')
+ax5.set_xlim(1e-1, 1e4)
+ax5.set_xticks(np.logspace(-1, 4, 6))
+ax5.set_xticks(
+    np.concatenate([np.linspace(10**i, 10**(i+1), 10) for i in range(-1, 4)]),
     minor=True)
-axs5[0].set_ylim(10, 35)
-axs5[0].set_yticks(np.linspace(12.5, 32.5, 5), minor=True)
-axs5[0].set_ylabel('Price error')
-axs5[0].grid(visible=True, linewidth=0.3)
-axs5[0].grid(visible=True, which='minor', linewidth=0.2)
-axs5[0].legend(loc=(0.015, 0.81))
-
-# R-squared
-axs5[1].plot(alphas, r2, color='C2', label='R-squared')
-axs5[1].set_xlabel(r'Regularization parameter $\alpha$', fontsize=11)
-axs5[1].set_ylim(0, 1)
-axs5[1].grid(visible=True, linewidth=0.3)
-axs5[1].grid(visible=True, which='minor', linewidth=0.2)
-axs5[1].legend(loc=(0.015, 0.89))
-
-# MAPE
-axs5[2].plot(alphas, 100*mape, color='C3', label='MAPE')
-axs5[2].set_ylim(12, 26)
-axs5[2].grid(visible=True, linewidth=0.3)
-axs5[2].grid(visible=True, which='minor', linewidth=0.2)
-axs5[2].legend(loc=(0.015, 0.89))
+ax5.set_xlabel('Regularization parameter (C)')
+ax5.set_ylim(0, 1)
+ax5.set_ylabel('Price error')
+ax5.grid(visible=True, linewidth=0.3)
+ax5.grid(visible=True, which='minor', linewidth=0.2)
+ax5.legend(loc=(0.015, 0.9), ncols=3)
 
 
 plt.show()
 
 r"""
-Figure 5 presents plots of our selected metrics as a function of
-the regularization parameter $\alpha$ of the ridge regression.
-The performance of the model starts to degrade for values of $\alpha$ above $\sim 100$.
+Figure 5 presents
+!!!
 """
-
 
 # %%
 r"""
@@ -657,138 +617,227 @@ the regularization parameter of our ridge model.
 """
 
 ## Complete pipeline
-ridge_model = Pipeline([('column_preprocessing', col_preproc),
-                        ('regressor', Ridge(alpha=100))])
+logreg_model = Pipeline([('column_preprocessing', col_preproc),
+                        ('classifier', LogisticRegression(C=100))])
 
 ## train
-ridge_model.fit(X_tr, y_tr)
+logreg_model.fit(X_tr, y_tr)
 
 ## evaluate of train set
-y_pred_tr = ridge_model.predict(X_tr)
-evaluation_df.iloc[0] = eval_metrics(y_tr, y_pred_tr)
+y_pred_tr = logreg_model.predict(X_tr)
+_, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[0] = prec, recall, f1
 
 ## evaluate on test set
-y_pred_test = ridge_model.predict(X_test)
-evaluation_df.iloc[1] = eval_metrics(y_test, y_pred_test)
+y_pred_test = logreg_model.predict(X_test)
+_, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[1] = prec, recall, f1
 
-
-print(evaluation_df.loc['Ridge'])
+print(evaluation_df.loc['Log reg'])
 
 r"""
-The performance of the model is acceptable, with $R^2 \simeq 0.7$.
-The mean absolute error is about 12-13, significantly lower than the root mean squared error (17-19).
-This indicates that our model deals poorly with outliers. This can be caused by the aggregation of
-infrequent categories that may correspond large price differences (especially the car brand).
-
-The metrics are significantly better for the train set than for the test set (300 vs 370 mean squared error),
-indicating an important overfitting of the model. Another possible explanation could be that the test set
-contains many observations with values in the infrequent categories, on which the model will fail to
-produce good results.
+!!!
 """
 
-#%%
+# %% Logistic regression
+r"""
+## <a id="random_forest"></a> Random forest
+
+!!!
+
+### Parameters optimization
+
+!!!
+
+No cos time here because trees capture well non-linear relationships
 """
-### Model interpretation
 
-We inspect the model coefficients to determine which variables are relevant to rental price.
+## column preprocessing
+cat_vars = ['month', 'weekday', 'state']
+bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+quant_vars = ['amt', 'day_time']
+tree_col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None, feature_names_out='one-to-one'),
+      bool_vars + quant_vars)])
+
+
+## Grid search of the regularization parameter with cross validation
+scoring = ('precision',  'recall', 'f1')
+max_depths = np.arange(2, 17, 2)
+rfc = RandomForestClassifier(criterion='gini',
+                             max_features=0.5,
+                             bootstrap=True,
+                             random_state=1234)
+clf = Pipeline(
+    [('column_preprocessing', tree_col_preproc),
+     ('classifier', GridSearchCV(rfc, param_grid={'max_depth': max_depths},
+                                 scoring=scoring, refit=False, cv=5))]
+)
+clf.fit(X_tr, y_tr)
+
+
+## Extract the relevant metrics
+cv_res = clf['classifier'].cv_results_
+prec = cv_res['mean_test_precision']
+std_prec = cv_res['std_test_precision']
+recall = cv_res['mean_test_recall']
+std_recall = cv_res['std_test_recall']
+f1 = cv_res['mean_test_f1']
+std_f1 = cv_res['std_test_f1']
+
+
+# %%
+##
+fig6, ax6 = plt.subplots(
+    nrows=1, ncols=1, sharex=True, sharey=False, figsize=(6, 4), dpi=120,
+    gridspec_kw={'left': 0.11, 'right': 0.95, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
+fig6.suptitle("Figure 6: Scoring metrics vs random forest regularization parameter",
+              x=0.02, ha='left')
+
+# RMSE and MAE
+ax6.plot(max_depths, prec, color='C0', label='Precision')
+ax6.fill_between(max_depths, prec-std_prec, prec+std_prec,
+                 color='C0', alpha=0.2)
+ax6.plot(max_depths, recall, color='C1', label='Recall')
+ax6.fill_between(max_depths, recall-std_recall, recall+std_recall,
+                 color='C1', alpha=0.2)
+ax6.plot(max_depths, f1, color='C2', label='F1-score')
+ax6.fill_between(max_depths, f1-std_f1, f1+std_f1,
+                 color='C2', alpha=0.2)
+ax6.set_xlim(0, 16)
+ax6.set_xticks(np.arange(0, 18, 2))
+ax6.set_xlabel('Max depth')
+ax6.set_ylim(0, 1)
+ax6.set_ylabel('Price error')
+ax6.grid(visible=True, linewidth=0.3)
+ax6.grid(visible=True, which='minor', linewidth=0.2)
+ax6.legend(loc=(0.3, 0.02), ncols=3)
+
+
+plt.show()
+
+r"""
+Figure 6 presents
+!!!
 """
 
-## Recover feature names
-col_preproc_ = ridge_model['column_preprocessing']
-features = ['intercept']
-features += [feature_name.split('__')[1].split('_sklearn')[0]
-             for feature_name in col_preproc_.get_feature_names_out()]
+# %%
 
-## Get coefficients
-intercept = ridge_model['regressor'].intercept_
-coef_vals = np.concatenate([[intercept], ridge_model['regressor'].coef_])
+r"""
+### Model training and evaluation
 
-
-for feature, coef in zip(features, coef_vals):
-    print(f'{feature:<26} : {coef:>6.2f}')
-
+According to the previous results, we retain a value $\alpha = 100$ for
+the regularization parameter of our ridge model.
 """
-The two most important factors influencing the rental price are the mileage and engine power.
-This is in agreement with what was observed on the correlation matrix (see figure 2).
-The presence of car options, especially GPS, is also important to the pricing.
-Within a given categorical feature, some categories appear have an important offset with the average price (intercept)
-while other do not. Compare for instance `car_type_suv` and `car_type_sedan`.
-This could be an artefact of the strong correlation between the prediction features.
+
+## Complete pipeline
+randforest_model = Pipeline(
+    [('column_preprocessing', col_preproc),
+     ('classifier', RandomForestClassifier(criterion='gini',
+                                           max_features=0.5,
+                                           bootstrap=True,
+                                           random_state=1234))]
+)
+
+## train
+randforest_model.fit(X_tr, y_tr)
+
+## evaluate of train set
+y_pred_tr = randforest_model.predict(X_tr)
+_, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[2] = prec, recall, f1
+
+## evaluate on test set
+y_pred_test = randforest_model.predict(X_test)
+_, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[3] = prec, recall, f1
+
+print(evaluation_df.loc['RF'])
+
+r"""
+!!!
 """
+
 
 
 # %% Gradient Boosting model
 """
-## <a id="gbm"></a> Gradient Boosting model
+## <a id="hgbm"></a> Hist Gradient Boosting model
 
 We complete the pricing models catalogue of our application by training
 a gradient boosting regressor.
 
 
 ### Parameters optimization
+
 """
 
-## Grid search of the regularization parameter with cross validation
-scoring = ('neg_mean_squared_error',  'neg_root_mean_squared_error', 'r2',
-           'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error')
-n_estimators_vals = np.arange(100, 1001, 100)
-reg = Pipeline(
-    [('column_preprocessing', col_preproc),
-     ('regressor', GridSearchCV(GradientBoostingRegressor(random_state=1234),
-                                param_grid={'n_estimators': n_estimators_vals},
-                                scoring=scoring, refit=False, cv=5))]
-)
+## column preprocessing
+cat_vars = ['month', 'weekday', 'state']
+bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+quant_vars = ['amt', 'day_time']
+tree_col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None, feature_names_out='one-to-one'),
+      bool_vars + quant_vars)])
 
-reg.fit(X_tr, y_tr)
+
+## Grid search of the regularization parameter with cross validation
+scoring = ('precision',  'recall', 'f1')
+n_est_vals = np.arange(100, 1001, 100)
+clf = Pipeline(
+    [('column_preprocessing', tree_col_preproc),
+     ('classifier', GridSearchCV(HistGradientBoostingClassifier(random_state=1234),
+                                 param_grid={'n_estimators': n_est_vals},
+                                 scoring=scoring, refit=False, cv=5))]
+)
+clf.fit(X_tr, y_tr)
+
+
+## Extract the relevant metrics
+cv_res = clf['classifier'].cv_results_
+prec = cv_res['mean_test_precision']
+std_prec = cv_res['std_test_precision']
+recall = cv_res['mean_test_recall']
+std_recall = cv_res['std_test_recall']
+f1 = cv_res['mean_test_f1']
+std_f1 = cv_res['std_test_f1']
+
 
 #%%
 
-## Extract the relevant metrics
-cv_res = reg['regressor'].cv_results_
-rmse = -cv_res['mean_test_neg_root_mean_squared_error']
-r2 = cv_res['mean_test_r2']
-mae = -cv_res['mean_test_neg_mean_absolute_error']
-mape = -cv_res['mean_test_neg_mean_absolute_percentage_error']
-
-
-##
-fig6, axs6 = plt.subplots(
-    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(9, 3.6), dpi=120,
-    gridspec_kw={'left': 0.06, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.24})
-fig6.suptitle("Figure 6: Scoring metrics vs the number of gradient boosting estimators",
+fig7, ax7 = plt.subplots(
+    nrows=1, ncols=1, sharex=True, sharey=False, figsize=(6, 4), dpi=120,
+    gridspec_kw={'left': 0.11, 'right': 0.95, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
+fig7.suptitle("Figure 7: Scoring metrics vs number of gradient boosting estimators",
               x=0.02, ha='left')
 
-# RMSE and MAE
-axs6[0].plot(n_estimators_vals, rmse, color='C0', label='Root mean sq. err.')
-axs6[0].plot(n_estimators_vals, mae, color='C1', label='Mean abs. err')
-axs6[0].set_xlim(0, 1000)
-axs6[0].set_ylim(10, 18)
-axs6[0].set_yticks(np.linspace(10.5, 17.5, 8), minor=True)
-axs6[0].set_ylabel('Price error')
-axs6[0].grid(visible=True, linewidth=0.3)
-axs6[0].grid(visible=True, which='minor', linewidth=0.2)
-axs6[0].legend(loc=(0.015, 0.81))
 
-# R-squared
-axs6[1].plot(n_estimators_vals, r2, color='C2', label='R-squared')
-axs6[1].set_xlabel(r'Number of estimators `n_estimators`', fontsize=11)
-axs6[1].set_ylim(0.7, 0.8)
-axs6[1].grid(visible=True, linewidth=0.3)
-axs6[1].grid(visible=True, which='minor', linewidth=0.2)
-axs6[1].legend(loc=(0.015, 0.89))
-
-# MAPE
-axs6[2].plot(n_estimators_vals, 100*mape, color='C3', label='MAPE')
-axs6[2].set_ylim(12, 13)
-axs6[2].grid(visible=True, linewidth=0.3)
-axs6[2].grid(visible=True, which='minor', linewidth=0.2)
-axs6[2].legend(loc=(0.61, 0.89))
+ax7.plot(n_est_vals, prec, color='C0', label='Precision')
+ax7.fill_between(n_est_vals, prec-std_prec, prec+std_prec,
+                 color='C0', alpha=0.2)
+ax7.plot(n_est_vals, recall, color='C1', label='Recall')
+ax7.fill_between(n_est_vals, recall-std_recall, recall+std_recall,
+                 color='C1', alpha=0.2)
+ax7.plot(n_est_vals, f1, color='C2', label='F1-score')
+ax7.fill_between(n_est_vals, f1-std_f1, f1+std_f1,
+                 color='C2', alpha=0.2)
+ax7.set_xlim(0, 1000)
+ax7.set_xticks(np.arange(0, 1000, 200))
+ax7.set_xticks(np.arange(100, 1000, 200), minor=True)
+ax7.set_xlabel('Number of estimators')
+ax7.set_ylim(0, 1)
+ax7.set_ylabel('Price error')
+ax7.grid(visible=True, linewidth=0.3)
+ax7.grid(visible=True, which='minor', linewidth=0.2)
+ax7.legend(loc=(0.015, 0.9), ncols=3)
 
 
 plt.show()
 
 r"""
-Figure 6 presents plots of our selected metrics as a function of the number of estimators
+Figure 7 presents plots of our selected metrics as a function of the number of estimators
 used with the gradient boosting regressor. The metrics reach an optimum for `n_estimators = 500`,
 which we retain for the model.
 """
@@ -800,27 +849,36 @@ which we retain for the model.
 """
 
 ## Complete pipeline
-gb_model = Pipeline(
+hgb_model = Pipeline(
     [('column_preprocessing', col_preproc),
-     ('regressor', GradientBoostingRegressor(n_estimators=500, random_state=1234))]
+     ('regressor', HistGradientBoostingClassifier(n_estimators=500,
+                                                  random_state=1234))]
 )
 
 ## train
-gb_model.fit(X_tr, y_tr)
+hgb_model.fit(X_tr, y_tr)
 
 ## evaluate of train set
-y_pred_tr = gb_model.predict(X_tr)
-evaluation_df.iloc[2] = eval_metrics(y_tr, y_pred_tr)
+y_pred_tr = hgb_model.predict(X_tr)
+_, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[5] = prec, recall, f1
 
 ## evaluate on test set
-y_pred_test = gb_model.predict(X_test)
-evaluation_df.iloc[3] = eval_metrics(y_test, y_pred_test)
+y_pred_test = hgb_model.predict(X_test)
+_, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[5] = prec, recall, f1
 
-print(evaluation_df)
+print(evaluation_df['HGB'])
 
 """
 The gradient boosting model is more performant than the simple ridge model.
 However, overfitting is still present, and even worse than for ridge regression.
 Nevertheless, the test set metrics are quite close
 to those obtained by cross-validation (see figure 6).
+"""
+
+# %%
+"""
+## <a id="summary"></a> Summary
+
 """
