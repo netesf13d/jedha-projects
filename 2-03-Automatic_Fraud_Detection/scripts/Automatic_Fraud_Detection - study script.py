@@ -5,6 +5,7 @@ project.
 """
 
 import sys
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -35,10 +36,12 @@ https://www.kaggle.com/datasets/kartik2112/fraud-detection/
 raw_df = pd.read_csv('../data/fraudTest.csv')
 raw_df = raw_df.drop('Unnamed: 0', axis=1)
 
+raw_df
+
 print(raw_df.describe(include='all'))
 
 r"""
-The dataset has 555715 rows, each corresponds to a transaction
+The dataset has 555719 rows, each corresponds to a transaction
 
 We are in the presence of the following variables:
 - Datetime-like variables
@@ -63,16 +66,6 @@ We are in the presence of the following variables:
   - `city_pop`, the population of the city
   - `lat` and `long`, the geographic coordinates of the customer
   - `merch_lat` and `merch_long`, the geographic coordinates of the merchant
-
-A lot of these variables are either irrelevant (eg the transaction number) or impossible
-to use (eg the address). Moreover, some can be considered as personal data, and may not be
-legal to use in a realistic context. We therefore produce a new set of features for fraud
-detection:
-- `month`, `weekday`, `day_time`, date and time of the transaction
-- `amt`, the transaction amount
-- `state`, the merchant or customer state
-- 'cust_fraudster', indicates whether the customer has already commited fraud
-- 'merch_fraud_victim', indicated whether the merchant has already been victim of fraud
 """
 
 ## cast the quantitative variable to float, for better handling of missing values
@@ -81,78 +74,191 @@ raw_df = raw_df.astype({'trans_date_trans_time': 'datetime64[s]'})
 ## discard the 'fraud_' string before each merchant value
 raw_df['merchant'] = raw_df['merchant'].apply(lambda x: x.strip('fraud_'))
 
-##
-customers = [' '.join(cust)
-             for cust in raw_df.loc[:, ['first', 'last']].to_numpy()]
-customer_ids = dict(zip(set(customers), range(len(customers))))
-raw_df = raw_df.assign(customer=customers)
-customer_fraud = raw_df.loc[:, ['customer', 'is_fraud']].groupby('customer').any()
-customer_fraud = dict(customer_fraud['is_fraud'].items())
 
-## 
-merchant_ids = dict(zip(set(raw_df['merchant']), range(len(raw_df))))
-merchant_fraud = raw_df.loc[:, ['merchant', 'is_fraud']].groupby('merchant').any()
-merchant_fraud = dict(merchant_fraud['is_fraud'].items())
+# %%
+"""
+The dataset contains private information about about customers and merchants
+(address, name, etc). We therefore build two reference tables, `merchants` and
+`customers`, that are dedicated to hold this sensitive information.
+"""
+
+##`customer` reference table
+customer_cols = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
+                 'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob']
+customers_df = raw_df[customer_cols].value_counts().index.to_frame()
+customers_df.index = pd.Index(np.arange(1, len(customers_df)+1),
+                              name='customer_id')
+
+## compute customer fraudster status
+cust_fraud = pd.merge(raw_df[customer_cols + ['is_fraud']],
+                      customers_df.assign(customer_id=customers_df.index),
+                      how='left', on=customer_cols)
+cust_fraud = cust_fraud[['is_fraud', 'customer_id']]
+
+## add fraudster status to customers table
+cust_fraudster = cust_fraud.groupby('customer_id').any() \
+                           .rename({'is_fraud': 'cust_fraudster'}, axis=1)
+customers_df = customers_df.join(cust_fraudster, validate='one_to_one')
+
+
+
+## `merchants` reference table
+merchant_cols = ['merchant']
+merchants_df = raw_df[merchant_cols].value_counts().index.to_frame()
+merchants_df.index = pd.Index(np.arange(1, len(merchants_df)+1),
+                              name='merchant_id')
+
+## compute merchant victim status
+merch_victim = pd.merge(raw_df[merchant_cols + ['is_fraud']],
+                        merchants_df.assign(merchant_id=merchants_df.index),
+                        how='left', on=merchant_cols)
+merch_victim = merch_victim[['is_fraud', 'merchant_id']] \
+
+## add fraudster status to merchants table
+merch_fraud_victim = merch_victim.groupby('merchant_id').any() \
+                                 .rename({'is_fraud': 'merch_fraud_victim'}, axis=1)
+merchants_df = merchants_df.join(merch_fraud_victim, validate='one_to_one')
+
+
+# %%
+
+"""
+A lot of the variables of the dataset are either irrelevant (eg the transaction number)
+or impossible to use (eg the address). Moreover, the personal information may not be
+legal to use in a realistic context. We therefore produce a new set of features for fraud
+detection:
+- `merchant_id`, `customer_id`, these two quantities link to reference table entries
+to determine `cust_fraudster` and `merch_fraud_victim`
+- `month`, `weekday`, `day_time`, date and time of the transaction
+- `amt`, the transaction amount
+- `category`, the category of the goods boughts
+- `cust_fraudster`, indicates whether the customer has already commited fraud
+- `merch_fraud_victim`, indicated whether the merchant has already been victim of fraud
+"""
 
 ##
 dt = raw_df['trans_date_trans_time'].dt
+cust_fraud_map = dict(customers_df['cust_fraudster'])
+merch_fraud_map = dict(merchants_df['merch_fraud_victim'])
 
 
 ##
 df = pd.DataFrame({
-    'merchant_id': raw_df['merchant'].map(merchant_ids),
-    'customer_id': raw_df['customer'].map(customer_ids),
+    'merchant_id': merch_victim['merchant_id'],
+    'customer_id': cust_fraud['customer_id'],
     'month': dt.month,
     'weekday': dt.weekday,
     'day_time': (raw_df['trans_date_trans_time'] - dt.floor('D')).dt.seconds,
     'amt': raw_df['amt'],
-    'state': raw_df['state'],
-    'cust_fraudster': raw_df['customer'].map(customer_fraud),
-    'merch_fraud_victim': raw_df['merchant'].map(merchant_fraud),
+    'category': raw_df['category'],
+    'cust_fraudster': cust_fraud['customer_id'].map(cust_fraud_map),
+    'merch_fraud_victim': merch_victim['merchant_id'].map(merch_fraud_map),
     'is_fraud': raw_df['is_fraud']
     })
 
 r"""
-!!!
 In addition, since the day time and week day are cyclic (e.g., 1h is as close to 23h
 as 15h is close to 13h), we create derived features by taking the sine and cosine of
 these variables.
+The case of cyclic quantitative variables is problematic for some models,
+which do not "see" the periodic nature of the data. The typical example is the
+day time, where 1:00 is as close to 23:00 as 15:00 is close to 13:00. 
+Such features require a specific handling. One approach is to decompose the feature $X$
+with period $T(X)$ on a set of periodic functions, e.g., sine and cosine:
+$$\cos \left( 2 k \pi X / T(X) \right), \quad \cos \left( 2 k \pi X / T(X) \right).$$
+The harmonics $k$ must be chosen manually to maximize the predictive power of the
+model.
 
-$$\cos \left( 2 k \pi X / T(X) \right), \quad \cos \left( 2 k \pi X / T(X) \right)$$
-
-
-To keep thins simple, we limit ourselves to $k=1$ to capture simple periodic structures.
-This gives, for instance, in the case of `day_time`, the two features
-$$\cos(2 \pi \mathrm{day_time} / \mathrm{24h}), \quad \cos(2 \pi \mathrm{day_time} / \mathrm{24h})$$
+We apply this method to the `day_time` feature. To keep thins simple,
+we limit ourselves to $k=1$ to capture simple periodic structures.
+This yields the two features:
+$$\cos(2 \pi \times \mathrm{day\_time} / \mathrm{24h}), \quad \cos(2 \pi \times \mathrm{day\_time} / \mathrm{24h}).$$
 """
 
 ## Add cosine and sine of periodic features
 df = df.assign(cos_day_time=np.cos(2*np.pi*df['day_time']/86400),
                sin_day_time=np.sin(2*np.pi*df['day_time']/86400),)
-               # cos_weekday=np.cos(2*np.pi*df['weekday']/7),
-               # sin_weekday=np.sin(2*np.pi*df['weekday']/7))
-
-##
-cat_vars = ['month', 'weekday', 'state']
-bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['day_time', 'amt', 'cos_day_time', 'sin_day_time']
 
 # %% EDA
 """
 ## <a id="eda"></a> Preliminary data analysis
 
-
+We begin with an exploratory data analysis to get insights on the factors influencing
+the fraud risk.
 """
+
+##
+cat_vars = ['month', 'weekday', 'category']
+bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+quant_vars = ['day_time', 'amt', 'cos_day_time', 'sin_day_time']
+
+
+##
+print('Number of merchants victim of fraud :',
+      merchants_df['merch_fraud_victim'].sum())
+
+##
+print('Number of fraudster customers :',
+      customers_df['cust_fraudster'].sum())
+
+##
 print(df.describe(include='all'))
 
+##
+loc = (df['merch_fraud_victim'] == True) & (df['cust_fraudster'] == True)
+print(df.loc[loc].describe(include='all'))
+
 
 """
-!!!
+- The transactions originate from 693 merchants and 917 customers.
+- Of the 557/693 (80.4 %) merchants were victim of fraud.
+- Of the 218/917 (23.6 %) customers are fraudsters.
+- The amount spent is usually low, 70 on average, with 75% of the transactions
+corresponding to an amount less than 83. However, the standard deviation, 157, is
+rather large in comparison. This indicates that the transactions amounts have a long trail
+of high values (up to 22768).
+- The fraud probability is rather low, about 0.4%, but it increases to 2% when
+we condition on fraudster customers and merchants victim of fraud.
 """
 
 # %%
 """
+### Effect of the sold goods category on the fraud probability
+"""
+
+##
+a = df.loc[:, ['category', 'is_fraud']].groupby('category').mean()
+
+##
+fig1, ax1 = plt.subplots(
+    nrows=1, ncols=1, figsize=(6, 4), dpi=100,
+    gridspec_kw={'left': 0.11, 'right': 0.94, 'top': 0.89, 'bottom': 0.14})
+fig1.suptitle("Figure 1: Inverse cummulative distribution of transaction amounts",
+              x=0.02, ha='left')
+
+ax1.plot(a['is_fraud'], linestyle='', marker='+', markersize=5)
+
+ax1.set_xlim(-1, 14)
+ax1.set_xticks([])
+# ax1.set_ylim(1e-6, 1)
+# ax1.set_ylabel('Counts (x1000)', labelpad=5)
+ax1.grid(visible=True, linewidth=0.3)
+ax1.grid(visible=True, which='minor', linewidth=0.2)
+
+
+plt.show()
+"""
+!!!
+"""
+
+
+# %%
+r"""
 ### Distribution of transfered amounts
+
+We mentioned a very broad distribution of transaction amounts. To get more detailed
+insights, we compute the inverse cummultive distribution function, $P(X \geq x)$,
+where $X$ represents the transaction amount.
 """
 
 ##
@@ -163,7 +269,7 @@ amt_icdf = np.sum(df['amt'].to_numpy() > amt_vals, axis=1) / len(df['amt'])
 fig1, ax1 = plt.subplots(
     nrows=1, ncols=1, figsize=(6, 4), dpi=100,
     gridspec_kw={'left': 0.11, 'right': 0.94, 'top': 0.89, 'bottom': 0.14})
-fig1.suptitle("Figure 1: Distribution of amounts spent in transactions",
+fig1.suptitle("Figure 1: Inverse cummulative distribution of transaction amounts",
               x=0.02, ha='left')
 
 ax1.plot(amt_vals, amt_icdf, linestyle='', marker='+', markersize=5)
@@ -181,9 +287,10 @@ ax1.grid(visible=True, which='minor', linewidth=0.2)
 plt.show()
 
 """
-!!!
-Figure 1 presents the distribution of transaction amounts. Most values are below
-200.
+As anticipated, we observe that 90% of the transactions correspond to amounts less that 100.
+However, after the threshold at 100, We have a slow power-law decrease of the transaction amount.
+This leads to a significant fraction of very high transaction amounts. More than 1/1000 transactions
+corresponds to amounts > 1500.
 """
 
 # %%
@@ -236,13 +343,18 @@ plt.show()
 """
 Figure 2 shows the correlation matrix of non-categorical variables.
 The linear correlation between fraud events and other variables is rather weak.
-!!!
+Important factors seem to be the transaction amount and the fact that the customer
+has previously frauded. There is a significant anti-correlation Between the merchant status
+(victim of fraud or not) and the transaction time. Merchants that are victim of
+fraud are those for which transactions tend to occur in the morning.
 """
 
 # %%
 """
-### Fraud probability vs time
+### Fraud probability vs day time
 
+We investigate further the time dependence of frauds by determining the fraud
+probability for each value of datetime-like features.
 """
 
 ## Fraud probability vs month
@@ -286,7 +398,7 @@ fig3, axs3 = plt.subplots(
     nrows=1, ncols=3, figsize=(10, 3.8), dpi=100, sharey=True,
     gridspec_kw={'left': 0.065, 'right': 0.95, 'top': 0.87, 'bottom': 0.16,
                  'wspace': 0.06})
-fig3.suptitle("Figure 3: Time-dependence of the fraud probability",
+fig3.suptitle("Figure 3: date and time-dependence of the fraud probability",
               x=0.02, y=0.97, ha='left')
 
 axs3[0].errorbar(months, 100*month_fprob, yerr=100*month_fprob_err,
@@ -332,19 +444,25 @@ fig3.text(0.02, 0.51, 'Fraud probability (%)', rotation=90, fontsize=11,
 plt.show()
 
 """
-Figure 3 presents
-!!!
-
-Strong non-linearity in the time dependence of the fraud -> choose non-linear model
-such as decision tree.
+Figure 3 shows the fraud probability as a function of the month (left panel),
+the week day (middle panel), and the day hour (right panel).
+- Our data extends over a 6-month period, from june to december. Fraud occurrences
+are not very dependent on the month, except maybe a lower risk in december.
+- Fraud occurences are also weakly dependent on the week day, except maybe a lower
+risk on mondays and tuesdays.
+- There is however, a very strong dependence of fraud on the time of the transaction.
+Actually, frauds are much more frequents when transactions occur between 22:00 and 4:00.
+This dependence is stepped-like dependence is highly non-linear. It would be better capured
+by models such as decision trees.
 """
 
 
 # %%
 """
-### Joint probability distributions
+### Combined effect of transaction amount and transaction time
 
-!!!
+We conclude with the study of the combined effect of the 2 most influencial factors
+determined previously: the transaction amount and the transaction time.
 """
 
 ## Transaction amounts and 1D histogram bins
@@ -368,7 +486,6 @@ for i in range(len(time_bins)-1):
     idx_i = (time_i == i)
     for j in range(len(amt_bins)-1):
         fraud_prob[i, j] = np.mean(is_fraud[(amt_j == j) * idx_i])
-# for i, j in np.ndindex(fraud_prob.shape):
 
 
 # %%
@@ -431,30 +548,36 @@ axs4[1].set_title('Fraud probability')
 plt.show()
 
 """
-Figure 4 presents
-!!!
+Figure 4 presents the joint distribution of the transaction time
+and transaction amount (left panel), along with the fraud probability
+at the corresponding bins (right panel).
+
+For the joint distribution, the counts in each bin are represented on a log scale
+to make the visualization clear despite the many orders of magintude difference
+between values. We again recover the fact that most transactions have low amount.
+However, we note a step-like dependence of the transaction amount on the time.
+High transaction amounts are lmore frequent in the afternoon, and even more so
+between 22:00 and 0:00. There is also a noticeable increase of high amounts
+between 0:00 and 4:00. When looking at the corresponding fraud probability,
+it appears clearly that these high transaction amount events are actually
+related to fraud attempts. 
 """
 
 # %% Preprocessing and utilities
 r"""
 ## <a id="preproc_utils"></a> Data preprocessing and utilities
 
-!!!
-Before moving on to model constructicat_vars = ['month', 'weekday']
-bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['day_time', 'amt', 'cos_day_time', 'sin_day_time']on and training, we must first setup dataset
-preprocessing and preparation.
-We also introduce here some utilities relevant to model evaluation carried later on.
+Before moving on to model construction and training, we first introduce here some utilities
+related to model evaluation. We also setup here the common parts of the training pipelines.
 
 
 ### Model evaluation utilities
 
-We evaluate our model using the following metrics:
-- The confusion matrix
+We evaluate our classification models using metrics which are robust to the
+very high imbalance of fraud event occurences. These are derived from the confusion matrix:
 - The precision
 - The recall
 - The F1 score
-
 """
 
 def eval_metrics(y_true: np.ndarray,
@@ -485,25 +608,21 @@ def eval_metrics(y_true: np.ndarray,
 ## Dataframe to hold the results
 metric_names = ['precision', 'recall', 'F1-score']
 index = pd.MultiIndex.from_product(
-    [('Log reg', 'RF', 'HGB'), ('train', 'test')],
+    [('Logistic regression', 'Random forest', 'hist gradient boosting'),
+     ('train', 'test')],
     names=['model', 'eval. set'])
 evaluation_df = pd.DataFrame(
     np.full((6, 3), np.nan), index=index, columns=metric_names)
 
+
 """
 ### Data preprocessing
 
-The preprocessing of the dataset consists in the removal of outliers. We choose to remove those
-observations corresponding to high rental price and mileage using a quantile range criterion.
-More precisely, we discard those observations $i$ such that
-$x_i < m + k(Q_{0.75} - Q_{0.25})$, where
-$Q_{\alpha}$ is the $\alpha$-quantile and $k=6$ is an exclusion factor. We filter only
-the values above, since the quantities are positive by definition.
-
-We also setup here the preprocessing pipeline that will be part of the pricing models:
-one-hot encoding of categorical variables and scaling of quantitative variables.
+There is no need for data imputation nor outliers removal with this dataset.
+However, we will use models that require different feature preprocessing pipelines.
+For instance, trees do not require quantitative variable scaling nor one-hot encoding of
+categorical features. We setup the corresponding pipelines here.
 """
-
 
 ## data preparation
 y = df['is_fraud']
@@ -514,11 +633,38 @@ X_tr, X_test, y_tr, y_test = train_test_split(
     X, y, test_size=0.2, stratify=y, random_state=1234)
 
 
+## Column preprocessing for continuous function models (eg logistic regression)
+func_cat_vars = ['month', 'weekday', 'category']
+func_bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+func_quant_vars = ['amt', 'cos_day_time', 'sin_day_time']
+
+func_col_preproc = ColumnTransformer(
+    [('cat_ohe',
+      OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.005),
+      cat_vars),
+     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
+     ('quant_scaler', StandardScaler(), quant_vars)]
+)
+
+
+## Column preprocessing for decision tree-derived models
+tree_cat_vars = ['month', 'weekday', 'category']
+tree_bool_vars = ['cust_fraudster', 'merch_fraud_victim']
+tree_quant_vars = ['amt', 'day_time']
+
+tree_col_preproc = ColumnTransformer(
+    [('cat_oe', OrdinalEncoder(), cat_vars),
+     ('id_', FunctionTransformer(None, feature_names_out='one-to-one'),
+      bool_vars + quant_vars)]
+)
+
+
+
 # %% Logistic regression
 r"""
 ## <a id="logreg"></a> Logistic regression
 
-We first begin by training a baseline ridge regression model.
+We first begin by training a baseline logistic regression model.
 
 
 ### Parameters optimization
@@ -530,26 +676,13 @@ with cross validation.
 !!!
 """
 
-## column preprocessing
-cat_vars = ['month', 'weekday', 'state']
-bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['amt', 'cos_day_time', 'sin_day_time']
-
-col_preproc = ColumnTransformer(
-    [('cat_ohe',
-      OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.005),
-      cat_vars),
-     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)])
-
-
 
 ## Grid search of the regularization parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
 Cs = np.logspace(-1, 4, 11)
 logreg = LogisticRegression(penalty='l2')
 clf = Pipeline(
-    [('column_preprocessing', col_preproc),
+    [('column_preprocessing', func_col_preproc),
      ('classifier', GridSearchCV(logreg, param_grid={'C': Cs},
                                  scoring=scoring, refit=False, cv=5))]
 )
@@ -575,7 +708,6 @@ fig5, ax5 = plt.subplots(
 fig5.suptitle("Figure 5: Scoring metrics vs ridge regularization parameter",
               x=0.02, ha='left')
 
-# RMSE and MAE
 ax5.plot(Cs, prec, color='C0', label='Precision')
 ax5.fill_between(Cs, prec-std_prec, prec+std_prec,
                  color='C0', alpha=0.2)
@@ -585,7 +717,6 @@ ax5.fill_between(Cs, recall-std_recall, recall+std_recall,
 ax5.plot(Cs, f1, color='C2', label='F1-score')
 ax5.fill_between(Cs, f1-std_f1, f1+std_f1,
                  color='C2', alpha=0.2)
-
 
 ax5.set_xscale('log')
 ax5.set_xlim(1e-1, 1e4)
@@ -617,7 +748,7 @@ the regularization parameter of our ridge model.
 """
 
 ## Complete pipeline
-logreg_model = Pipeline([('column_preprocessing', col_preproc),
+logreg_model = Pipeline([('column_preprocessing', func_col_preproc),
                         ('classifier', LogisticRegression(C=100))])
 
 ## train
@@ -633,7 +764,8 @@ y_pred_test = logreg_model.predict(X_test)
 _, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
 evaluation_df.iloc[1] = prec, recall, f1
 
-print(evaluation_df.loc['Log reg'])
+# print(evaluation_df.loc['Logistic regression'])
+print(evaluation_df)
 
 r"""
 !!!
@@ -652,26 +784,17 @@ r"""
 No cos time here because trees capture well non-linear relationships
 """
 
-## column preprocessing
-cat_vars = ['month', 'weekday', 'state']
-bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['amt', 'day_time']
-tree_col_preproc = ColumnTransformer(
-    [('cat_oe', OrdinalEncoder(), cat_vars),
-     ('id_', FunctionTransformer(None, feature_names_out='one-to-one'),
-      bool_vars + quant_vars)])
-
-
 ## Grid search of the regularization parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
-max_depths = np.arange(2, 17, 2)
+n_est_vals = np.arange(100, 1100, 100)
 rfc = RandomForestClassifier(criterion='gini',
                              max_features=0.5,
                              bootstrap=True,
+                             n_jobs=4,
                              random_state=1234)
 clf = Pipeline(
     [('column_preprocessing', tree_col_preproc),
-     ('classifier', GridSearchCV(rfc, param_grid={'max_depth': max_depths},
+     ('classifier', GridSearchCV(rfc, param_grid={'n_estimators': n_est_vals},
                                  scoring=scoring, refit=False, cv=5))]
 )
 clf.fit(X_tr, y_tr)
@@ -695,19 +818,19 @@ fig6, ax6 = plt.subplots(
 fig6.suptitle("Figure 6: Scoring metrics vs random forest regularization parameter",
               x=0.02, ha='left')
 
-# RMSE and MAE
-ax6.plot(max_depths, prec, color='C0', label='Precision')
-ax6.fill_between(max_depths, prec-std_prec, prec+std_prec,
+ax6.plot(n_est_vals, prec, color='C0', label='Precision')
+ax6.fill_between(n_est_vals, prec-std_prec, prec+std_prec,
                  color='C0', alpha=0.2)
-ax6.plot(max_depths, recall, color='C1', label='Recall')
-ax6.fill_between(max_depths, recall-std_recall, recall+std_recall,
+ax6.plot(n_est_vals, recall, color='C1', label='Recall')
+ax6.fill_between(n_est_vals, recall-std_recall, recall+std_recall,
                  color='C1', alpha=0.2)
-ax6.plot(max_depths, f1, color='C2', label='F1-score')
-ax6.fill_between(max_depths, f1-std_f1, f1+std_f1,
+ax6.plot(n_est_vals, f1, color='C2', label='F1-score')
+ax6.fill_between(n_est_vals, f1-std_f1, f1+std_f1,
                  color='C2', alpha=0.2)
-ax6.set_xlim(0, 16)
-ax6.set_xticks(np.arange(0, 18, 2))
-ax6.set_xlabel('Max depth')
+
+ax6.set_xlim(0, 1100)
+ax6.set_xticks(np.arange(0, 1200, 100))
+ax6.set_xlabel('Number of estimators')
 ax6.set_ylim(0, 1)
 ax6.set_ylabel('Price error')
 ax6.grid(visible=True, linewidth=0.3)
@@ -733,10 +856,12 @@ the regularization parameter of our ridge model.
 
 ## Complete pipeline
 randforest_model = Pipeline(
-    [('column_preprocessing', col_preproc),
-     ('classifier', RandomForestClassifier(criterion='gini',
+    [('column_preprocessing', tree_col_preproc),
+     ('classifier', RandomForestClassifier(n_estimators=100,
+                                           criterion='gini',
                                            max_features=0.5,
                                            bootstrap=True,
+                                           n_jobs=4,
                                            random_state=1234))]
 )
 
@@ -753,7 +878,8 @@ y_pred_test = randforest_model.predict(X_test)
 _, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
 evaluation_df.iloc[3] = prec, recall, f1
 
-print(evaluation_df.loc['RF'])
+# print(evaluation_df.loc['Random forest'])
+print(evaluation_df)
 
 r"""
 !!!
@@ -763,7 +889,7 @@ r"""
 
 # %% Gradient Boosting model
 """
-## <a id="hgbm"></a> Hist Gradient Boosting model
+## <a id="hist_gradient_boosting"></a> Histogram-based Gradient Boosting model
 
 We complete the pricing models catalogue of our application by training
 a gradient boosting regressor.
@@ -773,23 +899,13 @@ a gradient boosting regressor.
 
 """
 
-## column preprocessing
-cat_vars = ['month', 'weekday', 'state']
-bool_vars = ['cust_fraudster', 'merch_fraud_victim']
-quant_vars = ['amt', 'day_time']
-tree_col_preproc = ColumnTransformer(
-    [('cat_oe', OrdinalEncoder(), cat_vars),
-     ('id_', FunctionTransformer(None, feature_names_out='one-to-one'),
-      bool_vars + quant_vars)])
-
-
 ## Grid search of the regularization parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
-n_est_vals = np.arange(100, 1001, 100)
+max_iters = np.arange(100, 1001, 100)
 clf = Pipeline(
     [('column_preprocessing', tree_col_preproc),
      ('classifier', GridSearchCV(HistGradientBoostingClassifier(random_state=1234),
-                                 param_grid={'n_estimators': n_est_vals},
+                                 param_grid={'max_iter': max_iters},
                                  scoring=scoring, refit=False, cv=5))]
 )
 clf.fit(X_tr, y_tr)
@@ -814,14 +930,14 @@ fig7.suptitle("Figure 7: Scoring metrics vs number of gradient boosting estimato
               x=0.02, ha='left')
 
 
-ax7.plot(n_est_vals, prec, color='C0', label='Precision')
-ax7.fill_between(n_est_vals, prec-std_prec, prec+std_prec,
+ax7.plot(max_iters, prec, color='C0', label='Precision')
+ax7.fill_between(max_iters, prec-std_prec, prec+std_prec,
                  color='C0', alpha=0.2)
-ax7.plot(n_est_vals, recall, color='C1', label='Recall')
-ax7.fill_between(n_est_vals, recall-std_recall, recall+std_recall,
+ax7.plot(max_iters, recall, color='C1', label='Recall')
+ax7.fill_between(max_iters, recall-std_recall, recall+std_recall,
                  color='C1', alpha=0.2)
-ax7.plot(n_est_vals, f1, color='C2', label='F1-score')
-ax7.fill_between(n_est_vals, f1-std_f1, f1+std_f1,
+ax7.plot(max_iters, f1, color='C2', label='F1-score')
+ax7.fill_between(max_iters, f1-std_f1, f1+std_f1,
                  color='C2', alpha=0.2)
 ax7.set_xlim(0, 1000)
 ax7.set_xticks(np.arange(0, 1000, 200))
@@ -837,6 +953,7 @@ ax7.legend(loc=(0.015, 0.9), ncols=3)
 plt.show()
 
 r"""
+!!!
 Figure 7 presents plots of our selected metrics as a function of the number of estimators
 used with the gradient boosting regressor. The metrics reach an optimum for `n_estimators = 500`,
 which we retain for the model.
@@ -850,8 +967,8 @@ which we retain for the model.
 
 ## Complete pipeline
 hgb_model = Pipeline(
-    [('column_preprocessing', col_preproc),
-     ('regressor', HistGradientBoostingClassifier(n_estimators=500,
+    [('column_preprocessing', tree_col_preproc),
+     ('regressor', HistGradientBoostingClassifier(max_iter=100,
                                                   random_state=1234))]
 )
 
@@ -861,16 +978,18 @@ hgb_model.fit(X_tr, y_tr)
 ## evaluate of train set
 y_pred_tr = hgb_model.predict(X_tr)
 _, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
-evaluation_df.iloc[5] = prec, recall, f1
+evaluation_df.iloc[4] = prec, recall, f1
 
 ## evaluate on test set
 y_pred_test = hgb_model.predict(X_test)
 _, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
 evaluation_df.iloc[5] = prec, recall, f1
 
-print(evaluation_df['HGB'])
+# print(evaluation_df.loc['hist gradient boosting'])
+print(evaluation_df)
 
 """
+!!!
 The gradient boosting model is more performant than the simple ridge model.
 However, overfitting is still present, and even worse than for ridge regression.
 Nevertheless, the test set metrics are quite close
