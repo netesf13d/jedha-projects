@@ -39,7 +39,7 @@ A `NULL` value corresponds to a time delta larger that 12h (720 min), in which c
 """
 
 
-# %% EDA
+# %% EDA user
 """
 ## <a id="eda_user"></a> Study of user behavior
 
