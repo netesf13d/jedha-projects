@@ -4,6 +4,7 @@ Script for the exploratory data analysis of the automatic fraud detection
 project.
 """
 
+import time
 import sys
 
 import numpy as np
@@ -20,6 +21,7 @@ from sklearn.preprocessing import (OneHotEncoder,
                                    FunctionTransformer)
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import (RandomForestClassifier,
+                              GradientBoostingClassifier,
                               HistGradientBoostingClassifier)
 
 
@@ -57,7 +59,7 @@ We are in the presence of the following variables:
   - `merchant`, the merchant name
   - `category`, the purchased goods category
   - `first`, `last`, `gender`, `job`, information about the customer
-  - `street`, `city`, `state`, `zip`, location information about the merchant or customer
+  - `street`, `city`, `state`, `zip`, location information about the customer
   - `trans_num`, the transaction number
 - Boolean variables:
   - `is_fraud`, our target
@@ -82,7 +84,7 @@ The dataset contains private information about about customers and merchants
 `customers`, that are dedicated to hold this sensitive information.
 """
 
-##`customer` reference table
+## `customer` reference table
 customer_cols = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
                  'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob']
 customers_df = raw_df[customer_cols].value_counts().index.to_frame()
@@ -227,28 +229,17 @@ we condition on fraudster customers and merchants victim of fraud.
 """
 
 ##
-a = df.loc[:, ['category', 'is_fraud']].groupby('category').mean()
+fraud_vs_categ = pd.concat(
+    [df['category'].value_counts(),
+     df.loc[:, ['category', 'is_fraud']].groupby('category').mean()],
+    axis=1)
 
-##
-fig1, ax1 = plt.subplots(
-    nrows=1, ncols=1, figsize=(6, 4), dpi=100,
-    gridspec_kw={'left': 0.11, 'right': 0.94, 'top': 0.89, 'bottom': 0.14})
-fig1.suptitle("Figure 1: Inverse cummulative distribution of transaction amounts",
-              x=0.02, ha='left')
+print(fraud_vs_categ)
 
-ax1.plot(a['is_fraud'], linestyle='', marker='+', markersize=5)
-
-ax1.set_xlim(-1, 14)
-ax1.set_xticks([])
-# ax1.set_ylim(1e-6, 1)
-# ax1.set_ylabel('Counts (x1000)', labelpad=5)
-ax1.grid(visible=True, linewidth=0.3)
-ax1.grid(visible=True, which='minor', linewidth=0.2)
-
-
-plt.show()
 """
-!!!
+The fraud probability is actually quite low (about 0.2 %) for most categories.
+Only 3 categories are associated to a significantly higher fraud risk (about 1 %):
+`grocery_pos`, `Misc_net` and `shopping_net`.
 """
 
 
@@ -398,7 +389,7 @@ fig3, axs3 = plt.subplots(
     nrows=1, ncols=3, figsize=(10, 3.8), dpi=100, sharey=True,
     gridspec_kw={'left': 0.065, 'right': 0.95, 'top': 0.87, 'bottom': 0.16,
                  'wspace': 0.06})
-fig3.suptitle("Figure 3: date and time-dependence of the fraud probability",
+fig3.suptitle("Figure 3: Date and time-dependence of the fraud probability",
               x=0.02, y=0.97, ha='left')
 
 axs3[0].errorbar(months, 100*month_fprob, yerr=100*month_fprob_err,
@@ -608,7 +599,7 @@ def eval_metrics(y_true: np.ndarray,
 ## Dataframe to hold the results
 metric_names = ['precision', 'recall', 'F1-score']
 index = pd.MultiIndex.from_product(
-    [('Logistic regression', 'Random forest', 'hist gradient boosting'),
+    [('Logistic regression', 'Random forest', 'Hist gradient boosting'),
      ('train', 'test')],
     names=['model', 'eval. set'])
 evaluation_df = pd.DataFrame(
@@ -641,9 +632,9 @@ func_quant_vars = ['amt', 'cos_day_time', 'sin_day_time']
 func_col_preproc = ColumnTransformer(
     [('cat_ohe',
       OneHotEncoder(drop=None, handle_unknown='infrequent_if_exist', min_frequency=0.005),
-      cat_vars),
-     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), bool_vars),
-     ('quant_scaler', StandardScaler(), quant_vars)]
+      func_cat_vars),
+     ('bool_id', FunctionTransformer(feature_names_out='one-to-one'), func_bool_vars),
+     ('quant_scaler', StandardScaler(), func_quant_vars)]
 )
 
 
@@ -653,9 +644,9 @@ tree_bool_vars = ['cust_fraudster', 'merch_fraud_victim']
 tree_quant_vars = ['amt', 'day_time']
 
 tree_col_preproc = ColumnTransformer(
-    [('cat_oe', OrdinalEncoder(), cat_vars),
+    [('cat_oe', OrdinalEncoder(), tree_cat_vars),
      ('id_', FunctionTransformer(None, feature_names_out='one-to-one'),
-      bool_vars + quant_vars)]
+      tree_bool_vars + tree_quant_vars)]
 )
 
 
@@ -667,30 +658,28 @@ r"""
 We first begin by training a baseline logistic regression model.
 
 
-### Parameters optimization
+### Regularization parameter optimization
 
-We introduce L2 regularization to the model because of the large number of categorical features.
-In order to select the appropriate value for the regularization parameter $\alpha$, we perform a grid search
-with cross validation.
-
-!!!
+The `LogisticRegression` classifier provided by `scikit-learn` has a regularization
+parameter `C` that must be set. We select the appropriate value with a grid search
+with cross-validation.
 """
-
 
 ## Grid search of the regularization parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
-Cs = np.logspace(-1, 4, 11)
-logreg = LogisticRegression(penalty='l2')
-clf = Pipeline(
+Cs = np.logspace(-3, 4, 13)
+base_lr = LogisticRegression(penalty='l2')
+lr_clf = Pipeline(
     [('column_preprocessing', func_col_preproc),
-     ('classifier', GridSearchCV(logreg, param_grid={'C': Cs},
-                                 scoring=scoring, refit=False, cv=5))]
+     ('classifier', GridSearchCV(base_lr, param_grid={'C': Cs},
+                                 scoring=scoring, n_jobs=4,
+                                 refit=False, cv=5))]
 )
-clf.fit(X_tr, y_tr)
+lr_clf.fit(X_tr, y_tr)
 
 
 ## Extract the relevant metrics
-cv_res = clf['classifier'].cv_results_
+cv_res = lr_clf['classifier'].cv_results_
 prec = cv_res['mean_test_precision']
 std_prec = cv_res['std_test_precision']
 recall = cv_res['mean_test_recall']
@@ -705,62 +694,72 @@ std_f1 = cv_res['std_test_f1']
 fig5, ax5 = plt.subplots(
     nrows=1, ncols=1, sharex=True, sharey=False, figsize=(6, 4), dpi=120,
     gridspec_kw={'left': 0.11, 'right': 0.95, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
-fig5.suptitle("Figure 5: Scoring metrics vs ridge regularization parameter",
+fig5.suptitle("Figure 5: Logistic regression scoring metrics vs regularization parameter",
               x=0.02, ha='left')
 
-ax5.plot(Cs, prec, color='C0', label='Precision')
-ax5.fill_between(Cs, prec-std_prec, prec+std_prec,
-                 color='C0', alpha=0.2)
-ax5.plot(Cs, recall, color='C1', label='Recall')
-ax5.fill_between(Cs, recall-std_recall, recall+std_recall,
-                 color='C1', alpha=0.2)
-ax5.plot(Cs, f1, color='C2', label='F1-score')
-ax5.fill_between(Cs, f1-std_f1, f1+std_f1,
-                 color='C2', alpha=0.2)
+l_prec, = ax5.plot(Cs, prec, color='C0', label='Precision')
+fill_prec = ax5.fill_between(Cs, prec-std_prec, prec+std_prec,
+                             color='C0', alpha=0.2)
+l_rec, = ax5.plot(Cs, recall, color='C1', label='Recall')
+fill_rec = ax5.fill_between(Cs, recall-std_recall, recall+std_recall,
+                            color='C1', alpha=0.2)
+l_f1, = ax5.plot(Cs, f1, color='C2', label='F1-score')
+fill_f1 = ax5.fill_between(Cs, f1-std_f1, f1+std_f1,
+                           color='C2', alpha=0.2)
 
 ax5.set_xscale('log')
-ax5.set_xlim(1e-1, 1e4)
-ax5.set_xticks(np.logspace(-1, 4, 6))
+ax5.set_xlim(1e-2, 1e4)
+ax5.set_xticks(np.logspace(-2, 4, 7))
 ax5.set_xticks(
-    np.concatenate([np.linspace(10**i, 10**(i+1), 10) for i in range(-1, 4)]),
+    np.concatenate([np.linspace(10**i, 10**(i+1), 10) for i in range(-2, 4)]),
     minor=True)
 ax5.set_xlabel('Regularization parameter (C)')
 ax5.set_ylim(0, 1)
-ax5.set_ylabel('Price error')
+ax5.set_ylabel('Score')
 ax5.grid(visible=True, linewidth=0.3)
 ax5.grid(visible=True, which='minor', linewidth=0.2)
-ax5.legend(loc=(0.015, 0.9), ncols=3)
+
+ax5.legend(handles=[(l_prec, fill_prec), (l_rec, fill_rec), (l_f1, fill_f1)],
+           labels=['Precision', 'Recall', 'F1-score'],
+           loc=(0.015, 0.9), ncols=3)
 
 
 plt.show()
 
 r"""
-Figure 5 presents
-!!!
+Figure 5 presents the evolution of the selected metrics, precision, recall and F1-score,
+with varying regularization parameter `C`. The light-colored band around the main curve represent
+the standard deviation across cross-validation samples.
+The performance of the model increases with `C`
+(which corresponds to a decrease in the regularization strength).
+This performance increase reaches a plateau at a F1-score of about 0.4 for $C \geq 100$.
 """
 
 # %%
 r"""
 ### Model training and evaluation
 
-According to the previous results, we retain a value $\alpha = 100$ for
-the regularization parameter of our ridge model.
+According to the previous results, we retain a value $C = 1000$ for
+our L2-regularized logistic regression, a very weak regularization.
 """
 
 ## Complete pipeline
-logreg_model = Pipeline([('column_preprocessing', func_col_preproc),
-                        ('classifier', LogisticRegression(C=100))])
+lr_model = Pipeline([('column_preprocessing', func_col_preproc),
+                        ('classifier', LogisticRegression(C=1e3))])
 
 ## train
-logreg_model.fit(X_tr, y_tr)
+t0 = time.time()
+lr_model.fit(X_tr, y_tr)
+t1 = time.time()
+print(f'Logistic regression training in {t1-t0:.2f} s')
 
 ## evaluate of train set
-y_pred_tr = logreg_model.predict(X_tr)
+y_pred_tr = lr_model.predict(X_tr)
 _, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
 evaluation_df.iloc[0] = prec, recall, f1
 
 ## evaluate on test set
-y_pred_test = logreg_model.predict(X_test)
+y_pred_test = lr_model.predict(X_test)
 _, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
 evaluation_df.iloc[1] = prec, recall, f1
 
@@ -768,40 +767,47 @@ evaluation_df.iloc[1] = prec, recall, f1
 print(evaluation_df)
 
 r"""
-!!!
+The model does not overfit. However, with a F1-score of only 0.40,
+it has poor performance. This is due to a low recall, the model has a high
+false negatives rate.
 """
 
-# %% Logistic regression
+# %% Random forest
 r"""
 ## <a id="random_forest"></a> Random forest
 
-!!!
+As a second model, we train a random forest classifier. This model is expected to
+perform much better than the previous logistic regression due to its ability to capture
+the non-linear relationship between time/transaction amount and the fraud risk.
+For this reason, we need not include the derived features `cos_day_time` and `cos_day_time`
+in the model.
+
 
 ### Parameters optimization
 
-!!!
-
-No cos time here because trees capture well non-linear relationships
+There is a strong risk of overfitting for tree-based models if allowed to grow too deep
+(in addition to the excessive training times). We thus first select the random forest
+`max_depth` parameter by cross validation.
 """
 
-## Grid search of the regularization parameter with cross validation
+## Grid search of the max tree depth parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
-n_est_vals = np.arange(100, 1100, 100)
-rfc = RandomForestClassifier(criterion='gini',
-                             max_features=0.5,
-                             bootstrap=True,
-                             n_jobs=4,
-                             random_state=1234)
-clf = Pipeline(
+max_depths = np.arange(3, 19, 1)
+base_rfc = RandomForestClassifier(n_estimators=200,
+                                  criterion='gini',
+                                  bootstrap=True,
+                                  random_state=1234)
+rf_clf = Pipeline(
     [('column_preprocessing', tree_col_preproc),
-     ('classifier', GridSearchCV(rfc, param_grid={'n_estimators': n_est_vals},
-                                 scoring=scoring, refit=False, cv=5))]
+     ('classifier', GridSearchCV(base_rfc, param_grid={'max_depth': max_depths},
+                                 scoring=scoring, n_jobs=4, refit=False, cv=5))]
 )
-clf.fit(X_tr, y_tr)
+rf_clf.fit(X_tr, y_tr)
 
 
+# %%
 ## Extract the relevant metrics
-cv_res = clf['classifier'].cv_results_
+cv_res = rf_clf['classifier'].cv_results_
 prec = cv_res['mean_test_precision']
 std_prec = cv_res['std_test_precision']
 recall = cv_res['mean_test_recall']
@@ -810,39 +816,40 @@ f1 = cv_res['mean_test_f1']
 std_f1 = cv_res['std_test_f1']
 
 
-# %%
 ##
 fig6, ax6 = plt.subplots(
     nrows=1, ncols=1, sharex=True, sharey=False, figsize=(6, 4), dpi=120,
     gridspec_kw={'left': 0.11, 'right': 0.95, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
-fig6.suptitle("Figure 6: Scoring metrics vs random forest regularization parameter",
+fig6.suptitle("Figure 6: Random forest scoring metrics vs max tree depth",
               x=0.02, ha='left')
 
-ax6.plot(n_est_vals, prec, color='C0', label='Precision')
-ax6.fill_between(n_est_vals, prec-std_prec, prec+std_prec,
-                 color='C0', alpha=0.2)
-ax6.plot(n_est_vals, recall, color='C1', label='Recall')
-ax6.fill_between(n_est_vals, recall-std_recall, recall+std_recall,
-                 color='C1', alpha=0.2)
-ax6.plot(n_est_vals, f1, color='C2', label='F1-score')
-ax6.fill_between(n_est_vals, f1-std_f1, f1+std_f1,
-                 color='C2', alpha=0.2)
+l_prec, = ax6.plot(max_depths, prec, color='C0', label='Precision')
+fill_prec = ax6.fill_between(max_depths, prec-std_prec, prec+std_prec,
+                             color='C0', alpha=0.2)
+l_rec, = ax6.plot(max_depths, recall, color='C1', label='Recall')
+fill_rec = ax6.fill_between(max_depths, recall-std_recall, recall+std_recall,
+                            color='C1', alpha=0.2)
+l_f1, = ax6.plot(max_depths, f1, color='C2', label='F1-score')
+fill_f1 = ax6.fill_between(max_depths, f1-std_f1, f1+std_f1,
+                           color='C2', alpha=0.2)
 
-ax6.set_xlim(0, 1100)
-ax6.set_xticks(np.arange(0, 1200, 100))
-ax6.set_xlabel('Number of estimators')
+ax6.set_xlim(2, max(max_depths))
+ax6.set_xticks(np.arange(2, 18, 2))
+ax6.set_xlabel('Max tree depth')
 ax6.set_ylim(0, 1)
-ax6.set_ylabel('Price error')
+ax6.set_ylabel('Score')
 ax6.grid(visible=True, linewidth=0.3)
 ax6.grid(visible=True, which='minor', linewidth=0.2)
-ax6.legend(loc=(0.3, 0.02), ncols=3)
+ax6.legend(handles=[(l_prec, fill_prec), (l_rec, fill_rec), (l_f1, fill_f1)],
+           labels=['Precision', 'Recall', 'F1-score'],
+           loc=(0.305, 0.015), ncols=3)
 
 
 plt.show()
 
 r"""
-Figure 6 presents
-!!!
+The performance of the model increases with the max tree depth to reach a plateau
+at `max_depth = 14`, and a corresponding F1-score slightly above 0.8.
 """
 
 # %%
@@ -850,31 +857,33 @@ Figure 6 presents
 r"""
 ### Model training and evaluation
 
-According to the previous results, we retain a value $\alpha = 100$ for
-the regularization parameter of our ridge model.
+We select `max_depth = 14` to train the random forest model.
 """
 
 ## Complete pipeline
-randforest_model = Pipeline(
+rf_model = Pipeline(
     [('column_preprocessing', tree_col_preproc),
-     ('classifier', RandomForestClassifier(n_estimators=100,
+     ('classifier', RandomForestClassifier(n_estimators=200,
                                            criterion='gini',
-                                           max_features=0.5,
+                                           max_depth=14,
                                            bootstrap=True,
                                            n_jobs=4,
                                            random_state=1234))]
 )
 
 ## train
-randforest_model.fit(X_tr, y_tr)
+t0 = time.time()
+rf_model.fit(X_tr, y_tr)
+t1 = time.time()
+print(f'Random forest model training in {t1-t0:.2f} s')
 
 ## evaluate of train set
-y_pred_tr = randforest_model.predict(X_tr)
+y_pred_tr = rf_model.predict(X_tr)
 _, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
 evaluation_df.iloc[2] = prec, recall, f1
 
 ## evaluate on test set
-y_pred_test = randforest_model.predict(X_test)
+y_pred_test = rf_model.predict(X_test)
 _, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
 evaluation_df.iloc[3] = prec, recall, f1
 
@@ -882,37 +891,47 @@ evaluation_df.iloc[3] = prec, recall, f1
 print(evaluation_df)
 
 r"""
-!!!
+The random forest model shows good performance, with a F1-score of 0.82 on the test
+set. Similarly to the logistic regression, there is an asymmetry between precision and recall,
+the later being significantly lower as a consequence of the strong imbalance
+between fraud and non-fraud events. However, the random forest model clearly overfits
+the data, with scores 0.07 - 0.1 higher on the training data than on the test data.
 """
-
 
 
 # %% Gradient Boosting model
 """
 ## <a id="hist_gradient_boosting"></a> Histogram-based Gradient Boosting model
 
-We complete the pricing models catalogue of our application by training
-a gradient boosting regressor.
+We complete our models catalogue by training an histogram-based gradient boosting
+classifier. Due to data binning, the convergence is much faster than plain gradient
+boosting. However, this comes at the price of a possible lower performance than its counterpart.
 
 
 ### Parameters optimization
 
+The `HistGradientBoostingClassifier` implementation of `scikit-learn` proposes
+to add L2 regularization to limit overfitting.
+We select this parameter by cross validation.
 """
 
-## Grid search of the regularization parameter with cross validation
+## Grid search of the L2 regularization parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
-max_iters = np.arange(100, 1001, 100)
-clf = Pipeline(
+l2_reg_vals = np.logspace(-3, 3, 19)
+base_hgb = HistGradientBoostingClassifier(categorical_features=np.arange(5),
+                                          random_state=1234)
+hgb_clf = Pipeline(
     [('column_preprocessing', tree_col_preproc),
-     ('classifier', GridSearchCV(HistGradientBoostingClassifier(random_state=1234),
-                                 param_grid={'max_iter': max_iters},
-                                 scoring=scoring, refit=False, cv=5))]
+     ('classifier',
+      GridSearchCV(base_hgb,
+                   param_grid={'l2_regularization': l2_reg_vals},
+                   scoring=scoring, n_jobs=4, refit=False, cv=5))]
 )
-clf.fit(X_tr, y_tr)
+hgb_clf.fit(X_tr, y_tr)
 
 
 ## Extract the relevant metrics
-cv_res = clf['classifier'].cv_results_
+cv_res = hgb_clf['classifier'].cv_results_
 prec = cv_res['mean_test_precision']
 std_prec = cv_res['std_test_precision']
 recall = cv_res['mean_test_recall']
@@ -926,54 +945,65 @@ std_f1 = cv_res['std_test_f1']
 fig7, ax7 = plt.subplots(
     nrows=1, ncols=1, sharex=True, sharey=False, figsize=(6, 4), dpi=120,
     gridspec_kw={'left': 0.11, 'right': 0.95, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
-fig7.suptitle("Figure 7: Scoring metrics vs number of gradient boosting estimators",
+fig7.suptitle("Figure 7: Hist gradient boosting scoring metrics vs L2 regularization",
               x=0.02, ha='left')
 
 
-ax7.plot(max_iters, prec, color='C0', label='Precision')
-ax7.fill_between(max_iters, prec-std_prec, prec+std_prec,
-                 color='C0', alpha=0.2)
-ax7.plot(max_iters, recall, color='C1', label='Recall')
-ax7.fill_between(max_iters, recall-std_recall, recall+std_recall,
-                 color='C1', alpha=0.2)
-ax7.plot(max_iters, f1, color='C2', label='F1-score')
-ax7.fill_between(max_iters, f1-std_f1, f1+std_f1,
-                 color='C2', alpha=0.2)
-ax7.set_xlim(0, 1000)
-ax7.set_xticks(np.arange(0, 1000, 200))
-ax7.set_xticks(np.arange(100, 1000, 200), minor=True)
-ax7.set_xlabel('Number of estimators')
+l_prec, = ax7.plot(l2_reg_vals, prec, color='C0', label='Precision')
+fill_prec = ax7.fill_between(l2_reg_vals, prec-std_prec, prec+std_prec,
+                             color='C0', alpha=0.2)
+l_rec, = ax7.plot(l2_reg_vals, recall, color='C1', label='Recall')
+fill_rec = ax7.fill_between(l2_reg_vals, recall-std_recall, recall+std_recall,
+                            color='C1', alpha=0.2)
+l_f1, = ax7.plot(l2_reg_vals, f1, color='C2', label='F1-score')
+fill_f1 = ax7.fill_between(l2_reg_vals, f1-std_f1, f1+std_f1,
+                           color='C2', alpha=0.2)
+ax7.set_xscale('log')
+ax7.set_xlim(1e-3, 1e3)
+ax7.set_xlabel('L2 regularization parameter')
 ax7.set_ylim(0, 1)
-ax7.set_ylabel('Price error')
+ax7.set_ylabel('Score')
 ax7.grid(visible=True, linewidth=0.3)
 ax7.grid(visible=True, which='minor', linewidth=0.2)
-ax7.legend(loc=(0.015, 0.9), ncols=3)
+ax7.legend(handles=[(l_prec, fill_prec), (l_rec, fill_rec), (l_f1, fill_f1)],
+           labels=['Precision', 'Recall', 'F1-score'],
+           loc=(0.305, 0.015), ncols=3)
 
 
 plt.show()
 
 r"""
-!!!
-Figure 7 presents plots of our selected metrics as a function of the number of estimators
-used with the gradient boosting regressor. The metrics reach an optimum for `n_estimators = 500`,
-which we retain for the model.
+Figure 7 presents the scoring metrics as a function of the L2 regularization parameter,
+with the light bands representing the standard deviation across the cross-validation samples.
+The model actually benefits from some amount of L2 regularization
+(contrary for instance to the logistic regression). The model performance increases
+with the regularization parameter up to a plateau between 0.2 and 30 for the regularization
+parameter, after which the performance quickly drops to zero.
+The F1-score on the plateau is slightly above 0.8.
 """
 
 
 # %%
 """
 ### Model training and evaluation
+
+According to the previous results, we select a value `l2_regularization = 3`
+for our final histogram-based gradient boosting model.
 """
 
 ## Complete pipeline
 hgb_model = Pipeline(
     [('column_preprocessing', tree_col_preproc),
-     ('regressor', HistGradientBoostingClassifier(max_iter=100,
+     ('regressor', HistGradientBoostingClassifier(l2_regularization=3,
+                                                  categorical_features=np.arange(5),
                                                   random_state=1234))]
 )
 
 ## train
+t0 = time.time()
 hgb_model.fit(X_tr, y_tr)
+t1 = time.time()
+print(f'Hist gradient boosting model training in {t1-t0:.2f} s')
 
 ## evaluate of train set
 y_pred_tr = hgb_model.predict(X_tr)
@@ -985,19 +1015,12 @@ y_pred_test = hgb_model.predict(X_test)
 _, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
 evaluation_df.iloc[5] = prec, recall, f1
 
-# print(evaluation_df.loc['hist gradient boosting'])
+# print(evaluation_df.loc['Hist gradient boosting'])
 print(evaluation_df)
 
 """
-!!!
-The gradient boosting model is more performant than the simple ridge model.
-However, overfitting is still present, and even worse than for ridge regression.
-Nevertheless, the test set metrics are quite close
-to those obtained by cross-validation (see figure 6).
-"""
-
-# %%
-"""
-## <a id="summary"></a> Summary
-
+With a test set F1-score of 0.81, this last model exhibits similar performance
+as the random forest. However, contrary to the latter, overfitting is less pronounced,
+with lower score differences between train and test sets, in the range 0.04 - 0.07.
+The imbalance between precision and recall is also lower than that of the random forest.
 """
