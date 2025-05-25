@@ -3,7 +3,6 @@
 API utilities
 """
 
-import ast
 import os
 
 import mlflow
@@ -28,14 +27,6 @@ def check_environment_vars()-> None:
                        ' `AWS_SECRET_ACCESS_KEY` is not set')
 
 
-def process_input():
-    """
-    Process API output to model input
-    """
-    pass
-    # TODO
-
-
 def fetch_models(mlflow_tracking_uri: str)-> dict:
     """
     Fetch available pricing optimization models from the MLflow server.
@@ -46,12 +37,3 @@ def fetch_models(mlflow_tracking_uri: str)-> dict:
                   for m in model_infos}
     return {name: mlflow.pyfunc.load_model(uri)
               for name, uri in model_uris.items()}
-
-
-def fetch_categories(models: dict)-> dict[str, list[str]]:
-    """
-
-    """
-    model = next(iter(models.values()))
-    run = mlflow.get_run(model._model_meta.run_id)
-    return ast.literal_eval(run.data.params['categories'])

@@ -21,6 +21,8 @@ The API provides two endpoints:
 
 ### Local deployment
 
+
+
 ```bash
 python run_api.py
 ```
@@ -54,6 +56,18 @@ Port 8501 is required by HuggingFace
 gunicorn --bind 0.0.0.0:8501 --worker-class uvicorn_worker.UvicornWorker app:app
 ```
 
+### Cloud deployment
+
+The tracking server is deployed in an Huggingface space.
+
+1. Create a huggingface [space](https://huggingface.co/new-space). Choose `docker` as the software development kit.
+2. Transfer the contents of this directory: `Dockerfile`, `README.md`, `requirements.txt` and `app/`.
+3. Setup the variables and secrets in the space's settings
+  - Secret `AWS_ACCESS_KEY_ID`,
+  - Secret `AWS_SECRET_ACCESS_KEY`,
+  - Variable `MLFLOW_TRACKING_URI`,
+  - Variable `PORT`. Here the value is set to 7860, the default value (in any case, it must match the `app_port` config variable of the space).
+4. Run the space and set it public. It will be accessible at `https://{owner}-{your-space-name}.hf.space/`.
 
 
 ## Usage
@@ -61,46 +75,38 @@ gunicorn --bind 0.0.0.0:8501 --worker-class uvicorn_worker.UvicornWorker app:app
 
 ```bash
 curl -X 'POST' \
-  'http://localhost:8000/predict/ridge-regression' \
+  'http://localhost:8000/predict/logistic-regression' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "model_key": "Audi",
-  "mileage": 132979,
-  "engine_power": 112,
-  "fuel": "diesel",
-  "paint_color": "brown",
-  "car_type": "estate",
-  "private_parking_available": true,
-  "has_gps": true,
-  "has_air_conditioning": false,
-  "automatic_car": false,
-  "has_getaround_connect": true,
-  "has_speed_regulator": true,
-  "winter_tires": true
-}'
+    "month": 6,
+    "weekday": 6,
+    "day_time": 45948,
+    "amt": 242.35,
+    "category": "health_fitness",
+    "cust_fraudster": false,
+    "merch_fraud_victim": false,
+    "cos_day_time": -0.980098,
+    "sin_day_time": -0.198513,
+  }'
 ```
 
 
 ```python
 >>> import requests
 >>> model_name = 'ridge_regression'
->>> data = {'model_key': 'Audi',
-...         'mileage': 132979,
-...         'engine_power': 112,
-...         'fuel': 'diesel',
-...         'paint_color': 'brown',
-...         'car_type': 'estate',
-...         'private_parking_available': True,
-...         'has_gps': True,
-...         'has_air_conditioning': False,
-...         'automatic_car': False,
-...         'has_getaround_connect': True,
-...         'has_speed_regulator': True,
-...         'winter_tires': True}
->>> r = requests.post('http://localhost:8000/predict/ridge-regression', json=data)
+>>> data = {'month': 6,
+            'weekday': 6,
+            'day_time': 45948,
+            'amt': 242.35,
+            'category': 'health_fitness',
+            'cust_fraudster': False,
+            'merch_fraud_victim': False,
+            'cos_day_time': -0.980098,
+            'sin_day_time': -0.198513}
+>>> r = requests.post('http://localhost:8000/predict/logistic-regression', json=data)
 >>> r.json()
-{'prediction': 120.81970398796342}
+{'prediction': False}
 ```
 
 

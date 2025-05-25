@@ -24,7 +24,7 @@ def probe_api(url: str = 'http://localhost:8000')-> int:
     return res
 
 
-def test_get_pricing_models(url: str = 'http://localhost:8000')-> list[str]:
+def test_get_fraud_detection_models(url: str = 'http://localhost:8000')-> list[str]:
     """
     Test the `GET /get_pricing_models` API endpoint.
 
@@ -40,51 +40,27 @@ def test_get_pricing_models(url: str = 'http://localhost:8000')-> list[str]:
     return res
 
 
-def test_get_categories(url: str = 'http://localhost:8000')-> int:
-    """
-    Test the `GET /get_categories` API endpoint.
-
-    Examples
-    --------
-    >>> test_get_categories('http://localhost:8000')
-    {'model_key': ['Alfa Romeo', 'Audi', 'BMW', ...],
-     'fuel': ['diesel', 'electro', 'hybrid_petrol', 'petrol'],
-     'paint_color': ['beige', 'black', ...],
-     'car_type': ['convertible', 'coupe', ...]}
-    """
-    r = requests.get(f'{url}/categories')
-    r.raise_for_status()
-    if not isinstance(res:=r.json(), dict):
-        raise ValueError(f'invalid value: {r.content}')
-    return res
-
-
 def test_predict(model_name: str,
                  data: dict[str, str | float | bool],
-                 url: str = 'http://localhost:8000')-> dict[str, float]:
+                 url: str = 'http://localhost:8000')-> dict[str, int]:
     """
     Test the `POST /predict` API endpoint.
 
     Examples
     --------
-    >>> model_name = 'ridge_regression'
-    >>> data = {'model_key': 'Audi',
-    ...         'mileage': 132979,
-    ...         'engine_power': 112,
-    ...         'fuel': 'diesel',
-    ...         'paint_color': 'brown',
-    ...         'car_type': 'estate',
-    ...         'private_parking_available': True,
-    ...         'has_gps': True,
-    ...         'has_air_conditioning': False,
-    ...         'automatic_car': False,
-    ...         'has_getaround_connect': True,
-    ...         'has_speed_regulator': True,
-    ...         'winter_tires': True}
+    >>> model_name = 'hist-gradient-boosting'
+    >>> data = {'month': 12,
+    ...         'weekday': 5,
+    ...         'day_time': 85664,
+    ...         'amt': 419.52,
+    ...         'category': 'entertainment',
+    ...         'cust_fraudster': True,
+    ...         'merch_fraud_victim': True,
+    ...         'cos_day_time': 0.998568,
+    ...         'sin_day_time': -0.053498}
     >>> test_predict(model_name, data, 'http://localhost:8000')
-    {'prediction': 120.81970398796342}
+    {'prediction': 1}
     """
-
     r = requests.post(f'{url}/predict/{model_name}', json=data)
     r.raise_for_status()
     if not isinstance(res:=r.json(), dict):
@@ -99,26 +75,19 @@ if __name__ == '__main__':
     print('Probe API:', bool(probe_api(addr)))
 
     # /pricing_models endpoint
-    model_names = test_get_pricing_models(addr)
-    print('GET pricing_models:', bool(model_names), model_names)
-
-    # /categories endpoint
-    print('GET categories:', bool(res:=test_get_categories(addr)), res)
+    model_names = test_get_fraud_detection_models(addr)
+    print('GET fraud_detection_models:', bool(model_names), model_names)
 
     # /predict endpoint
-    data = {"model_key": "Audi",
-            "mileage": 132979,
-            "engine_power": 112,
-            "fuel": "diesel",
-            "paint_color": "brown",
-            "car_type": "estate",
-            "private_parking_available": True,
-            "has_gps": True,
-            "has_air_conditioning": False,
-            "automatic_car": False,
-            "has_getaround_connect": True,
-            "has_speed_regulator": True,
-            "winter_tires": True}
+    data = {'month': 12,
+            'weekday': 5,
+            'day_time': 85664,
+            'amt': 419.52,
+            'category': 'entertainment',
+            'cust_fraudster': True,
+            'merch_fraud_victim': True,
+            'cos_day_time': 0.998568,
+            'sin_day_time': -0.053498}
     pred = test_predict(model_names[0], data, addr)
     print('POST predict:', bool(pred), pred)
 

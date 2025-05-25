@@ -5,7 +5,6 @@ project.
 """
 
 import time
-import sys
 
 import numpy as np
 import pandas as pd
@@ -21,7 +20,6 @@ from sklearn.preprocessing import (OneHotEncoder,
                                    FunctionTransformer)
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import (RandomForestClassifier,
-                              GradientBoostingClassifier,
                               HistGradientBoostingClassifier)
 
 
@@ -180,6 +178,10 @@ $$\cos(2 \pi \times \mathrm{day\_time} / \mathrm{24h}), \quad \cos(2 \pi \times 
 ## Add cosine and sine of periodic features
 df = df.assign(cos_day_time=np.cos(2*np.pi*df['day_time']/86400),
                sin_day_time=np.sin(2*np.pi*df['day_time']/86400),)
+
+
+## Export training data to csv
+# df.to_csv('../data/fraud_train_data.csv', index=False)
 
 # %% EDA
 """

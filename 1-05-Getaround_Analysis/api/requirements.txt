@@ -1,11 +1,9 @@
-boto3 == 1.37
-cloudpickle == 3.1.1
+boto3 == 1.38
 gunicorn == 23.0
 httpx == 0.28
-mlflow == 2.21
-pandas == 2.2
-psutil == 7.0.0
-scikit-learn == 1.6.1
+mlflow == 2.22
+pandas == 2.2.3
+scikit-learn == 1.6
 sqlalchemy == 2.0
 uvicorn == 0.34
 uvicorn-worker == 0.3

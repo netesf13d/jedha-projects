@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.responses import RedirectResponse
 
-from .utils import check_environment_vars, fetch_models, fetch_categories
+from .utils import check_environment_vars, fetch_models
 
 
 # =============================================================================
@@ -20,36 +20,28 @@ from .utils import check_environment_vars, fetch_models, fetch_categories
 # =============================================================================
 
 class PredictionFeatures(BaseModel):
-    model_key: str
-    mileage: float
-    engine_power: float
-    fuel: str
-    paint_color: str
-    car_type: str
-    private_parking_available: bool
-    has_gps: bool
-    has_air_conditioning: bool
-    automatic_car: bool
-    has_getaround_connect: bool
-    has_speed_regulator: bool
-    winter_tires: bool
+    month: int
+    weekday: int
+    day_time: int
+    amt: float
+    category: str
+    cust_fraudster: bool
+    merch_fraud_victim: bool
+    cos_day_time: float
+    sin_day_time: float
 
 
 prediction_examples = [
     {
-         'model_key': 'Audi',
-         'mileage': 132979,
-         'engine_power': 112,
-         'fuel': 'diesel',
-         'paint_color': 'brown',
-         'car_type': 'estate',
-         'private_parking_available': True,
-         'has_gps': True,
-         'has_air_conditioning': False,
-         'automatic_car': False,
-         'has_getaround_connect': True,
-         'has_speed_regulator': True,
-         'winter_tires': True
+         'month': 12,
+         'weekday': 5,
+         'day_time': 85664,
+         'amt': 419.52,
+         'category': 'entertainment',
+         'cust_fraudster': True,
+         'merch_fraud_victim': True,
+         'cos_day_time': 0.998568,
+         'sin_day_time': -0.053498,
     },
 ]
 
@@ -59,7 +51,6 @@ prediction_examples = [
 # =============================================================================
 
 models = {}
-categories = {}
 
 
 @asynccontextmanager
@@ -71,7 +62,6 @@ async def lifespan(app: FastAPI):
     print('Loading models...', end=' ')
     check_environment_vars()
     models.update(fetch_models(os.environ['MLFLOW_TRACKING_URI']))
-    categories.update(fetch_categories(models))
     print('Done.')
 
     # yield to the app
@@ -86,20 +76,20 @@ async def lifespan(app: FastAPI):
 #
 # =============================================================================
 
-title = 'Getaround car rental pricing API'
+title = 'Automatic fraud detection API'
 
 description = (
-    'The API interfaces the pricing models registry. It is used by the '
-    'dashboard to propose a user-friendly pricing estimation.'
+    'The API interfaces the fraud detection models registry. It is used by the '
+    'fraud detection engine to determine whether a transaction is fraudulent.'
 )
 
 tags_metadata = [
     {'name': 'Test',
      'description': 'API test endpoint.'},
     {'name': 'Models info',
-     'description': 'Information about available pricing models.'},
-    {'name': 'Pricing',
-     'description': 'Car rental pricing optimization.'},
+     'description': 'Information about available fraud detection models.'},
+    {'name': 'Fraud detection',
+     'description': 'Fraud detection model.'},
 ]
 
 contact = {'name': 'Jedha', 'url': 'https://jedha.co'}
@@ -130,7 +120,7 @@ async def test()-> int:
 
 
 
-@app.get('/pricing_models', tags=['Models info'])
+@app.get('/fraud_detection_models', tags=['Models info'])
 async def get_pricing_models()-> list[str]:
     """
     Get the pricing models available from the MLflow server.
@@ -138,19 +128,11 @@ async def get_pricing_models()-> list[str]:
     return list(models)
 
 
-@app.get('/categories', tags=['Models info'])
-async def get_categories()-> dict[str, list[str]]:
-    """
-    Get the categories associated to each categorical feature.
-    """
-    return categories
-
-
-@app.post('/predict/{model_name}', tags=['Pricing'])
+@app.post('/predict/{model_name}', tags=['Fraud detection'])
 async def predict(model_name: str,
                   data: Annotated[PredictionFeatures,
                                   Body(examples=prediction_examples)]
-                  )-> dict[str, float]:
+                  )-> dict[str, int]:
     """
     Evaluate a car rental price using the selected model.
     """
@@ -159,8 +141,8 @@ async def predict(model_name: str,
     try:
         model = models[model_name]
     except KeyError:
-        detail = {'message': f'pricing model {model_name} not available',
-                  'pricing_models': list(models)}
+        detail = {'message': f'fraud detection model {model_name} not available',
+                  'models': list(models)}
         raise HTTPException(status_code=404, detail=detail)
     else:
         prediction = model.predict(input_features)
