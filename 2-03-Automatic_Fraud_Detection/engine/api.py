@@ -9,10 +9,11 @@ import time
 from io import BytesIO
 from typing import Any
 
+
 import httpx
 import numpy as np
 
-
+API_URL = 'https://charlestng-real-time-fraud-detection.hf.space/'
 
 # =============================================================================
 # Fetch from Jedha API
@@ -20,10 +21,9 @@ import numpy as np
 
 def get_root()-> dict[str, dict[str, float | int]]:
     """
-    
+    !!!
     """
-    r = httpx.get('https://real-time-payments-api.herokuapp.com/',
-                  follow_redirects=True)
+    r = httpx.get(API_URL, follow_redirects=True)
     raw_data = r.raise_for_status().text
     return raw_data
 
@@ -31,12 +31,15 @@ def get_root()-> dict[str, dict[str, float | int]]:
 
 def get_transaction()-> dict[str, list]:
     """
-    
+    !!!
     """
-    r = httpx.get('https://real-time-payments-api.herokuapp.com/current-transactions',
-                  follow_redirects=True)
+    url = API_URL + 'current-transactions'
+    r = httpx.get(url, follow_redirects=True,
+                  timeout=httpx.Timeout(10, read=None))
     raw_data = r.raise_for_status().text
-    return json.loads(raw_data)
+    return json.loads(json.loads(raw_data))
 
 
 
+
+a = get_transaction()
