@@ -55,7 +55,7 @@ class Customer(Base):
     lat: Mapped[float]
     long: Mapped[float]
     city_pop: Mapped[int]
-    job: Mapped(str)
+    job: Mapped[str]
     dob: Mapped[str]
     cust_fraudster: Mapped[bool]
     
@@ -86,9 +86,10 @@ class Transaction(Base):
     """
     __tablename__ = 'transactions'
     
-    timestamp: Mapped[datetime]
+    transaction_id: Mapped[int] = mapped_column(primary_key=True)
     merchant_id: Mapped[int] = mapped_column(ForeignKey("merchants.merchant_id"))
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.customer_id"))
+    timestamp: Mapped[datetime]
     month: Mapped[int]
     weekday: Mapped[int]
     day_time: Mapped[int]
@@ -101,9 +102,10 @@ class Transaction(Base):
     
     def __repr__(self):
         str_ = (
-            f"Transaction(timestamp={self.timestamp!r}, "
+            f"Transaction(transaction_id={self.transaction_id!r}, "
             f"merchant_id={self.merchant_id!r}, "
             f"customer_id={self.customer_id!r}, "
+            f"timestamp={self.timestamp!r}, "
             f"month={self.month!r}, "
             f"weekday={self.weekday!r}, "
             f"day_time={self.day_time!r}, "

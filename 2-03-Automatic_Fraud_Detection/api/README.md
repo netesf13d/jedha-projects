@@ -1,10 +1,10 @@
 ---
-title: Getaround Pricing API
-emoji: 🚗
+title: Automatic Fraud Detection API
+emoji: 💸
 sdk: docker
 app_port: 7860
 ---
-# Getaround Pricing API
+# Automatic Fraud Detection API
 
 In this project we deploy a small application.
 

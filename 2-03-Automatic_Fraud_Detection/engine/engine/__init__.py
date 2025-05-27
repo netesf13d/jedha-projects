@@ -6,7 +6,7 @@ This package implement Extract-Transform-Load helper functions.
 - `db_mgmt`: Implementation of the tables structure with SQLAlchemy
 """
 
-# from .utils import save_to_json
+from .utils import check_environment_vars
 from .api_mgmt import get_root, get_transaction, detect_fraud
 from .db_mgmt import Base, Merchant, Customer, Transaction, reflect_db
 
