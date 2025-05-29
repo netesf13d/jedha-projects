@@ -72,7 +72,7 @@ X_tr, X_test, y_tr, y_test = train_test_split(
 
 
 ## Column preprocessing
-cat_vars = ['month', 'weekday', 'category']
+cat_vars = ['weekday', 'category']
 bool_vars = ['cust_fraudster', 'merch_fraud_victim']
 quant_vars = ['amt', 'day_time']
 
@@ -90,7 +90,7 @@ with mlflow.start_run(experiment_id=experiment.experiment_id):
     ## Full pipeline, fit on train data
     l2_regularization = 200
     clf = HistGradientBoostingClassifier(l2_regularization=l2_regularization,
-                                         categorical_features=[0, 1, 2, 3, 4],
+                                         categorical_features=[0, 1, 2, 3],
                                          random_state=random_state)
     model = Pipeline([('column_preprocessing', tree_col_preproc),
                       ('classifier', clf)])

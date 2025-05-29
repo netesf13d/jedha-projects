@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 FastAPI application.
+TODO doc
 """
 
 import os
@@ -134,6 +135,7 @@ async def predict(model_name: str,
                                   Body(examples=prediction_examples)]
                   )-> dict[str, int]:
     """
+    !!!
     Evaluate a car rental price using the selected model.
     """
     input_features = pd.DataFrame.from_records([dict(data)])

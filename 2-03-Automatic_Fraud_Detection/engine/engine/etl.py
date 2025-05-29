@@ -1,67 +1,161 @@
 # -*- coding: utf-8 -*-
 """
-
+TDOD doc
 """
 
-import json
+from datetime import datetime
 
+import numpy as np
 import pandas as pd
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from .db_mgmt import Customer, Merchant, Transaction
 
 
-# =============================================================================
-# 
-# =============================================================================
-
-# def create_merchants_df(raw_df: pd.DataFrame)-> pd.DataFrame:
-    
-#     ## discard the 'fraud_' string before each merchant value
-#     raw_df['merchant'] = raw_df['merchant'].apply(lambda x: x.strip('fraud_'))
-    
-#     ## `merchants` reference table
-#     merchant_cols = ['merchant']
-#     merchants_df = raw_df[merchant_cols].value_counts().index.to_frame()
-#     merchants_df.index = pd.Index(np.arange(1, len(merchants_df)+1),
-#                                   name='merchant_id')
-    
-#     ## compute merchant victim status
-#     merch_victim = pd.merge(raw_df[merchant_cols + ['is_fraud']],
-#                             merchants_df.assign(merchant_id=merchants_df.index),
-#                             how='left', on=merchant_cols)
-#     merch_victim = merch_victim[['is_fraud', 'merchant_id']] \
-    
-#     ## add fraudster status to merchants table
-#     merch_fraud_victim = merch_victim.groupby('merchant_id').any() \
-#                                      .rename({'is_fraud': 'merch_fraud_victim'}, axis=1)
-#     merchants_df = merchants_df.join(merch_fraud_victim, validate='one_to_one')
-#     return merchants_df
-
-
-# def create_customers_df()-> pd.DataFrame:
-    
-#     ## `customer` reference table
-#     customer_cols = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
-#                      'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob']
-#     customers_df = raw_df[customer_cols].value_counts().index.to_frame()
-#     customers_df.index = pd.Index(np.arange(1, len(customers_df)+1),
-#                                   name='customer_id')
-    
-#     ## compute customer fraudster status
-#     cust_fraud = pd.merge(raw_df[customer_cols + ['is_fraud']],
-#                           customers_df.assign(customer_id=customers_df.index),
-#                           how='left', on=customer_cols)
-#     cust_fraud = cust_fraud[['is_fraud', 'customer_id']]
-    
-#     ## add fraudster status to customers table
-#     cust_fraudster = cust_fraud.groupby('customer_id').any() \
-#                                .rename({'is_fraud': 'cust_fraudster'}, axis=1)
-#     customers_df = customers_df.join(cust_fraudster, validate='one_to_one')
-
+CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
+                 'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob']
+MERCHANT_COLS = ['merchant']
 
 # =============================================================================
 # 
 # =============================================================================
 
-def process_transaction():
-    pass
+def merchant_features(transaction: pd.Series, engine)-> dict:
+    """
+    !!!
+
+    Parameters
+    ----------
+    transaction : pd.Series
+        DESCRIPTION.
+    engine : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    merch_filt = dict(transaction[MERCHANT_COLS])
+    merch_filt['merchant'] = merch_filt['merchant'].strip('fraud_')
+
+    statement = (
+        select(Merchant.merchant_id, Merchant.merch_fraud_victim)
+        .filter_by(**merch_filt)
+    )
+    with Session(engine) as session:
+        merch_features = session.execute(statement).all()[0]
+    return {'merchant_id': merch_features[0],
+            'merch_fraud_victim': merch_features[1]}
+
+
+def customer_features(transaction: pd.Series, engine)-> dict:
+    """
+    !!!
+
+    Parameters
+    ----------
+    transaction : pd.Series
+        DESCRIPTION.
+    engine : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    cust_filt = dict(transaction[CUSTOMER_COLS])
+    cust_filt['cc_num'] = str(cust_filt['cc_num'])
+
+    statement = (
+        select(Customer.customer_id, Customer.cust_fraudster)
+        .filter_by(**cust_filt)
+    )
+    with Session(engine, future=True) as session:
+        cust_features = session.execute(statement).all()[0]
+    return {'customer_id': cust_features[0],
+            'cust_fraudster': cust_features[1]}
+
+
+def fraud_detection_features(transaction: pd.Series,
+                             merchant_features: dict,
+                             customer_features: dict)-> dict:
+    """
+    !!!
+
+    Parameters
+    ----------
+    transaction : pd.Series
+        DESCRIPTION.
+    merchant_features : dict
+        DESCRIPTION.
+    customer_features : dict
+        DESCRIPTION.
+
+    Returns
+    -------
+    dict
+        DESCRIPTION.
+
+    """
+    ts = transaction['current_time']//1000
+    day_time = ts % 86400
+    ts = datetime.fromtimestamp(ts)
+    features = {
+        'month': ts.month,
+        'weekday': ts.weekday(),
+        'day_time': day_time,
+        'amt': float(transaction['amt']),
+        'category': transaction['category'],
+        'cust_fraudster': customer_features['cust_fraudster'],
+        'merch_fraud_victim': merchant_features['merch_fraud_victim'],
+        'cos_day_time': np.cos(2*np.pi*day_time/86400),
+        'sin_day_time': np.sin(2*np.pi*day_time/86400),
+        }
+    
+    return features
+
+
+def transaction_entry(transaction: pd.Series,
+                      transaction_id: int,
+                      merchant_features: dict,
+                      customer_features: dict,
+                      fraud_risk: bool)-> dict:
+    """
+    !!!
+
+    Parameters
+    ----------
+    transaction : pd.Series
+        DESCRIPTION.
+    merchant_features : dict
+        DESCRIPTION.
+    customer_features : dict
+        DESCRIPTION.
+
+    Returns
+    -------
+    dict
+        DESCRIPTION.
+
+    """
+    ts = transaction['current_time']//1000
+    day_time = ts % 86400
+    ts = datetime.fromtimestamp(ts)
+    
+    entry = {'transaction_id': transaction_id,
+             'timestamp': ts.isoformat(),
+             'month': ts.month,
+             'weekday': ts.weekday(),
+             'day_time': day_time,
+             'amt': float(transaction['amt']),
+             'category': transaction['category'],
+             'fraud_risk': fraud_risk}
+    entry.update(customer_features)
+    entry.update(merchant_features)
+    
+    return Transaction(**entry)
 
 

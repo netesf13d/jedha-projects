@@ -92,13 +92,12 @@ class Transaction(Base):
     timestamp: Mapped[datetime]
     month: Mapped[int]
     weekday: Mapped[int]
-    day_time: Mapped[int]
+    day_time: Mapped[float]
     amt: Mapped[float]
     category: Mapped[str]
     cust_fraudster: Mapped[bool]
     merch_fraud_victim: Mapped[bool]
-    is_fraud: Mapped[int]
-    fraud_risk: Mapped[int]
+    fraud_risk: Mapped[bool]
     
     def __repr__(self):
         str_ = (
@@ -113,7 +112,6 @@ class Transaction(Base):
             f"category={self.category!r}, "
             f"cust_fraudster={self.cust_fraudster!r}, "
             f"merch_fraud_victim={self.merch_fraud_victim!r}, "
-            f"is_fraud={self.is_fraud!r}, "
             f"fraud_risk={self.fraud_risk!r})"
         )
         return str_

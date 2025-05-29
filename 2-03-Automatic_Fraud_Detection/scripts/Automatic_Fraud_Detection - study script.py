@@ -627,7 +627,7 @@ X_tr, X_test, y_tr, y_test = train_test_split(
 
 
 ## Column preprocessing for continuous function models (eg logistic regression)
-func_cat_vars = ['month', 'weekday', 'category']
+func_cat_vars = ['weekday', 'category']
 func_bool_vars = ['cust_fraudster', 'merch_fraud_victim']
 func_quant_vars = ['amt', 'cos_day_time', 'sin_day_time']
 
@@ -641,7 +641,7 @@ func_col_preproc = ColumnTransformer(
 
 
 ## Column preprocessing for decision tree-derived models
-tree_cat_vars = ['month', 'weekday', 'category']
+tree_cat_vars = ['weekday', 'category']
 tree_bool_vars = ['cust_fraudster', 'merch_fraud_victim']
 tree_quant_vars = ['amt', 'day_time']
 
@@ -920,7 +920,8 @@ We select this parameter by cross validation.
 ## Grid search of the L2 regularization parameter with cross validation
 scoring = ('precision',  'recall', 'f1')
 l2_reg_vals = np.logspace(-3, 3, 19)
-base_hgb = HistGradientBoostingClassifier(categorical_features=np.arange(5),
+n_cat = len(tree_cat_vars) + len(tree_bool_vars)
+base_hgb = HistGradientBoostingClassifier(categorical_features=np.arange(n_cat),
                                           random_state=1234)
 hgb_clf = Pipeline(
     [('column_preprocessing', tree_col_preproc),
@@ -997,7 +998,7 @@ for our final histogram-based gradient boosting model.
 hgb_model = Pipeline(
     [('column_preprocessing', tree_col_preproc),
      ('regressor', HistGradientBoostingClassifier(l2_regularization=3,
-                                                  categorical_features=np.arange(5),
+                                                  categorical_features=np.arange(n_cat),
                                                   random_state=1234))]
 )
 

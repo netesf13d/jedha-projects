@@ -1,21 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-
+!!!
 """
 
-import csv
 import os
 
 import httpx
+import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine, URL, inspect
-from sqlalchemy import select
+from psycopg2.extensions import register_adapter, AsIs
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from engine import check_environment_vars
-from engine import get_root, get_transaction
+from engine import get_root, get_transaction, detect_fraud
 from engine import Base, Merchant, Customer, Transaction
+from engine import (customer_features, merchant_features,
+                    fraud_detection_features, transaction_entry)
 
+
+register_adapter(np.float64, AsIs)
+register_adapter(np.int64, AsIs)
+
+
+FRAUD_MODEL = 'random-forest'
 
 
 # =============================================================================
@@ -38,42 +46,73 @@ engine = create_engine(os.environ['DATABASE_URI'], echo=False)
 Base.metadata.create_all(engine)
 
 
-# !!! check ref tables
 ## Add merchants and customers table content to database if not present
-# merchants_df = pd.read_csv('./merchants_table.csv')
-# merchants = [dict(row[1]) for row in merchants_df.iterrows()]
-# customers_df = pd.read_csv('./customers_table.csv')
-# customers = [dict(row[1]) for row in customers_df.iterrows()]
-# with Session(engine) as session:
-#     session.add_all(merchants)
-#     session.commit()
-#     session.add_all(customers)
-#     session.commit()
+with Session(engine) as session:
+    n_merchants = session.query(Merchant).count()
+    n_customers = session.query(Customer).count()
 
+if n_merchants < 693:
+    print('Setting up `merchants` table...')
+    merchants_df = pd.read_csv('./merchants_table.csv')
+    merchants = [Merchant(**dict(row[1])) for row in merchants_df.iterrows()]
+    with Session(engine) as session:
+        session.add_all(merchants)
+        session.commit()
+print('Table `merchants` set')
 
-# !!!
+if n_customers < 924:
+    print('Setting up `customers` table...')
+    customers_df = pd.read_csv('./customers_table.csv')
+    customers = [Customer(**dict(row[1])) for row in customers_df.iterrows()]
+    with Session(engine) as session:
+        session.add_all(customers)
+        session.commit()
+print('Table `customers` set')
+
+        
+
 ## Get last transaction id, initialize to 1 if `transactions` table is empty
-transaction_id = 1
+statement = select(Transaction.transaction_id)
+with Session(engine) as session:
+    transact_ids = session.execute(statement).all()
+transaction_id = 1 if not transact_ids else max(transact_ids) + 1
+print(f'Initialization with transaction id = {transaction_id}')
 
 
+# =============================================================================
+# Get transactions
+# =============================================================================
+
+CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
+                 'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob']
+MERCHANT_COLS = ['merchant']
 
 
+try:
+    transaction = get_transaction(os.environ['TRANSACTIONS_API_URI'])
+except httpx.HTTPError as e:
+    print(f"Error fetching transaction: {e}")
+else:
+    transaction = pd.DataFrame(**transaction).iloc[0]
+print(transaction)
 
+merch_features = merchant_features(transaction, engine)
+cust_features = customer_features(transaction, engine)
 
-# # =============================================================================
-# # Get transactions
-# # =============================================================================
+pred_features = fraud_detection_features(
+    transaction, merch_features, cust_features)
 
-# try:
-#     transaction = get_transaction()
-# except httpx.HTTPError as e:
-#     print(f"Error fetching transaction: {e}")
-# else:
-#     transaction = pd.DataFrame(**transaction)
+fraud_risk = detect_fraud(os.environ['FRAUD_DETECTION_API_URI'],
+                          FRAUD_MODEL, pred_features)
 
+transaction_out = transaction_entry(transaction, transaction_id,
+                                    merch_features, cust_features,
+                                    fraud_risk)
+with Session(engine) as session:
+    session.add(transaction_out)
+    session.commit()
+    transaction_id += 1
 
+## close the engine gracefully
+engine.dispose()
 
-
-
-## close database connection gracefully
-# engine.dispose()

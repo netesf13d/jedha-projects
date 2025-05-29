@@ -73,7 +73,7 @@ X_tr, X_test, y_tr, y_test = train_test_split(
 
 
 ## Column preprocessing
-cat_vars = ['month', 'weekday', 'category']
+cat_vars = ['weekday', 'category']
 bool_vars = ['cust_fraudster', 'merch_fraud_victim']
 quant_vars = ['amt', 'cos_day_time', 'sin_day_time']
 
