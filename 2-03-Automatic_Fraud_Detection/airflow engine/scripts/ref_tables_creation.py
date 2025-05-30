@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Sript to prepare and save the `merchants` and `customers` tables from the raw
+Script to prepare and save the `merchants` and `customers` tables from the raw
 transactions data. The tables are saved as csv files.
 """
 

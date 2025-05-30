@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 !!!
+Run the fraud detection pipeline with a single transaction
 """
 
 import os
@@ -12,10 +13,10 @@ from psycopg2.extensions import register_adapter, AsIs
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from engine import check_environment_vars
-from engine import get_root, get_transaction, detect_fraud
-from engine import Base, Merchant, Customer, Transaction
-from engine import (customer_features, merchant_features,
+from core import check_environment_vars
+from core import get_root, get_transaction, detect_fraud
+from core import Base, Merchant, Customer, Transaction
+from core import (customer_features, merchant_features,
                     fraud_detection_features, transaction_entry)
 
 
@@ -27,7 +28,7 @@ FRAUD_MODEL = 'random-forest'
 
 
 # =============================================================================
-# Connect to / create database
+# Check environment variables and API servers
 # =============================================================================
 
 os.environ['TRANSACTIONS_API_URI'] = 'https://charlestng-real-time-fraud-detection.hf.space/'
@@ -40,6 +41,10 @@ except FileNotFoundError:
     pass
 check_environment_vars()
 
+
+# =============================================================================
+# Connect to / create database
+# =============================================================================
 
 ## setup SQL engine and connect to database
 engine = create_engine(os.environ['DATABASE_URI'], echo=False)
@@ -80,13 +85,8 @@ print(f'Initialization with transaction id = {transaction_id}')
 
 
 # =============================================================================
-# Get transactions
+# Process transactions
 # =============================================================================
-
-CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
-                 'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob']
-MERCHANT_COLS = ['merchant']
-
 
 try:
     transaction = get_transaction(os.environ['TRANSACTIONS_API_URI'])

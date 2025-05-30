@@ -97,7 +97,7 @@ class Transaction(Base):
     category: Mapped[str]
     cust_fraudster: Mapped[bool]
     merch_fraud_victim: Mapped[bool]
-    fraud_risk: Mapped[bool]
+    fraud_risk: Mapped[bool | None]
     
     def __repr__(self):
         str_ = (

@@ -124,7 +124,7 @@ async def test()-> int:
 @app.get('/fraud_detection_models', tags=['Models info'])
 async def get_pricing_models()-> list[str]:
     """
-    Get the pricing models available from the MLflow server.
+    Get the fraud detection models available from the MLflow server.
     """
     return list(models)
 
@@ -135,8 +135,7 @@ async def predict(model_name: str,
                                   Body(examples=prediction_examples)]
                   )-> dict[str, int]:
     """
-    !!!
-    Evaluate a car rental price using the selected model.
+    Evaluate the faud risk with the selected model.
     """
     input_features = pd.DataFrame.from_records([dict(data)])
 
