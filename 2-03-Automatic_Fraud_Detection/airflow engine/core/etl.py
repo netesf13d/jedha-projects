@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 TDOD doc
+!!!
 """
 
 from datetime import datetime
 
 import numpy as np
-import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,7 @@ MERCHANT_COLS = ['merchant']
 # 
 # =============================================================================
 
-def merchant_features(transaction: pd.Series, engine)-> dict:
+def merchant_features(transaction: dict, engine)-> dict:
     """
     !!!
 
@@ -37,7 +37,7 @@ def merchant_features(transaction: pd.Series, engine)-> dict:
     None.
 
     """
-    merch_filt = dict(transaction[MERCHANT_COLS])
+    merch_filt = {col: transaction[col] for col in MERCHANT_COLS}
     merch_filt['merchant'] = merch_filt['merchant'].strip('fraud_')
 
     statement = (
@@ -50,7 +50,7 @@ def merchant_features(transaction: pd.Series, engine)-> dict:
             'merch_fraud_victim': merch_features[1]}
 
 
-def customer_features(transaction: pd.Series, engine)-> dict:
+def customer_features(transaction: dict, engine)-> dict:
     """
     !!!
 
@@ -66,7 +66,7 @@ def customer_features(transaction: pd.Series, engine)-> dict:
     None.
 
     """
-    cust_filt = dict(transaction[CUSTOMER_COLS])
+    cust_filt = {col: transaction[col] for col in CUSTOMER_COLS}
     cust_filt['cc_num'] = str(cust_filt['cc_num'])
 
     statement = (
@@ -79,7 +79,7 @@ def customer_features(transaction: pd.Series, engine)-> dict:
             'cust_fraudster': cust_features[1]}
 
 
-def fraud_detection_features(transaction: pd.Series,
+def fraud_detection_features(transaction: dict,
                              merchant_features: dict,
                              customer_features: dict)-> dict:
     """
@@ -118,7 +118,7 @@ def fraud_detection_features(transaction: pd.Series,
     return features
 
 
-def transaction_entry(transaction: pd.Series,
+def transaction_entry(transaction: dict,
                       transaction_id: int,
                       merchant_features: dict,
                       customer_features: dict,

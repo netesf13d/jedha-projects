@@ -13,8 +13,9 @@ ENV AWS_DEFAULT_REGION=eu-west-1
 # Switch user
 USER root
 
-# COPY DAGS
-COPY ./dags /opt/airflow/dags # !!!!!!!!!!!!!
+# Copy DAGs and engine core
+COPY ./core /opt/airflow/core
+COPY ./airflow_dags.py /opt/airflow/
 
 # Change the UID of airflow user to 1000
 RUN usermod -u 1000 airflow
@@ -24,7 +25,7 @@ USER airflow
 
 # Install any additional dependencies if needed
 COPY requirements.txt requirements.txt 
-RUN pip install -r requirements.txt
+RUN pip install apache-airflow==${AIRFLOW_VERSION} -r requirements.txt
 
 # Initialize the Airflow database (PostgreSQL in this case)
 # IF YOU WANT TO HAVE THAT RUNNING IN HUGGINGFACE, YOU NEED TO HARD CODE THE VALUE HERE UNFORTUNATELY
@@ -33,6 +34,8 @@ RUN pip install -r requirements.txt
 # SO MAKE SURE YOUR SPACE IS PRIVATE
 ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=$AIRFLOW_BACKEND_URI
 
+# Clean and reset the backend database
+RUN airflow db clean --skip-archive
 RUN airflow db init
 
 # Create default admin user for Airflow (username: admin, password: admin)

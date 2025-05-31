@@ -177,110 +177,43 @@ st.caption('Data provided by [Jedha](https://jedha.co)')
 
 # st.write(cancellation_rates) # test
 
-tab_delay, tab_pricing = st.tabs(['Rental delay analysis', 'Car pricing'])
 
 
-########## Rental delay tab ##########
-with tab_delay:
-    st.markdown('#### Car rental delay analysis')
+col_plot, col_table = st.columns([1, 0.5], gap='medium')
 
-    col_plot, col_table = st.columns([1, 0.5], gap='medium')
+with col_plot:
 
-    with col_plot:
+    ## Mobile checkin plot
+    n0 = delay_info_df.loc['Baseline cancel nb', 'mobile']
+    p0 = delay_info_df.loc['Baseline cancel rate', 'mobile']
+    mobile_fig = rental_delay_chart(
+        rental_delays, cancel_rates['mobile'], p0, n0, 0.08, 0.12)
+    mobile_fig.update_layout(
+        title={'text': 'Mobile checkin', 'y':0.94, 'x':0.5},)
+    st.plotly_chart(mobile_fig, key='mobile_chart', theme=None,
+                    use_container_width=True)
 
-        ## Mobile checkin plot
-        n0 = delay_info_df.loc['Baseline cancel nb', 'mobile']
-        p0 = delay_info_df.loc['Baseline cancel rate', 'mobile']
-        mobile_fig = rental_delay_chart(
-            rental_delays, cancel_rates['mobile'], p0, n0, 0.08, 0.12)
-        mobile_fig.update_layout(
-            title={'text': 'Mobile checkin', 'y':0.94, 'x':0.5},)
-        st.plotly_chart(mobile_fig, key='mobile_chart', theme=None,
-                        use_container_width=True)
-
-        ## Getaround connect checkin plot
-        n0 = delay_info_df.loc['Baseline cancel nb', 'connect']
-        p0 = delay_info_df.loc['Baseline cancel rate', 'connect']
-        getaround_fig = rental_delay_chart(
-            rental_delays, cancel_rates['connect'], p0, n0, 0.14, 0.18)
-        getaround_fig.update_layout(
-            title={'text': 'Getaround connect checkin', 'y':0.94, 'x':0.5},)
-        st.plotly_chart(getaround_fig, key='getaround_chart', theme=None,
-                        use_container_width=True)
+    ## Getaround connect checkin plot
+    n0 = delay_info_df.loc['Baseline cancel nb', 'connect']
+    p0 = delay_info_df.loc['Baseline cancel rate', 'connect']
+    getaround_fig = rental_delay_chart(
+        rental_delays, cancel_rates['connect'], p0, n0, 0.14, 0.18)
+    getaround_fig.update_layout(
+        title={'text': 'Getaround connect checkin', 'y':0.94, 'x':0.5},)
+    st.plotly_chart(getaround_fig, key='getaround_chart', theme=None,
+                    use_container_width=True)
 
 
-    with col_table:
-        # Rental delay slider
-        rental_delay = st.slider('Rental delay (minutes)',
-                                 min_value=-400, max_value=400, value=0, step=2)
+with col_table:
+    # Rental delay slider
+    rental_delay = st.slider('Rental delay (minutes)',
+                             min_value=-400, max_value=400, value=0, step=2)
 
-        # Rental delay summary table
-        delay_info_container = st.empty()
+    # Rental delay summary table
+    delay_info_container = st.empty()
 
 
 
-########## Car pricing tab ##########
-with tab_pricing:
-    st.markdown('#### Car rental pricing')
-
-    # Categorical variables
-    cols_categ = st.columns(4, gap='medium')
-    with cols_categ[0]:
-        model_key = st.selectbox("Car model", categories['model_key'],
-                                 key='car_model', disabled=not api_available)
-    with cols_categ[1]:
-        car_type = st.selectbox("Car type", categories['car_type'],
-                                key='car_type', disabled=not api_available)
-    with cols_categ[2]:
-        fuel = st.selectbox("Fuel", categories['fuel'], key='fuel',
-                            disabled=not api_available)
-    with cols_categ[3]:
-        paint_color = st.selectbox("Paint color", categories['paint_color'],
-                                   key='paint', disabled=not api_available)
-
-    # Boolean variables
-    cols_bool = st.columns(7, gap='medium')
-    with cols_bool[0]:
-        private_parking = st.checkbox('Private parking', value=False,
-                                     disabled=not api_available)
-    with cols_bool[1]:
-        gps = st.checkbox('GPS', value=False, disabled=not api_available)
-    with cols_bool[2]:
-        air_conditioning = st.checkbox('Air conditioning', value=False,
-                                       disabled=not api_available)
-    with cols_bool[3]:
-        automatic_car = st.checkbox('Automatic car', value=False,
-                                    disabled=not api_available)
-    with cols_bool[4]:
-        getaround_connect = st.checkbox('Getaround connect', value=False,
-                                        disabled=not api_available)
-    with cols_bool[5]:
-        speed_regulator = st.checkbox('Speed regulator', value=False,
-                                      disabled=not api_available)
-    with cols_bool[6]:
-        winter_tires = st.checkbox('Winter tires', value=False,
-                                   disabled=not api_available)
-
-    # Quantitative variables
-    cols_quant = st.columns(2, gap='large')
-    with cols_quant[0]:
-        engine_power = st.number_input('Engine power', min_value=0, value=100,
-                                       disabled=not api_available)
-    with cols_quant[1]:
-        mileage = st.number_input('Mileage', min_value=0, value=100_000,
-                                  disabled=not api_available)
-
-    st.divider()
-
-    col_model, col_pricing = st.columns([0.5, 1], gap='medium')
-    # Select pricing model
-    with col_model:
-        pricing_model = st.selectbox(
-            "Pricing model", pricing_models, key='pricing_model',
-            disabled=not api_available)
-    # Pricing recommendation
-    with col_pricing:
-        rental_price_container = st.empty()
 
 
 # =============================================================================
@@ -291,31 +224,3 @@ with delay_info_container:
     delay_info_df = update_delay_info(df, p_cancel, time_bins,
                                       delay_info_df, rental_delay)
     delay_info_table = st.table(delay_info_df)
-
-if api_available:
-    data = {"model_key": model_key,
-            "mileage": mileage,
-            "engine_power": engine_power,
-            "fuel": fuel,
-            "paint_color": paint_color,
-            "car_type": car_type,
-            "private_parking_available": private_parking,
-            "has_gps": gps,
-            "has_air_conditioning": air_conditioning,
-            "automatic_car": automatic_car,
-            "has_getaround_connect": getaround_connect,
-            "has_speed_regulator": speed_regulator,
-            "winter_tires": winter_tires}
-    rental_price = 100
-
-    ## fetch a new rental price only if necessary
-    if (pricing_model != st.session_state['curr_model']
-        or data != st.session_state['curr_data']):
-        rental_price = get_pricing(API_URL, pricing_model, data)
-        st.session_state['curr_model'] = pricing_model
-        st.session_state['curr_data'] = data
-
-    with rental_price_container:
-        st.html('<p style="font-size:20px;">Recommended price : '
-                f'{rental_price:.2f}</p>')
-

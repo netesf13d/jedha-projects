@@ -1,0 +1,6 @@
+httpx == 0.28
+mlflow == 2.21
+streamlit == 1.43
+numpy == 2.2
+pandas == 2.2.3
+plotly == 6.0

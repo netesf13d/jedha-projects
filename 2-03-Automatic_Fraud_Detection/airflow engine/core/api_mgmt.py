@@ -4,18 +4,18 @@
 """
 
 import json
-# from datetime import datetime, UTC
 
 import httpx
 import numpy as np
 
 
 
-def get_root(api_url: str)-> dict[str, dict[str, float | int]]:
+def probe_transaction_api(api_url: str)-> str:
     """
     Probe the transaction API endpoint. Return the contents of the main page.
     """
-    r = httpx.get(api_url, follow_redirects=True)
+    r = httpx.get(api_url, follow_redirects=True,
+                  timeout=httpx.Timeout(3, read=None))
     raw_data = r.raise_for_status().text
     return raw_data
 
@@ -41,9 +41,17 @@ def get_transaction(api_url: str)-> tuple[str, dict[str, list]]:
                   follow_redirects=True,
                   timeout=httpx.Timeout(10, read=None))
     raw_data = r.raise_for_status().text
-    # return (datetime.now(tz=UTC).isoformat(),
     return json.loads(json.loads(raw_data))
 
+
+def probe_fraud_detection_api(api_url: str)-> dict[str, int]:
+    """
+    Probe the fraud detection API endpoint.
+    """
+    r = httpx.get(f'{api_url.strip("/")}/test', follow_redirects=True,
+                  timeout=httpx.Timeout(3, read=None))
+    raw_data = r.raise_for_status().text
+    return raw_data
 
 
 def detect_fraud(api_url: str,
