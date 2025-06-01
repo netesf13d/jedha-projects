@@ -90,18 +90,18 @@ It is of course recommended to avoid redundancy by selecting a single tool for a
 \subsection*{Overview of the Pilot Implementation}
 
 \textbf{Objective of the Pilot:}\\
-To validate the effectiveness of the new Data Governance Framework of Spotify by applying it to the user data domain. The rationale behind this choice is that user data is central to key components of the governance plan: compliance, quality and security. This dataset includes user interactions such as play history, search behavior, and playlist creation. The pilot aims to enhance data quality, ensure GDPR/CCPA compliance, and improve internal accessibility and reliability of engagement insights.
+To validate the effectiveness of the new Data Governance Framework of Spotify by applying it to the user data domain. The rationale behind this choice is that user data is central to key components of the governance plan: compliance, quality and security. The dataset considered includes personal information (e.g., phone number, banking information) and user interactions (e.g., play history, search behavior, playlist creation). The pilot aims to enhance data quality, ensure GDPR/CCPA compliance, and improve internal accessibility and reliability of engagement insights.
 
-\textbf{Scope of the Pilot:}\\
-The pilot will focus on the User Engagement Data used by the Product, Marketing, and Analytics teams to assess content performance and drive personalization strategies.
+\noindent\textbf{Scope of the Pilot:}\\
+The pilot will focus on the user data domain. The rationale behind this choice is that user data is central to key components of the governance plan: compliance, quality and security.
 
 
 \subsection*{Key Goals}
 
 \begin{itemize}[itemsep=5pt, parsep=0pt]
-	\item \textbf{Improve Data Quality} (accuracy, completeness, consistency) in engagement records
-	\item \textbf{Ensure Compliance} with GDPR/CCPA for user behavior data
-	\item \textbf{Streamline Access} to clean, governed engagement data for authorized staff
+	\item \textbf{Improve Data Quality} (accuracy, completeness, consistency) in data records
+	\item \textbf{Ensure Compliance} with GDPR/CCPA for user data
+	\item \textbf{Streamline Access} to clean, governed data for authorized staff
 	\item \textbf{Mitigate Risks} associated with personal data misuse or poor data quality
 \end{itemize}
 
@@ -120,7 +120,7 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 			- & Pilot Project Manager & Oversees pilot execution, coordination, and reporting \\
 			- & Data Steward & Manages quality and documentation of engagement data \\
 			- & Data Protection Officer (DPO) & Conducts privacy audits and ensures GDPR/CCPA compliance \\
-			- & Data Analyst Engineer & Implements quality monitoring and access control tools \\
+			- & IT Engineer / Data Analyst & Implements quality monitoring and access control tools \\
 			- & Product Department Lead & Aligns implementation with product strategy and insights \\
 			\bottomrule
 		\end{tabularx}
@@ -129,6 +129,8 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 
 
 \subsection*{Timeline and Milestones}
+
+Important steps of pilot implementation are given below. They should be completed in 3-6 months.
 
 \begin{table}[ht]
 	\centering
@@ -154,24 +156,33 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 \subsection*{Key Deliverables}
 
 \begin{itemize}[itemsep=5pt, parsep=0pt]
-	\item \textbf{Data Quality} Report (before/after metrics for missing/duplicate/inconsistent data)
-	\item \textbf{Compliance Assessment} of engagement data processing practices
-	\item \textbf{Integration Plan} for user engagement data across product and analytics teams
-	\item \textbf{Risk Assessment} Report for data security and exposure
+	\item \textbf{Data Quality Report} (before/after metrics for missing/duplicate/inconsistent data)
+	\item \textbf{Compliance Assessment Report} of data processing practices
+	\item \textbf{Technical Integration Plan} for data across product and analytics teams
+	\item \textbf{Risk Assessment Report} for data security and exposure, with mitigation strategies
 	\item \textbf{Stakeholder Feedback Summary} with insights from product managers and analysts
 \end{itemize}
 
 
 \subsection*{Key Performance Indicators (KPIs)}
 
+\noindent\textbf{Compliance:}
 \begin{itemize}[itemsep=5pt, parsep=0pt]
 	\item 100\% GDPR/CCPA consent tracking on the dataset
-	\item 20\% faster access to engagement insights via data catalog
 	\item 0 security incidents involving personal data during the pilot
 	\item 90\% service-level agreement compliance on data subject requests
-%	\item 80\% data literacy training adoption in pilot teams
+\end{itemize}
+
+\noindent\textbf{Data Quality:}
+\begin{itemize}[itemsep=5pt, parsep=0pt]
 	\item 10\% reduction in missing or inaccurate user interaction logs
-	\item less than 3\% data quality error rate in governed domain
+	\item < 3\% data quality error rate in governed domain
+\end{itemize}
+
+\noindent\textbf{Performance improvement:}
+\begin{itemize}[itemsep=5pt, parsep=0pt]
+	\item 20\% faster access to engagement insights via data catalog
+	\item 80\% data literacy training adoption in pilot teams
 \end{itemize}
 
 
@@ -188,7 +199,7 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 			\midrule
 			Non-compliance with regulations & Medium & High & Weekly audits and DPO signoff \\
 			Team resistance to new processes & High & Medium & Stakeholder workshops and clear benefit framing \\
-			Metadata gaps in engagement data & Medium & High & Pre-pilot documentation sprint \\
+			Unresolved data quality issues & Medium & High & Pre-pilot documentation sprint; Regular monitoring and review \\
 			Technical integration complexity & Medium & High & IT involvement in early scoping \\
 			\bottomrule
 		\end{tabularx}
@@ -217,8 +228,8 @@ The pilot will focus on the User Engagement Data used by the Product, Marketing,
 \subsection*{Next Steps}
 
 \begin{itemize}[itemsep=5pt, parsep=0pt]
-	\item \textbf{Scaling Plan:} Expand framework to cover Marketing Data and Content Metadata
-	\item \textbf{Adjustments:} Update metadata standards and training materials based on pilot outcomes
+	\item \textbf{Scaling Plan:} Expand framework to cover the other data domains (e.g., Marketing Data and Content Metadata)
+	\item \textbf{Adjustments:} Update standards and training materials based on pilot outcomes
 	\item \textbf{Full Rollout Proposal:} Present refined strategy and timeline to the Data Governance Committee
 \end{itemize}
 
