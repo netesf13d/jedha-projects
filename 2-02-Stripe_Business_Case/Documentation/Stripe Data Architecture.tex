@@ -93,7 +93,14 @@ We present in table~\ref{table:providers} a list of possible providers for the v
 \clearpage
 \section*{Reference Database}
 
-Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification. We present in table~\ref{table:ReferenceDataDict} a data dictionary for some tables in the reference database.
+Slowly changing or static reference data (e.g. country reference, merchant information, currency change rates) is stored in a reference database that serves as a single source of truth. The OLTP, OLAP and NoSQL systems incorporate a copy of the relevant reference tables for faster access. Central updates are propagated through change data capture (CDC). The data is subject to the security and compliance policy described below (e.g. encryption of merchant information). This approach has the advantage of a finer-grained monitoring and control of data access and modification. We present the reference database structure in figure~\ref{fig:Reference} along with the corresponding data dictionary in table~\ref{table:ReferenceDataDict}.
+
+\begin{figure}[!htb]
+	\centering
+	\includegraphics[scale=0.5]{./figures/Ref}
+	\caption{Proposed reference database structure.}
+	\label{fig:Reference}
+\end{figure}
 
 \begin{table}[!htb]
 	\centering
@@ -144,7 +151,7 @@ Our proposed OLTP architecture is presented in figure~\ref{fig:OLTP}, with the a
 
 \begin{figure}[!htb]
 	\centering
-	\includegraphics[scale=0.7]{./figures/OLTP}
+	\includegraphics[scale=0.6]{./figures/OLTP}
 	\caption{Proposed OLTP database structure.}
 	\label{fig:OLTP}
 \end{figure}
