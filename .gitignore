@@ -61,6 +61,4 @@ _.*/
 # temporary ignore #
 ####################
 versions.ipynb
-#2-01-Spotify_Data_Governance/
-#2-02-Automatic_Fraud_Detection/
-#2-03-Stripe_Business_Case/
+data_exploration.ipynb
