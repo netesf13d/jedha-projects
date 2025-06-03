@@ -21,7 +21,7 @@ def connect_to_database():
     !!!
     """
     from sqlalchemy import create_engine
-    from core import Base
+    from engine_core import Base
     
     engine = create_engine(os.environ['DATABASE_URI'], echo=False)
     Base.metadata.create_all(engine)
@@ -57,14 +57,14 @@ with DAG(
     
     @task('chk_env_vars')
     def check_env_vars():
-        from core import check_environment_vars
+        from engine_core import check_environment_vars
         check_environment_vars()
     
     
     @task(task_id='probe_transact_api')
     def probe_transact_api():
         from httpx import HTTPError
-        from core import probe_transaction_api
+        from engine_core import probe_transaction_api
         try:
             probe_transaction_api(os.environ['TRANSACTIONS_API_URI'])
         except HTTPError as e:
@@ -74,7 +74,7 @@ with DAG(
     @task(task_id='probe_fraud_api')
     def probe_fraud_api()-> bool:
         from httpx import HTTPError
-        from core import probe_fraud_detection_api
+        from engine_core import probe_fraud_detection_api
         try:
             probe_fraud_detection_api(os.environ['FRAUD_DETECTION_API_URI'])
         except HTTPError:
@@ -115,7 +115,7 @@ with DAG(
         """
         import pandas as pd
         from sqlalchemy.orm import Session
-        from core import Merchant, Customer
+        from engine_core import Merchant, Customer
         
         ## Add merchants and customers table content to database if not present
         with Session(engine) as session:
@@ -124,8 +124,9 @@ with DAG(
         
         if n_merchants < 693: # merchants table absent from database
             dag.log.info('Setting up `merchants` table...')
-            merchants_df = pd.read_csv('./merchants_table.csv')
-            merchants = [Merchant(**dict(row[1])) for row in merchants_df.iterrows()]
+            merchants_df = pd.read_csv(Variable.get(key='merchants_table_csv'))
+            merchants = [Merchant(**dict(row[1]))
+                         for row in merchants_df.iterrows()]
             with Session(engine) as session:
                 session.add_all(merchants)
                 session.commit()
@@ -133,8 +134,9 @@ with DAG(
         
         if n_customers < 924: # customers table absent from database
             dag.log.info('Setting up `customers` table...')
-            customers_df = pd.read_csv('./customers_table.csv')
-            customers = [Customer(**dict(row[1])) for row in customers_df.iterrows()]
+            customers_df = pd.read_csv(Variable.get(key='customers_table_csv'))
+            customers = [Customer(**dict(row[1]))
+                         for row in customers_df.iterrows()]
             with Session(engine) as session:
                 session.add_all(customers)
                 session.commit()
@@ -171,7 +173,7 @@ with DAG(
         """
         from sqlalchemy import func, select
         from sqlalchemy.orm import Session
-        from core import Transaction
+        from engine_core import Transaction
         
         statement = select(func.max(Transaction.transaction_id))
         with Session(engine) as session:
@@ -187,7 +189,7 @@ with DAG(
         """
         from httpx import HTTPError
         import pandas as pd
-        from core import get_transaction
+        from engine_core import get_transaction
         try:
             transaction = get_transaction(os.environ['TRANSACTIONS_API_URI'])
         except HTTPError as e:
@@ -201,7 +203,7 @@ with DAG(
         """
         !!!
         """
-        from core import customer_features, merchant_features
+        from engine_core import customer_features, merchant_features
         
         return {'merch_features': merchant_features(transaction, engine),
                 'cust_features': customer_features(transaction, engine)}
@@ -215,10 +217,14 @@ with DAG(
         """
         !!!
         """
-        from core import fraud_detection_features, detect_fraud
-        if Variable.get(key='fraud_api_available'):
+        from httpx import HTTPError
+        from engine_core import fraud_detection_features, detect_fraud
+        try:
             pred_features = fraud_detection_features(
                 transaction, merch_features, cust_features)
+        except HTTPError:
+            return
+        else:
             return detect_fraud(os.environ['FRAUD_DETECTION_API_URI'],
                                 fraud_model, pred_features)
     
@@ -232,7 +238,7 @@ with DAG(
         !!!
         """
         from sqlalchemy.orm import Session
-        from core import transaction_entry
+        from engine_core import transaction_entry
         
         import numpy as np
         from psycopg2.extensions import register_adapter, AsIs

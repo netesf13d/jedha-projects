@@ -16,12 +16,12 @@ from psycopg2.extensions import register_adapter, AsIs
 from sqlalchemy import create_engine, select, func
 from sqlalchemy.orm import Session
 
-from core import check_environment_vars
-from core import (probe_transaction_api, get_transaction,
-                  probe_fraud_detection_api, detect_fraud)
-from core import Base, Merchant, Customer, Transaction
-from core import (customer_features, merchant_features,
-                    fraud_detection_features, transaction_entry)
+from engine_core import check_environment_vars
+from engine_core import (probe_transaction_api, get_transaction,
+                         probe_fraud_detection_api, detect_fraud)
+from engine_core import Base, Merchant, Customer, Transaction
+from engine_core import (customer_features, merchant_features,
+                         fraud_detection_features, transaction_entry)
 
 
 register_adapter(np.float64, AsIs)

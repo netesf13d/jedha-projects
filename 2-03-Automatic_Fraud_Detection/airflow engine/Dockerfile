@@ -4,18 +4,18 @@ FROM apache/airflow:3.0.1
 # Set environment variables
 ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
-ENV AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
 ENV AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT=300
 ENV AIRFLOW__WEBSERVER__WORKER_CLASS=gevent
-ENV AIRFLOW__WEBSERVER__WEB_SERVER_PORT=$PORT
-ENV AWS_DEFAULT_REGION=eu-west-1
+ENV AIRFLOW__API__WEB_SERVER_PORT=7860
+# ENV AWS_DEFAULT_REGION=eu-west-1
 
 # Switch user
 USER root
 
 # Copy DAGs and engine core
-COPY ./core /opt/airflow/core
-COPY ./airflow_dags.py /opt/airflow/
+COPY ./engine_core /opt/airflow/dags/engine_core
+COPY ./airflow_dags.py /opt/airflow/dags/
 
 # Change the UID of airflow user to 1000
 RUN usermod -u 1000 airflow
@@ -24,7 +24,7 @@ RUN usermod -u 1000 airflow
 USER airflow
 
 # Install any additional dependencies if needed
-COPY requirements.txt requirements.txt 
+COPY requirements.txt .
 RUN pip install apache-airflow==${AIRFLOW_VERSION} -r requirements.txt
 
 # Initialize the Airflow database (PostgreSQL in this case)
@@ -35,21 +35,24 @@ RUN pip install apache-airflow==${AIRFLOW_VERSION} -r requirements.txt
 ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=$AIRFLOW_BACKEND_URI
 
 # Clean and reset the backend database
-RUN airflow db clean --skip-archive
-RUN airflow db init
+# RUN airflow db clean --skip-archive
+RUN airflow db migrate
 
 # Create default admin user for Airflow (username: admin, password: admin)
-RUN airflow users create \
-   --username admin \
-   --firstname Admin \
-   --lastname User \
-   --role Admin \
-   --email admin@example.com \
-   --password admin $ADMIN_PASSWORD
+#RUN airflow users create \
+#   --username admin \
+#   --firstname Admin \
+#   --lastname User \
+#   --role Admin \
+#   --email admin@example.com \
+#   --password test
+# $ADMIN_PASSWORD
+# default user : airflow
+# default password : airflow
 
 # Start Airflow webserver and scheduler within the same container
-CMD bash \
-    -c \
-    airflow scheduler \
-    & airflow webserver
-# CMD ["bash", "-c", "airflow scheduler & airflow webserver"]
+#CMD bash \
+#    -c \
+#    airflow scheduler \
+#    & airflow webserver
+CMD ["bash", "-c", "airflow scheduler & airflow api-server"]
