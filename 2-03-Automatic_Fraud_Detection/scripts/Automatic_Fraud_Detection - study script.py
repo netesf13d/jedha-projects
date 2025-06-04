@@ -27,6 +27,7 @@ from sklearn.ensemble import (RandomForestClassifier,
 """
 ## <a id="loading"></a> Data loading and preprocessing
 
+!!!
 
 
 https://www.kaggle.com/datasets/kartik2112/fraud-detection/
@@ -578,7 +579,7 @@ def eval_metrics(y_true: np.ndarray,
                  print_cm: bool = False,
                  print_f1: bool = False)-> None:
     """
-    Helper function that evaluates and return the relevant evaluation metrics:
+    Helper function to evaluate and return the relevant evaluation metrics:
         confusion matrix, precision, recall, F1-score
     """
     cm = confusion_matrix(y_true, y_pred)
