@@ -1,6 +1,8 @@
 httpx
+libsqlite
 numpy
 pandas
 psycopg2-binary
 pyarrow
 sqlalchemy
+sqlite

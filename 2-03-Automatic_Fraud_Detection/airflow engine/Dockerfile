@@ -5,17 +5,15 @@ FROM apache/airflow:3.0.1
 ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
-ENV AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT=300
-ENV AIRFLOW__WEBSERVER__WORKER_CLASS=gevent
-ENV AIRFLOW__API__WEB_SERVER_PORT=7860
-# ENV AWS_DEFAULT_REGION=eu-west-1
+ENV AIRFLOW__API__WORKER_TIMEOUT=300
+ENV AIRFLOW__API__PORT=7860
 
 # Switch user
 USER root
 
 # Copy DAGs and engine core
-COPY ./engine_core /opt/airflow/dags/engine_core
-COPY ./airflow_dags.py /opt/airflow/dags/
+COPY ./engine_core $AIRFLOW_HOME/dags/engine_core
+COPY ./airflow_dags.py $AIRFLOW_HOME/dags/
 
 # Change the UID of airflow user to 1000
 RUN usermod -u 1000 airflow
@@ -25,34 +23,38 @@ USER airflow
 
 # Install any additional dependencies if needed
 COPY requirements.txt .
-RUN pip install apache-airflow==${AIRFLOW_VERSION} -r requirements.txt
+RUN pip install apache-airflow==${AIRFLOW_VERSION} \
+    apache-airflow-providers-flask-appbuilder \
+    -r requirements.txt
+
+
+# !!! test
+RUN ls /opt/airflow -la
+
 
 # Initialize the Airflow database (PostgreSQL in this case)
-# IF YOU WANT TO HAVE THAT RUNNING IN HUGGINGFACE, YOU NEED TO HARD CODE THE VALUE HERE UNFORTUNATELY
-# DON'T STAGE THAT IN A PRIVATE REPO BECAUSE THE ENV VARIABLE IS HARD CODED IN PLAIN TEXT
-# IF YOU STAGE THAT IN HUGGING FACE SPACE, YOU DON'T HAVE A CHOICE THOUGH
-# SO MAKE SURE YOUR SPACE IS PRIVATE
-ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=$AIRFLOW_BACKEND_URI
+# or use default local sqlite database 
+RUN --mount=type=secret,id=AIRFLOW_BACKEND_URI,mode=0444,required=true \
+    export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=$(cat /run/secrets/AIRFLOW_BACKEND_URI)
+# ENV AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=$AIRFLOW_BACKEND_URI
+
+RUN echo $AIRFLOW__API__WORKER_TIMEOUT
 
 # Clean and reset the backend database
-# RUN airflow db clean --skip-archive
+# RUN airflow db reset
 RUN airflow db migrate
 
+
 # Create default admin user for Airflow (username: admin, password: admin)
-#RUN airflow users create \
+# auth_manager = airflow.providers.fab.auth_manager.FabAuthManager
+#RUN --mount=type=secret,id=AIRFLOW_BACKEND_URI,mode=0444,required=true \
+#   airflow users create \
 #   --username admin \
 #   --firstname Admin \
 #   --lastname User \
 #   --role Admin \
 #   --email admin@example.com \
-#   --password test
-# $ADMIN_PASSWORD
-# default user : airflow
-# default password : airflow
+#   --password $(cat /run/secrets/ADMIN_PASSWORD)
 
 # Start Airflow webserver and scheduler within the same container
-#CMD bash \
-#    -c \
-#    airflow scheduler \
-#    & airflow webserver
 CMD ["bash", "-c", "airflow scheduler & airflow api-server"]
