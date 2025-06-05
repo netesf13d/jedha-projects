@@ -15,12 +15,13 @@ RUN ./aws/install
 COPY requirements.txt /dependencies/requirements.txt
 RUN pip install -r /dependencies/requirements.txt
 
+# Not necessary with Huggingface
 ENV AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
 ENV AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 ENV BACKEND_STORE_URI=$BACKEND_STORE_URI
 ENV ARTIFACT_STORE_URI=$ARTIFACT_STORE_URI
 
-# Upgrade the database schema 
+# Upgrade the database schema (does not work with Hugging face)
 # RUN mlflow db upgrade $BACKEND_STORE_URI
 
 CMD mlflow server \
