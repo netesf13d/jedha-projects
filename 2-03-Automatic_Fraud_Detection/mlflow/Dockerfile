@@ -15,7 +15,7 @@ RUN ./aws/install
 COPY requirements.txt /dependencies/requirements.txt
 RUN pip install -r /dependencies/requirements.txt
 
-# Not necessary with Huggingface
+## Not necessary with Hugging face
 ENV AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
 ENV AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 ENV BACKEND_STORE_URI=$BACKEND_STORE_URI

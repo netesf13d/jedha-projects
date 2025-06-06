@@ -7,8 +7,7 @@ Airflow DAGs
 from datetime import datetime, timedelta
 import os
 
-from airflow.models import Variable
-from airflow.sdk import DAG, task
+from airflow.sdk import DAG, task, Variable
 
 
 # =============================================================================
@@ -42,8 +41,12 @@ def close_engine(engine):
 
 @task(task_id='chk_env_vars')
 def check_env_vars():
-    from engine_core import check_environment_vars
-    check_environment_vars()
+    try:
+        Variable.set(key='fraud_api_available', value=False)
+    except KeyError:
+        os.environ['DATABASE_URI'] = Variable.get('DATABASE_URI')
+        os.environ['TRANSACTIONS_API_URI'] = Variable.get('TRANSACTIONS_API_URI')
+        os.environ['FRAUD_DETECTION_API_URI'] = Variable.get('FRAUD_DETECTION_API_URI')
 
 
 @task(task_id='probe_transact_api')
@@ -69,15 +72,11 @@ def probe_fraud_api()-> bool:
 
 
 with DAG(
-    dag_id='check-environment',
+    dag_id='check_environment',
     description=('Check that all the necessary resources are present. '
                  'This DAG is to be triggered manually in case of problem.'),
-    default_args={
-        'owner': 'airflow',
-        "depends_on_past": False,
-        "retries": 1,
-        "retry_delay": timedelta(minutes=5),
-    },
+    max_active_runs=1,
+    default_args={'owner': 'admin', 'depends_on_past': False},
     schedule=None,
     catchup=False,
     tags=['config'],
@@ -129,16 +128,12 @@ def setup_reference_tables(
 
 
 with DAG(
-    dag_id='database-setup',
+    dag_id='setup_database',
     description=('Probe connection with the database, create schema, '
                  'load the reference tables. '
                  'This DAG is to be triggered manually.'),
-    default_args={
-        'owner': 'airflow',
-        "depends_on_past": False,
-        "retries": 1,
-        "retry_delay": timedelta(minutes=5),
-    },
+    max_active_runs=1,
+    default_args={'owner': 'admin', 'depends_on_past': False},
     schedule=None,
     catchup=False,
     tags=['database'],
@@ -244,19 +239,15 @@ def record_transaction(engine,
 with DAG(
     dag_id='process_transaction',
     description='Setup the database connection',
-    default_args={
-        'owner': 'airflow',
-        "depends_on_past": False,
-        "retries": 1,
-        "retry_delay": timedelta(minutes=5),
-    },
+    max_active_runs=1,
+    default_args={'owner': 'admin', 'depends_on_past': False},
     schedule=timedelta(seconds=20),
     start_date=datetime(1970, 1, 1),
     catchup=False,
     tags=['pipeline'],
 ) as dag:
     
-    _engine = connect_to_database
+    _engine = connect_to_database()
     _transaction_id = get_transaction_id(_engine)
     _transaction = fetch_transaction(_engine)
     _user_features = get_user_features(_engine, _transaction)

@@ -10,6 +10,11 @@ app_port: 7860
 ## Contents
 
 
+To [export the DAGs as images](https://airflow.apache.org/docs/apache-airflow/stable/howto/usage-cli.html#exporting-dags-structure-to-images) (here the DAG `process_transaction`):
+```bash
+ airflow dags show process-transaction --save process-transaction.png
+```
+
 
 ## Setup external ressources
 
@@ -44,12 +49,12 @@ The tracking server is deployed in an Huggingface space.
 
 1. Create a huggingface [space](https://huggingface.co/new-space). Choose `docker` as the software development kit.
 2. Transfer the contents of this directory: `Dockerfile`, `README.md`, `requirements.txt`.
-3. Setup the variables and secrets in the space's settings
-  - Secret `DATABASE_URI`,
+3. Setup the variables and secrets in the space's settings [here](https://airflow.apache.org/docs/apache-airflow/stable/howto/variable.html)
+  - Secret `AIRFLOW_VAR_DATABASE_URI`,
   - Secret `AIRFLOW_BACKEND_URI`, PostgreSQL database uri for Airflow.
   - Secret `ADMIN_PASSWORD`,
-  - Variable `TRANSACTIONS_API_URI`, 
-  - Variable `FRAUD_DETECTION_API_URI`,
+  - Variable `AIRFLOW_VAR_TRANSACTIONS_API_URI`, 
+  - Variable `AIRFLOW_VAR_FRAUD_DETECTION_API_URI`,
   - Variable `PORT`. Here the value is set to 7860, the default value (in any case, it must match the `app_port` config variable of the space).
 4. Run the space and set it public. It will be accessible at `https://{owner}-{your-space-name}.hf.space/`.
 
