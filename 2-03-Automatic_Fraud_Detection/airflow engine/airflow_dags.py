@@ -5,7 +5,6 @@ Airflow DAGs
 """
 
 from datetime import datetime, timedelta
-import os
 
 from airflow.sdk import DAG, task, Variable
 
@@ -22,7 +21,7 @@ def connect_to_database():
     from sqlalchemy import create_engine
     from engine_core import Base
     
-    engine = create_engine(os.environ['DATABASE_URI'], echo=False)
+    engine = create_engine(Variable.get('DATABASE_URI'), echo=False)
     Base.metadata.create_all(engine)
     return engine
 
@@ -41,30 +40,53 @@ def close_engine(engine):
 
 @task(task_id='chk_env_vars')
 def check_env_vars():
+    """
+    Check that the following variables are set in order to interact with
+    the database and APIs:
+    - `DATABASE_URI`: the URI of the postgreSQL database
+    - `TRANSACTIONS_API_URI`: the url of the API giving new transactions
+    - `FRAUD_DETECTION_API_URI`: the url of the fraud detection API
+    """
     try:
-        Variable.set(key='fraud_api_available', value=False)
+        Variable.get('DATABASE_URI')
     except KeyError:
-        os.environ['DATABASE_URI'] = Variable.get('DATABASE_URI')
-        os.environ['TRANSACTIONS_API_URI'] = Variable.get('TRANSACTIONS_API_URI')
-        os.environ['FRAUD_DETECTION_API_URI'] = Variable.get('FRAUD_DETECTION_API_URI')
+        raise KeyError('transaction storage database variable '
+                       '`DATABASE_URI` is not set')
+    try:
+        Variable.get('TRANSACTIONS_API_URI')
+    except KeyError:
+        raise KeyError('transactions API url environment variable '
+                       '`TRANSACTIONS_API_URI` is not set')
+    try:
+        Variable.get('FRAUD_DETECTION_API_URI')
+    except KeyError:
+        raise KeyError('fraud detection API url variable '
+                       '`FRAUD_DETECTION_API_URI` is not set')
+    
 
 
 @task(task_id='probe_transact_api')
 def probe_transact_api():
+    """
+    !!!
+    """
     from httpx import HTTPError
     from engine_core import probe_transaction_api
     try:
-        probe_transaction_api(os.environ['TRANSACTIONS_API_URI'])
+        probe_transaction_api(Variable.get('TRANSACTIONS_API_URI'))
     except HTTPError as e:
         raise HTTPError(f'Transaction API unvailable: {e}')
 
 
 @task(task_id='probe_fraud_api')
 def probe_fraud_api()-> bool:
+    """
+    !!!
+    """
     from httpx import HTTPError
     from engine_core import probe_fraud_detection_api
     try:
-        probe_fraud_detection_api(os.environ['FRAUD_DETECTION_API_URI'])
+        probe_fraud_detection_api(Variable.get('FRAUD_DETECTION_API_URI'))
     except HTTPError:
         Variable.set(key='fraud_api_available', value=False)
     else:
@@ -172,7 +194,7 @@ def fetch_transaction(engine)-> dict:
     import pandas as pd
     from engine_core import get_transaction
     try:
-        transaction = get_transaction(os.environ['TRANSACTIONS_API_URI'])
+        transaction = get_transaction(Variable.get('TRANSACTIONS_API_URI'))
     except HTTPError as e:
         print(f"Error fetching transaction: {e}")
     else:
@@ -206,7 +228,7 @@ def get_fraud_risk(transaction: dict,
     except HTTPError:
         return
     else:
-        return detect_fraud(os.environ['FRAUD_DETECTION_API_URI'],
+        return detect_fraud(Variable.get('FRAUD_DETECTION_API_URI'),
                             fraud_model, pred_features)
 
 
