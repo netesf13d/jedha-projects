@@ -30,11 +30,14 @@ def fetch_transaction()-> dict:
         transaction = get_transaction(Variable.get('TRANSACTIONS_API_URI'))
     except HTTPError as e:
         print(f"Error fetching transaction: {e}")
-    else:
-        return dict(pd.DataFrame(**transaction).iloc[0])
+    
+    transact = dict(pd.DataFrame(**transaction).iloc[0])
+    for k, v in transact.items():
+        transact[k] = getattr(v, 'tolist', lambda: v)()
+    return transact
 
 
-@task(task_id='get_transaction_info', multiple_outputs=True)
+@task(task_id='get_transaction_info')
 def get_transaction_info(transaction: dict)-> int:
     """
     !!! doc
@@ -42,7 +45,7 @@ def get_transaction_info(transaction: dict)-> int:
     
     """
     from sqlalchemy import create_engine
-    from engine_core import Base
+    from engine_core import Base, Merchant, Customer
     from engine_core import (customer_features, merchant_features,
                              transaction_id)
     
@@ -50,20 +53,20 @@ def get_transaction_info(transaction: dict)-> int:
     engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
                            echo=False)
     Base.metadata.create_all(engine)
-    
-    info = {'transaction_id': transaction_id(engine),
-            'merch_features': merchant_features(transaction, engine),
-            'cust_features': customer_features(transaction, engine)}
-    
+
+    info = {'transaction_id': transaction_id(engine)}
+    info.update(merchant_features(transaction, engine))
+    info.update(customer_features(transaction, engine))
+
+    ## close the engine gracefully
     engine.dispose()
-    
+
     return info
 
 
 @task(task_id='get_fraud_risk')
 def get_fraud_risk(transaction: dict,
-                   merch_features: dict,
-                   cust_features: dict,
+                   transaction_info: dict,
                    fraud_model: str = 'random-forest')-> bool | None:
     """
     Get the fraud risk associated to the transaction.
@@ -71,15 +74,14 @@ def get_fraud_risk(transaction: dict,
     from engine_core import fraud_detection_features, detect_fraud
     
     if Variable.get('fraud_api_online', deserialize_json=True):
-        pred_features = fraud_detection_features(
-            transaction, merch_features, cust_features)
+        pred_features = fraud_detection_features(transaction, transaction_info)
         return detect_fraud(Variable.get('FRAUD_DETECTION_API_URI'),
                             fraud_model, pred_features)
 
 
 @task(task_id='record_transaction')
-def record_transaction(transaction: dict, transaction_id: int,
-                       merch_features: dict, cust_features: dict,
+def record_transaction(transaction: dict,
+                       transaction_info: dict,
                        fraud_risk: bool | None):
     """
     !!! doc
@@ -87,13 +89,8 @@ def record_transaction(transaction: dict, transaction_id: int,
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
-    from engine_core import Base
+    from engine_core import Base, Transaction
     from engine_core import transaction_entry
-    
-    from numpy import float64, int64
-    from psycopg2.extensions import register_adapter, AsIs
-    register_adapter(float64, AsIs)
-    register_adapter(int64, AsIs)
     
     ## Create engine
     engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
@@ -101,12 +98,12 @@ def record_transaction(transaction: dict, transaction_id: int,
     Base.metadata.create_all(engine)
     
     ## build entry and store
-    entry = transaction_entry(transaction, transaction_id,
-                              merch_features, cust_features, fraud_risk)
+    entry = transaction_entry(transaction, transaction_info, fraud_risk)
     with Session(engine) as session:
-        session.add(entry)
+        session.add(Transaction(**entry))
         session.commit()
-    logging.info(f'Record transaction with id {transaction_id}')
+    logging.info('Record transaction with id '
+                 f'{transaction_info["transaction_id"]}')
     
     ## close the engine gracefully
     engine.dispose()
@@ -122,13 +119,8 @@ with DAG(
     catchup=False,
     tags=['pipeline'],
 ) as dag:
-    
     _transaction = fetch_transaction()
     _transaction_info = get_transaction_info(_transaction)
-    _fraud_risk = get_fraud_risk(_transaction_info['merchant_features'],
-                                 _transaction_info['customer_features'])
-    record_transaction(_transaction, _transaction_info['transaction_id'],
-                       _transaction_info['merchant_features'],
-                       _transaction_info['customer_features'],
-                       _fraud_risk)
+    _fraud_risk = get_fraud_risk(_transaction, _transaction_info)
+    record_transaction(_transaction, _transaction_info, _fraud_risk)
 

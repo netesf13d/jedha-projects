@@ -91,7 +91,7 @@ class Transaction(Base):
     transaction_id: Mapped[int] = mapped_column(primary_key=True)
     merchant_id: Mapped[int] = mapped_column(ForeignKey("merchants.merchant_id"))
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.customer_id"))
-    timestamp: Mapped[datetime]
+    timestamp: Mapped[str]
     month: Mapped[int]
     weekday: Mapped[int]
     day_time: Mapped[float]

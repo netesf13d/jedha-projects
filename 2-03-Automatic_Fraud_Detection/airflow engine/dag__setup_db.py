@@ -2,6 +2,7 @@
 """
 !!!
 Airflow DAGs
+Connect to / create database
 """
 
 import logging
@@ -9,9 +10,6 @@ import logging
 from airflow.sdk import DAG, Variable, task
 
 
-# =============================================================================
-# Connect to / create database
-# =============================================================================
 
 @task(task_id='setup_database')
 def setup_database(
@@ -64,7 +62,6 @@ def setup_database(
     engine.dispose()
 
 
-
 with DAG(
     dag_id='setup_database',
     description=('Probe connection with the database, create schema, '
@@ -76,5 +73,4 @@ with DAG(
     catchup=False,
     tags=['database'],
 ) as dag:
-
     setup_database()

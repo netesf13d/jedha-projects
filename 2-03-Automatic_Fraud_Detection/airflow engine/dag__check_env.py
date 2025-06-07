@@ -2,16 +2,12 @@
 """
 !!!
 Airflow DAGs
+Check environment variables and API servers
 """
-
-import logging
 
 from airflow.sdk import DAG, Variable, task
 
 
-# =============================================================================
-# Check environment variables and API servers
-# =============================================================================
 
 @task(task_id='check_variables')
 def chk_vars():
@@ -39,9 +35,8 @@ def chk_vars():
                        '`FRAUD_DETECTION_API_URI` is not set')
 
 
-
-@task(task_id='probe_transact_api')
-def probe_transact_api():
+@task(task_id='probe_transaction_api')
+def probe_transaction_api():
     """
     Check if the transaction API is online.
     """
@@ -78,5 +73,4 @@ with DAG(
     catchup=False,
     tags=['config'],
 ) as dag:
-
-    chk_vars() >> [probe_transact_api(), probe_fraud_api()]
+    chk_vars() >> [probe_transaction_api(), probe_fraud_api()]

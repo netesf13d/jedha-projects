@@ -7,7 +7,7 @@ This version is adapter to SQLAlchemy==1.4, compatible with Airflow==3.0
 from datetime import datetime
 
 from sqlalchemy import Table, ForeignKey, Column
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, String, Boolean, Float, DateTime
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import Mapped
 
@@ -26,8 +26,8 @@ class Merchant(Base):
     __tablename__ = "merchants"
     
     merchant_id: Mapped[int] = Column(Integer, primary_key=True)
-    merchant: Mapped[str]
-    merch_fraud_victim: Mapped[bool]
+    merchant: Mapped[str] = Column(String)
+    merch_fraud_victim: Mapped[bool] = Column(Boolean)
     
     def __repr__(self):
         str_ = (
@@ -45,20 +45,20 @@ class Customer(Base):
     __tablename__ = "customers"
     
     customer_id: Mapped[int] = Column(Integer, primary_key=True)
-    cc_num: Mapped[str]
-    first: Mapped[str]
-    last: Mapped[str]
-    gender: Mapped[str]
-    street: Mapped[str]
-    city: Mapped[str]
-    state: Mapped[str]
-    zip: Mapped[int]
-    lat: Mapped[float]
-    long: Mapped[float]
-    city_pop: Mapped[int]
-    job: Mapped[str]
-    dob: Mapped[str]
-    cust_fraudster: Mapped[bool]
+    cc_num: Mapped[str] = Column(String)
+    first: Mapped[str] = Column(String)
+    last: Mapped[str] = Column(String)
+    gender: Mapped[str] = Column(String)
+    street: Mapped[str] = Column(String)
+    city: Mapped[str] = Column(String)
+    state: Mapped[str] = Column(String)
+    zip: Mapped[int] = Column(Integer)
+    lat: Mapped[float] = Column(Float)
+    long: Mapped[float] = Column(Float)
+    city_pop: Mapped[int] = Column(Integer)
+    job: Mapped[str] = Column(String)
+    dob: Mapped[str] = Column(String)
+    cust_fraudster: Mapped[bool] = Column(Boolean)
     
     def __repr__(self):
         str_ = (
@@ -90,15 +90,15 @@ class Transaction(Base):
     transaction_id: Mapped[int] = Column(Integer, primary_key=True)
     merchant_id: Mapped[int] = Column(Integer, ForeignKey("merchants.merchant_id"))
     customer_id: Mapped[int] = Column(Integer, ForeignKey("customers.customer_id"))
-    timestamp: Mapped[datetime]
-    month: Mapped[int]
-    weekday: Mapped[int]
-    day_time: Mapped[float]
-    amt: Mapped[float]
-    category: Mapped[str]
-    cust_fraudster: Mapped[bool]
-    merch_fraud_victim: Mapped[bool]
-    fraud_risk: Mapped[bool | None]
+    timestamp: Mapped[datetime] = Column(DateTime)
+    month: Mapped[int] = Column(Integer)
+    weekday: Mapped[int] = Column(Integer)
+    day_time: Mapped[float] = Column(Float)
+    amt: Mapped[float] = Column(Float)
+    category: Mapped[str] = Column(String)
+    cust_fraudster: Mapped[bool] = Column(Boolean)
+    merch_fraud_victim: Mapped[bool] = Column(Boolean)
+    fraud_risk: Mapped[bool | None] = Column(Boolean, nullable=True)
     
     def __repr__(self):
         str_ = (

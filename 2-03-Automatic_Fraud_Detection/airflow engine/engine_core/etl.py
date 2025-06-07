@@ -28,8 +28,7 @@ def transaction_id(engine)-> int:
     statement = select(func.max(Transaction.transaction_id))
     with Session(engine) as session:
         transact_ids = session.execute(statement).all()[0][0]
-    return 1 if transact_ids is None else max(transact_ids) + 1
-
+    return 1 if transact_ids is None else transact_ids + 1
 
 
 def merchant_features(transaction: dict, engine)-> dict:
@@ -91,8 +90,7 @@ def customer_features(transaction: dict, engine)-> dict:
 
 
 def fraud_detection_features(transaction: dict,
-                             merchant_features: dict,
-                             customer_features: dict)-> dict:
+                             transaction_info: dict)-> dict:
     """
     !!!
 
@@ -118,21 +116,19 @@ def fraud_detection_features(transaction: dict,
         'month': ts.month,
         'weekday': ts.weekday(),
         'day_time': day_time,
-        'amt': float(transaction['amt']),
+        'amt': transaction['amt'],
         'category': transaction['category'],
-        'cust_fraudster': customer_features['cust_fraudster'],
-        'merch_fraud_victim': merchant_features['merch_fraud_victim'],
-        'cos_day_time': np.cos(2*np.pi*day_time/86400),
-        'sin_day_time': np.sin(2*np.pi*day_time/86400),
+        'cust_fraudster': transaction_info['cust_fraudster'],
+        'merch_fraud_victim': transaction_info['merch_fraud_victim'],
+        'cos_day_time': float(np.cos(2*np.pi*day_time/86400)),
+        'sin_day_time': float(np.sin(2*np.pi*day_time/86400)),
         }
     
     return features
 
 
 def transaction_entry(transaction: dict,
-                      transaction_id: int,
-                      merchant_features: dict,
-                      customer_features: dict,
+                      transaction_info: dict,
                       fraud_risk: bool)-> dict:
     """
     !!!
@@ -156,16 +152,14 @@ def transaction_entry(transaction: dict,
     day_time = ts % 86400
     ts = datetime.fromtimestamp(ts)
     
-    entry = {'transaction_id': transaction_id,
-             'timestamp': ts.isoformat(),
+    entry = {'timestamp': ts.isoformat(),
              'month': ts.month,
              'weekday': ts.weekday(),
              'day_time': day_time,
-             'amt': float(transaction['amt']),
+             'amt': transaction['amt'],
              'category': transaction['category'],
              'fraud_risk': fraud_risk}
-    entry.update(customer_features)
-    entry.update(merchant_features)
+    entry.update(transaction_info)
     
     return entry
 

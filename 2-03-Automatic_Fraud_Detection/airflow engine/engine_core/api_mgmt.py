@@ -62,12 +62,8 @@ def detect_fraud(api_url: str,
     Get the car pricing estimation.
     """
     ## remove numpy dtypes in data
-    for k, v in data.items():
-        if isinstance(v, np.float64):
-            data[k] = float(v)
-        elif isinstance(v, np.int64):
-            data[k] = int(v)
-    print(data)
+    # for k, v in data.items():
+    #     data[k] = getattr(v, 'tolist', lambda: v)()
     r = httpx.post(f'{api_url.strip("/")}/predict/{model}',
                    follow_redirects=True, json=data, timeout=3)
     res = r.raise_for_status().json()
