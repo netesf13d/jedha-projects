@@ -15,6 +15,8 @@ To [export the DAGs as images](https://airflow.apache.org/docs/apache-airflow/st
  airflow dags show process-transaction --save process-transaction.png
 ```
 
+Connection (management)[https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html]
+
 
 ## Setup external ressources
 

@@ -10,7 +10,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db_mgmt_14 import Customer, Merchant, Transaction
+from .db_mgmt_14 import Customer, Merchant
 
 
 CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
@@ -156,6 +156,6 @@ def transaction_entry(transaction: dict,
     entry.update(customer_features)
     entry.update(merchant_features)
     
-    return Transaction(**entry)
+    return entry
 
 

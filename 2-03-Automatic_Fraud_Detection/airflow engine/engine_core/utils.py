@@ -14,9 +14,9 @@ def check_environment_vars()-> None:
     - `TRANSACTIONS_API_URI`: the url of the API giving new transactions
     - `FRAUD_DETECTION_API_URI`: the url of the fraud detection API
     """
-    if 'DATABASE_TOKEN_URI' not in os.environ:
+    if 'CONN_TRANSACTION_DB' not in os.environ:
         raise KeyError('transaction storage database variable '
-                       '`DATABASE_TOKEN_URI` is not set')
+                       '`CONN_TRANSACTION_DB` is not set')
     if 'TRANSACTIONS_API_URI' not in os.environ:
         raise KeyError('transactions API url environment variable '
                        '`TRANSACTIONS_API_URI` is not set')
