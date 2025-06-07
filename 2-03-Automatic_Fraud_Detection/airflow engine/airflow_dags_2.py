@@ -4,6 +4,7 @@
 Airflow DAGs
 """
 
+import logging
 from datetime import datetime, timedelta
 
 from airflow.sdk import DAG, task, Variable
@@ -88,9 +89,13 @@ def probe_fraud_api2()-> bool:
     try:
         probe_fraud_detection_api(Variable.get('FRAUD_DETECTION_API_URI'))
     except HTTPError:
-        Variable.set(key='fraud_api_available', value=False)
+        Variable.set(key='fraud_api_online', value=False, serialize_json=True)
     else:
-        Variable.set(key='fraud_api_available', value=True)
+        Variable.set(key='fraud_api_online', value=True, serialize_json=True)
+        
+    print(Variable.get(key='fraud_api_online', deserialize_json=True))
+    logging.info(Variable.get(key='fraud_api_online', deserialize_json=True))
+    
 
 
 with DAG(

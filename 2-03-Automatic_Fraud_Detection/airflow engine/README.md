@@ -50,7 +50,7 @@ The tracking server is deployed in an Huggingface space.
 1. Create a huggingface [space](https://huggingface.co/new-space). Choose `docker` as the software development kit.
 2. Transfer the contents of this directory: `Dockerfile`, `README.md`, `requirements.txt`.
 3. Setup the variables and secrets in the space's settings [here](https://airflow.apache.org/docs/apache-airflow/stable/howto/variable.html)
-  - Secret `AIRFLOW_VAR_DATABASE_URI`,
+  - Secret `AIRFLOW_VAR_DATABASE_TOKEN_URI`, (the substring `'TOKEN'` is parsed by Airflow and the corresponding variable is hidden from logs)
   - Secret `AIRFLOW_BACKEND_URI`, PostgreSQL database uri for Airflow.
   - Secret `ADMIN_PASSWORD`,
   - Variable `AIRFLOW_VAR_TRANSACTIONS_API_URI`, 

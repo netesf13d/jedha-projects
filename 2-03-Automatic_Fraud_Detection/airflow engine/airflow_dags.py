@@ -4,6 +4,7 @@
 Airflow DAGs
 """
 
+import logging
 from datetime import datetime, timedelta
 
 from airflow.sdk import DAG, task, Variable
@@ -43,12 +44,12 @@ def check_env_vars():
     """
     Check that the following variables are set in order to interact with
     the database and APIs:
-    - `DATABASE_URI`: the URI of the postgreSQL database
+    - `DATABASE_TOKEN_URI`: the URI of the postgreSQL database
     - `TRANSACTIONS_API_URI`: the url of the API giving new transactions
     - `FRAUD_DETECTION_API_URI`: the url of the fraud detection API
     """
     try:
-        Variable.get('DATABASE_URI')
+        Variable.get('DATABASE_TOKEN_URI')
     except KeyError:
         raise KeyError('transaction storage database variable '
                        '`DATABASE_URI` is not set')
@@ -88,9 +89,9 @@ def probe_fraud_api()-> bool:
     try:
         probe_fraud_detection_api(Variable.get('FRAUD_DETECTION_API_URI'))
     except HTTPError:
-        Variable.set(key='fraud_api_available', value=False)
+        Variable.set(key='fraud_api_online', value=False, serialize_json=True)
     else:
-        Variable.set(key='fraud_api_available', value=True)
+        Variable.set(key='fraud_api_online', value=True, serialize_json=True)
 
 
 with DAG(
@@ -99,7 +100,7 @@ with DAG(
                  'This DAG is to be triggered manually in case of problem.'),
     max_active_runs=1,
     default_args={'owner': 'admin', 'depends_on_past': False},
-    schedule=None,
+    schedule='@once',
     catchup=False,
     tags=['config'],
 ) as dag:
@@ -129,24 +130,24 @@ def setup_reference_tables(
         n_customers = session.query(Customer).count()
     
     if n_merchants < 693: # merchants table absent from database
-        dag.log.info('Setting up `merchants` table...')
-        merchants_df = pd.read_csv(Variable.get(key='merchants_table_csv'))
+        logging.info('Setting up `merchants` table...')
+        merchants_df = pd.read_csv(merchants_table_file)
         merchants = [Merchant(**dict(row[1]))
                         for row in merchants_df.iterrows()]
         with Session(engine) as session:
             session.add_all(merchants)
             session.commit()
-    # dag.log.info('Table `merchants` set')
+    logging.info('Table `merchants` set')
     
     if n_customers < 924: # customers table absent from database
-        dag.log.info('Setting up `customers` table...')
-        customers_df = pd.read_csv(Variable.get(key='customers_table_csv'))
+        logging.info('Setting up `customers` table...')
+        customers_df = pd.read_csv(customers_table_file)
         customers = [Customer(**dict(row[1]))
-                        for row in customers_df.iterrows()]
+                     for row in customers_df.iterrows()]
         with Session(engine) as session:
             session.add_all(customers)
             session.commit()
-    # dag.log.info('Table `customers` set')
+    logging.info('Table `customers` set')
 
 
 with DAG(
@@ -220,14 +221,10 @@ def get_fraud_risk(transaction: dict,
     """
     !!!
     """
-    from httpx import HTTPError
     from engine_core import fraud_detection_features, detect_fraud
-    try:
+    if Variable.get('fraud_api_online', deserialize_json=True):
         pred_features = fraud_detection_features(
             transaction, merch_features, cust_features)
-    except HTTPError:
-        return
-    else:
         return detect_fraud(Variable.get('FRAUD_DETECTION_API_URI'),
                             fraud_model, pred_features)
 
@@ -255,7 +252,7 @@ def record_transaction(engine,
         session.add(transaction_out)
         session.commit()
         transaction_id += 1
-    # dag.log.info(f'Record transaction with id {transaction_id}')
+    logging.info(f'Record transaction with id {transaction_id}')
 
 
 with DAG(
