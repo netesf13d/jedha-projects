@@ -10,7 +10,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db_mgmt import Customer, Merchant, Transaction
+from .db_mgmt_14 import Customer, Merchant, Transaction
 
 
 CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',

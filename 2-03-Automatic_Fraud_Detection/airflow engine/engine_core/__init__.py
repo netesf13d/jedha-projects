@@ -10,6 +10,6 @@ This package implement Extract-Transform-Load helper functions.
 from .utils import check_environment_vars
 from .api_mgmt import (probe_transaction_api, get_transaction,
                        probe_fraud_detection_api, detect_fraud)
-from .db_mgmt import Base, Merchant, Customer, Transaction, reflect_db
+from .db_mgmt_14 import Base, Merchant, Customer, Transaction, reflect_db
 from .etl import (customer_features, merchant_features,
                   fraud_detection_features, transaction_entry)

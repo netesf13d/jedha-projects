@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import DAG, task, Variable
 
+import engine_core
 
 # =============================================================================
 # Shared tasks

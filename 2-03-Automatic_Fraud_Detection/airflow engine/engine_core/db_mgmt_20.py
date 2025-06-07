@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Classes that represent the tables of the database with SQLAlchemy.
+This version is adapter to SQLAlchemy==2.0, not compatible with Airflow==3.0,
+but compatible with the custom engine in /scripts.
 """
 
 from datetime import datetime
