@@ -7,10 +7,10 @@ TDOD doc
 from datetime import datetime
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from .db_mgmt_14 import Customer, Merchant
+from .db_mgmt_14 import Customer, Merchant, Transaction
 
 
 CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
@@ -20,6 +20,17 @@ MERCHANT_COLS = ['merchant']
 # =============================================================================
 # 
 # =============================================================================
+
+def transaction_id(engine)-> int:
+    """
+    Get the transaction id of the next transaction.
+    """
+    statement = select(func.max(Transaction.transaction_id))
+    with Session(engine) as session:
+        transact_ids = session.execute(statement).all()[0][0]
+    return 1 if transact_ids is None else max(transact_ids) + 1
+
+
 
 def merchant_features(transaction: dict, engine)-> dict:
     """
