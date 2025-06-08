@@ -23,10 +23,3 @@ def check_environment_vars()-> None:
     if 'FRAUD_DETECTION_API_URI' not in os.environ:
         raise KeyError('fraud detection API url environment variable '
                        '`FRAUD_DETECTION_API_URI` is not set')
-
-
-
-
-
-
-

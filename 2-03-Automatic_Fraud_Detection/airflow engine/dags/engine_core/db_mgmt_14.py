@@ -1,23 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 Classes that represent the tables of the database with SQLAlchemy.
-This version is adapter to SQLAlchemy==2.0, not compatible with Airflow==3.0,
-but compatible with the custom engine in /scripts.
+This version is adapter to SQLAlchemy==1.4, compatible with Airflow==3.0
 """
 
 from datetime import datetime
 
-from sqlalchemy import Table, ForeignKey
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Table, ForeignKey, Column
+from sqlalchemy import Integer, String, Boolean, Float, DateTime
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import Mapped
 
 
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
 
 # =============================================================================
-# 
+#
 # =============================================================================
 
 class Merchant(Base):
@@ -25,11 +24,11 @@ class Merchant(Base):
     Declarative 'merchants' table structure.
     """
     __tablename__ = "merchants"
-    
-    merchant_id: Mapped[int] = mapped_column(primary_key=True)
-    merchant: Mapped[str]
-    merch_fraud_victim: Mapped[bool]
-    
+
+    merchant_id: Mapped[int] = Column(Integer, primary_key=True)
+    merchant: Mapped[str] = Column(String)
+    merch_fraud_victim: Mapped[bool] = Column(Boolean)
+
     def __repr__(self):
         str_ = (
             f"Merchant(merchant_id={self.merchant_id!r}, "
@@ -44,23 +43,23 @@ class Customer(Base):
     Declarative 'customers' table structure.
     """
     __tablename__ = "customers"
-    
-    customer_id: Mapped[int] = mapped_column(primary_key=True)
-    cc_num: Mapped[str]
-    first: Mapped[str]
-    last: Mapped[str]
-    gender: Mapped[str]
-    street: Mapped[str]
-    city: Mapped[str]
-    state: Mapped[str]
-    zip: Mapped[int]
-    lat: Mapped[float]
-    long: Mapped[float]
-    city_pop: Mapped[int]
-    job: Mapped[str]
-    dob: Mapped[str]
-    cust_fraudster: Mapped[bool]
-    
+
+    customer_id: Mapped[int] = Column(Integer, primary_key=True)
+    cc_num: Mapped[str] = Column(String)
+    first: Mapped[str] = Column(String)
+    last: Mapped[str] = Column(String)
+    gender: Mapped[str] = Column(String)
+    street: Mapped[str] = Column(String)
+    city: Mapped[str] = Column(String)
+    state: Mapped[str] = Column(String)
+    zip: Mapped[int] = Column(Integer)
+    lat: Mapped[float] = Column(Float)
+    long: Mapped[float] = Column(Float)
+    city_pop: Mapped[int] = Column(Integer)
+    job: Mapped[str] = Column(String)
+    dob: Mapped[str] = Column(String)
+    cust_fraudster: Mapped[bool] = Column(Boolean)
+
     def __repr__(self):
         str_ = (
             f"Customer(customer_id={self.customer_id!r}, "
@@ -80,27 +79,27 @@ class Customer(Base):
             f"cust_fraudster={self.cust_fraudster!r})"
         )
         return str_
-    
+
 
 class Transaction(Base):
     """
     Declarative 'transactions' table structure.
     """
     __tablename__ = 'transactions'
-    
-    transaction_id: Mapped[int] = mapped_column(primary_key=True)
-    merchant_id: Mapped[int] = mapped_column(ForeignKey("merchants.merchant_id"))
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.customer_id"))
-    timestamp: Mapped[str]
-    month: Mapped[int]
-    weekday: Mapped[int]
-    day_time: Mapped[float]
-    amt: Mapped[float]
-    category: Mapped[str]
-    cust_fraudster: Mapped[bool]
-    merch_fraud_victim: Mapped[bool]
-    fraud_risk: Mapped[bool | None]
-    
+
+    transaction_id: Mapped[int] = Column(Integer, primary_key=True)
+    merchant_id: Mapped[int] = Column(Integer, ForeignKey("merchants.merchant_id"))
+    customer_id: Mapped[int] = Column(Integer, ForeignKey("customers.customer_id"))
+    timestamp: Mapped[datetime] = Column(DateTime)
+    month: Mapped[int] = Column(Integer)
+    weekday: Mapped[int] = Column(Integer)
+    day_time: Mapped[float] = Column(Float)
+    amt: Mapped[float] = Column(Float)
+    category: Mapped[str] = Column(String)
+    cust_fraudster: Mapped[bool] = Column(Boolean)
+    merch_fraud_victim: Mapped[bool] = Column(Boolean)
+    fraud_risk: Mapped[bool | None] = Column(Boolean, nullable=True)
+
     def __repr__(self):
         str_ = (
             f"Transaction(transaction_id={self.transaction_id!r}, "

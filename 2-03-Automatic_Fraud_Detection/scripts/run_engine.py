@@ -40,7 +40,7 @@ os.environ['FRAUD_DETECTION_API_URI'] = 'https://netesf13d-api-2-03-fraud-detect
 # Try to get the database uri from a file
 try:
     with open('fraud-detection-ref-db.key', 'rt', encoding='utf-8') as f:
-        os.environ['DATABASE_URI'] = f.read()
+        os.environ['CONN_TRANSACTION_DB'] = f.read()
 except FileNotFoundError:
     pass
 check_environment_vars()
@@ -78,20 +78,23 @@ if n_customers < 924: # customers table absent from database
         session.commit()
 print('Table `customers` set')
 
-        
+
 
 ## Get last transaction id, initialize to 1 if `transactions` table is empty
 statement = select(func.max(Transaction.transaction_id))
 with Session(engine) as session:
     transact_ids = session.execute(statement).all()[0][0]
-transaction_id = 1 if transact_ids is None else max(transact_ids) + 1
+transaction_id = 1 if transact_ids is None else transact_ids + 1
 print(f'Initialization with transaction id = {transaction_id}')
 
+## Initialize transaction info dict
+transaction_info = {'transaction_id': transaction_id}
 
 # =============================================================================
 # Process transactions
 # =============================================================================
 
+## Get transaction
 try:
     transaction = get_transaction(os.environ['TRANSACTIONS_API_URI'])
 except httpx.HTTPError as e:
@@ -100,23 +103,21 @@ else:
     transaction = dict(pd.DataFrame(**transaction).iloc[0])
 print(transaction)
 
-merch_features = merchant_features(transaction, engine)
-cust_features = customer_features(transaction, engine)
+## Get additional transaction info
+transaction_info.update(merchant_features(transaction, engine))
+transaction_info.update(customer_features(transaction, engine))
 
-pred_features = fraud_detection_features(
-    transaction, merch_features, cust_features)
-
+## Get fraud risk
+pred_features = fraud_detection_features(transaction, transaction_info)
 fraud_risk = detect_fraud(os.environ['FRAUD_DETECTION_API_URI'],
                           FRAUD_MODEL, pred_features)
 
-transaction_out = transaction_entry(transaction, transaction_id,
-                                    merch_features, cust_features,
-                                    fraud_risk)
+## Record transaction
+entry = transaction_entry(transaction, transaction_info, fraud_risk)
 with Session(engine) as session:
-    session.add(transaction_out)
+    session.add(Transaction(**entry))
     session.commit()
     transaction_id += 1
 
 ## close the engine gracefully
 engine.dispose()
-

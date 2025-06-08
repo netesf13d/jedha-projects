@@ -23,7 +23,7 @@ def probe_transaction_api(api_url: str)-> str:
 def get_transaction(api_url: str)-> tuple[str, dict[str, list]]:
     """
     Get a sample transaction data.
-    
+
     >>> api_url = 'http://localhost:8000'
     >>> get_transaction(api_url)
     {'columns': ['cc_num', 'merchant', 'category', 'amt', 'first', 'last',

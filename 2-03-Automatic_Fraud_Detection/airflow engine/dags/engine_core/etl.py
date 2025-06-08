@@ -18,7 +18,7 @@ CUSTOMER_COLS = ['cc_num', 'first', 'last', 'gender', 'street', 'city',
 MERCHANT_COLS = ['merchant']
 
 # =============================================================================
-# 
+#
 # =============================================================================
 
 def transaction_id(engine)-> int:
@@ -123,7 +123,7 @@ def fraud_detection_features(transaction: dict,
         'cos_day_time': float(np.cos(2*np.pi*day_time/86400)),
         'sin_day_time': float(np.sin(2*np.pi*day_time/86400)),
         }
-    
+
     return features
 
 
@@ -151,7 +151,7 @@ def transaction_entry(transaction: dict,
     ts = transaction['current_time']//1000
     day_time = ts % 86400
     ts = datetime.fromtimestamp(ts)
-    
+
     entry = {'timestamp': ts.isoformat(),
              'month': ts.month,
              'weekday': ts.weekday(),
@@ -160,7 +160,7 @@ def transaction_entry(transaction: dict,
              'category': transaction['category'],
              'fraud_risk': fraud_risk}
     entry.update(transaction_info)
-    
+
     return entry
 
 

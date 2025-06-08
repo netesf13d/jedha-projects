@@ -30,7 +30,7 @@ def fetch_transaction()-> dict:
         transaction = get_transaction(Variable.get('TRANSACTIONS_API_URI'))
     except HTTPError as e:
         print(f"Error fetching transaction: {e}")
-    
+
     transact = dict(pd.DataFrame(**transaction).iloc[0])
     for k, v in transact.items():
         transact[k] = getattr(v, 'tolist', lambda: v)()
@@ -42,13 +42,13 @@ def get_transaction_info(transaction: dict)-> int:
     """
     !!! doc
     Get last transaction id, initialize to 1 if `transactions` table is empty
-    
+
     """
     from sqlalchemy import create_engine
     from engine_core import Base, Merchant, Customer
     from engine_core import (customer_features, merchant_features,
                              transaction_id)
-    
+
     ## Create engine
     engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
                            echo=False)
@@ -72,7 +72,7 @@ def get_fraud_risk(transaction: dict,
     Get the fraud risk associated to the transaction.
     """
     from engine_core import fraud_detection_features, detect_fraud
-    
+
     if Variable.get('fraud_api_online', deserialize_json=True):
         pred_features = fraud_detection_features(transaction, transaction_info)
         return detect_fraud(Variable.get('FRAUD_DETECTION_API_URI'),
@@ -91,12 +91,12 @@ def record_transaction(transaction: dict,
     from sqlalchemy.orm import Session
     from engine_core import Base, Transaction
     from engine_core import transaction_entry
-    
+
     ## Create engine
     engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
                            echo=False)
     Base.metadata.create_all(engine)
-    
+
     ## build entry and store
     entry = transaction_entry(transaction, transaction_info, fraud_risk)
     with Session(engine) as session:
@@ -104,7 +104,7 @@ def record_transaction(transaction: dict,
         session.commit()
     logging.info('Record transaction with id '
                  f'{transaction_info["transaction_id"]}')
-    
+
     ## close the engine gracefully
     engine.dispose()
 
@@ -123,4 +123,3 @@ with DAG(
     _transaction_info = get_transaction_info(_transaction)
     _fraud_risk = get_fraud_risk(_transaction, _transaction_info)
     record_transaction(_transaction, _transaction_info, _fraud_risk)
-
