@@ -1,8 +1,8 @@
 # Spotify Data Governance
 
-In this project, we step into the role of a Data Governance Specialist for Spotify, the world’s leading music streaming platform. The goal is to design and pilot a Data Governance Framework that ensures regulatory compliance with GDPR, CCPA, and PCI-DSS, while also improving data quality, user privacy, and operational efficiency across Spotify’s global infrastructure.
+In this project, we step into the role of a Data Governance Specialist for Spotify, the world's leading music streaming platform. The goal is to design and pilot a Data Governance Framework that ensures regulatory compliance with GDPR, CCPA, and PCI-DSS, while also improving data quality, user privacy, and operational efficiency across Spotify's global infrastructure.
 
-The project is structured into four timed phases: assessing data maturity, developing governance policies and roles, building an implementation roadmap, and preparing an executive presentation. We integrate real-world compliance checklists, best-practice frameworks (e.g., ISO 8000), and scalable governance models into our solution.
+The project is structured into four timed phases: assessing data maturity, developing governance policies and roles, building an implementation roadmap, and preparing an executive presentation. We integrate real-world compliance checklists, best-practice frameworks, and scalable governance models into our solution.
 
 
 ## Structure of the project
