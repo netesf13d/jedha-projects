@@ -94,7 +94,7 @@ def rental_delay_chart(rental_delays: np.ndarray,
 # =============================================================================
 
 ########## Setup delay analysis session state ##########
-if not 'dataset' in st.session_state:
+if 'dataset' not in st.session_state:
     df = prepare_dataset(DATASET_FILENAME)
     st.session_state['dataset'] = df
     st.session_state['time_bins'] = TIME_BINS
@@ -111,7 +111,7 @@ if not 'dataset' in st.session_state:
 
 ########## Setup pricing optimization session state ##########
 ## Pricing optimization API available ?
-if not 'api_available' in st.session_state:
+if 'api_available' not in st.session_state:
     try:
         probe_api(API_URL)
     except httpx.HTTPError:
@@ -121,19 +121,19 @@ if not 'api_available' in st.session_state:
 api_available = st.session_state['api_available']
 
 ## If the API is available, get available models
-if not 'pricing_models' in st.session_state:
+if 'pricing_models' not in st.session_state:
     st.session_state['pricing_models'] = defaultdict(list)
 if api_available:
     st.session_state['pricing_models'] = get_pricing_models(API_URL)
 
 ## If the API is available, get categorical variables info
-if not 'categories' in st.session_state:
+if 'categories' not in st.session_state:
     st.session_state['categories'] = defaultdict(list)
 if api_available:
     st.session_state['categories'] = get_categories(API_URL)
 
 ## If the API is available, track the state of the current car attributes input
-if api_available and not 'curr_data' in st.session_state:
+if api_available and 'curr_data' not in st.session_state:
     st.session_state['curr_model'] = ''
     st.session_state['curr_data'] = {}
 
