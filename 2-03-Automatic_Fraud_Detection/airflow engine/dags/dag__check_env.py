@@ -18,11 +18,14 @@ def chk_vars():
     - `TRANSACTIONS_API_URI`: the url of the API giving new transactions
     - `FRAUD_DETECTION_API_URI`: the url of the fraud detection API
     """
+    from airflow.hooks.base import BaseHook
     try:
-        Variable.get('AIRFLOW_CONN_TRANSACTION_DB')
+        BaseHook.get_connection('transaction_db').get_uri()
+        # Variable.get('AIRFLOW_CONN_TRANSACTION_DB')
     except KeyError:
         raise KeyError('transaction and reference storage database connection '
-                       '`AIRFLOW_CONN_TRANSACTION_DB` is not set')
+                        '`transaction_db` is not set')
+                       #'`AIRFLOW_CONN_TRANSACTION_DB` is not set')
     try:
         Variable.get('TRANSACTIONS_API_URI')
     except KeyError:

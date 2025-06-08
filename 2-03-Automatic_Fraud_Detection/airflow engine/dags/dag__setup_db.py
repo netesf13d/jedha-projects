@@ -25,9 +25,11 @@ def setup_database(
     import pandas as pd
     from sqlalchemy.orm import Session
     from sqlalchemy import create_engine
+    from airflow.hooks.base import BaseHook
     from engine_core import Base, Merchant, Customer
-
-    engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
+    
+    uri = BaseHook.get_connection('transaction_db').get_uri()
+    engine = create_engine(uri, #Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
                            echo=False)
     Base.metadata.create_all(engine)
 

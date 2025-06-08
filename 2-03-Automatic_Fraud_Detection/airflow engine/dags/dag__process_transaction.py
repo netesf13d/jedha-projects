@@ -45,13 +45,16 @@ def get_transaction_info(transaction: dict)-> int:
 
     """
     from sqlalchemy import create_engine
+    from airflow.hooks.base import BaseHook
     from engine_core import Base, Merchant, Customer
     from engine_core import (customer_features, merchant_features,
                              transaction_id)
 
     ## Create engine
-    engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
-                           echo=False)
+    uri = BaseHook.get_connection('transaction_db').get_uri()
+    engine = create_engine(uri, echo=False)
+    #engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
+    #                       echo=False)
     Base.metadata.create_all(engine)
 
     info = {'transaction_id': transaction_id(engine)}
@@ -89,13 +92,15 @@ def record_transaction(transaction: dict,
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
+    from airflow.hooks.base import BaseHook
     from engine_core import Base, Transaction
     from engine_core import transaction_entry
 
     ## Create engine
-    engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
-                           echo=False)
-    Base.metadata.create_all(engine)
+    uri = BaseHook.get_connection('transaction_db').get_uri()
+    engine = create_engine(uri, echo=False)
+    #engine = create_engine(Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
+    #                       echo=False)
 
     ## build entry and store
     entry = transaction_entry(transaction, transaction_info, fraud_risk)
