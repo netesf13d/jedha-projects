@@ -1,6 +1,17 @@
 # Automatic Fraud Detection
 
+This project focuses on developing and deploying a real-time fraud detection system to combat financial fraud, a major concern for financial institutions. Leveraging machine learning, the goal is to accurately identify fraudulent transactions and integrate this capability into a production-ready infrastructure that can notify stakeholders as fraud occurs and generate daily reports on all payment activity.
 
+The pipeline produced is presented below. We train fraud detection models using a labeled dataset of past transactions, and then integrate it with a real-time payment API that updates every minute. The fraud detection algorithms are managed with an MLflow server and made available through an API. The ETL pipeline is orchestrated with Airflow through a succession of tasks:
+- Fetch a transaction from the payment API;
+- Process the data to extract features;
+- Request the fraud detection API to get a fraud risk indicator;
+- Store the resulting data in a SQL database. 
+The SQL database contains reference tables containing merchants and customers information, along with a table that stores transaction events. The contents of the `transactions` table is accessed by a dashboard that provides analytics.
+
+<p align="center">
+    <img src="./media/process_transaction_dag.png" width="600" />
+</p>
 
 
 ## Structure of the project

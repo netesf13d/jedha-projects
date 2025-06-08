@@ -1,0 +1,54 @@
+// Database structure defined with DBML
+// Docs: https://dbml.dbdiagram.io/docs
+
+Project Automatic_Fraud_Detection {
+  database_type: 'PostgreSQL'
+}
+
+
+///// Tables /////
+
+Table transactions {
+  transaction_id bigint [primary key, unique]
+  merchant_id bigint
+  customer_id bigint
+  timestamp datetime
+  month int
+  weekday int
+  day_time float
+  amt float
+  category text
+  cust_fraudster boolean
+  merch_fraud_victim boolean
+  fraud_risk boolean
+}
+
+Table merchants {
+  merchant_id bigint [primary key, unique]
+  merchant text
+  merch_fraud_victim boolean
+}
+
+Table customers {
+  customer_id bigint [primary key, unique]
+  cc_num text
+  first text
+  last text
+  gender text
+  street text
+  city text
+  state text
+  zip int
+  lat float
+  long float
+  city_pop int
+  job text
+  dob text
+  cust_fraudster boolean
+}
+
+
+///// Relationships /////
+
+Ref: transactions.merchant_id > merchants.merchant_id
+Ref: transactions.customer_id > customers.customer_id

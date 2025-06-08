@@ -74,14 +74,14 @@ async def lifespan(app: FastAPI):
 
 
 # =============================================================================
-#
+# API contents
 # =============================================================================
 
 title = 'Automatic fraud detection API'
 
 description = (
-    'The API interfaces the fraud detection models registry. It is used by the '
-    'fraud detection engine to determine whether a transaction is fraudulent.'
+    'The API interfaces the fraud detection models registry. '
+    'It provides a fraud risk evaluation endpoint.'
 )
 
 tags_metadata = [
@@ -106,7 +106,6 @@ app = FastAPI(
 )
 
 
-
 @app.get('/', include_in_schema=False)
 async def docs_redirect():
     return RedirectResponse(url='/docs')
@@ -118,7 +117,6 @@ async def test()-> int:
     Probe API endpoint.
     """
     return 1 if models else 0
-
 
 
 @app.get('/fraud_detection_models', tags=['Models info'])
