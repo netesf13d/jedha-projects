@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-
+Utilities to interface with the car pricing API.
 """
 
 import httpx

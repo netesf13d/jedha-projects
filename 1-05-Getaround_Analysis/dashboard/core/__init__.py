@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-
+Utility functions for the dashboard:
+- Functions to interact with the car pricing API.
+- Helper functions for the analysis of rental delays.
 """
 
 from .api import probe_api, get_pricing_models, get_categories, get_pricing

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-
+Main dashboard script. Contains 2 components:
+- A tab proposing analytics related to the implementation of a rental delay.
+- A tab that proposes a car rental pricing service
 """
 
 import os
@@ -109,7 +111,7 @@ if not 'dataset' in st.session_state:
 
 ########## Setup pricing optimization session state ##########
 ## Pricing optimization API available ?
-if 'api_available' not in st.session_state:
+if not 'api_available' in st.session_state:
     try:
         probe_api(API_URL)
     except httpx.HTTPError:
@@ -119,13 +121,13 @@ if 'api_available' not in st.session_state:
 api_available = st.session_state['api_available']
 
 ## If the API is available, get available models
-if 'pricing_models' not in st.session_state:
+if not 'pricing_models' in st.session_state:
     st.session_state['pricing_models'] = defaultdict(list)
 if api_available:
     st.session_state['pricing_models'] = get_pricing_models(API_URL)
 
 ## If the API is available, get categorical variables info
-if 'categories' not in st.session_state:
+if not 'categories' in st.session_state:
     st.session_state['categories'] = defaultdict(list)
 if api_available:
     st.session_state['categories'] = get_categories(API_URL)
