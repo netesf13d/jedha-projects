@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Functions for the analysis of rental delays
+Helper functions for the analysis of rental delays
 """
 
 import numpy as np
