@@ -73,10 +73,9 @@ airflow api-server --port 8080
 1. Create a huggingface [space](https://huggingface.co/new-space). Choose `docker` as the software development kit.
 2. Transfer the contents of this directory: `dags/`, `Dockerfile`, `README.md`, `requirements.txt`.
 3. Setup the variables and secrets in the space's settings [here](https://airflow.apache.org/docs/apache-airflow/stable/howto/variable.html)
-  - Secret `AIRFLOW_CONN_TRANSACTION_DB`, (the substring `'TOKEN'` is parsed by Airflow and the corresponding variable is hidden from logs)
-  - Secret `AIRFLOW_BACKEND_URI`, PostgreSQL database uri for Airflow.
+  - Secret `AIRFLOW_CONN_TRANSACTION_DB`, connection URL to the transactions storage database.
+  - (Optional) secret `AIRFLOW_BACKEND_URI`, PostgreSQL database uri for Airflow. The corresponding lines must be un-commented in the Dockerfile.
   - Secret `ADMIN_PASSWORD`,
   - Variable `AIRFLOW_VAR_TRANSACTIONS_API_URI`, 
-  - Variable `AIRFLOW_VAR_FRAUD_DETECTION_API_URI`,
-  - Variable `PORT`. Here the value is set to 7860, the default value (in any case, it must match the `app_port` config variable of the space).
+  - Variable `AIRFLOW_VAR_FRAUD_DETECTION_API_URI`.
 4. Run the space and set it public. It will be accessible at `https://{owner}-{your-space-name}.hf.space/`.
