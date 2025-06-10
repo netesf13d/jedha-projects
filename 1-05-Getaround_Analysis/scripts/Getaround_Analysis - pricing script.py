@@ -454,21 +454,33 @@ reg.fit(X_tr, y_tr)
 ## Extract the relevant metrics
 cv_res = reg['regressor'].cv_results_
 rmse = -cv_res['mean_test_neg_root_mean_squared_error']
+std_rmse = cv_res['std_test_neg_root_mean_squared_error']
 r2 = cv_res['mean_test_r2']
+std_r2 = cv_res['std_test_r2']
 mae = -cv_res['mean_test_neg_mean_absolute_error']
+std_mae = cv_res['std_test_neg_mean_absolute_error']
 mape = -cv_res['mean_test_neg_mean_absolute_percentage_error']
+std_mape = -cv_res['std_test_neg_mean_absolute_percentage_error']
 
 #%%
 ##
 fig5, axs5 = plt.subplots(
-    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(8.8, 3.6), dpi=120,
+    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(8.8, 3.6), dpi=200,
     gridspec_kw={'left': 0.06, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.22})
 fig5.suptitle("Figure 5: Scoring metrics vs ridge regularization parameter",
               x=0.02, ha='left')
 
+for ax in axs5.ravel():
+    ax.grid(visible=True, linewidth=0.4)
+    ax.grid(visible=True, which='minor', linewidth=0.2)
+
 # RMSE and MAE
-axs5[0].plot(alphas, rmse, color='C0', label='Root mean sq. err.')
-axs5[0].plot(alphas, mae, color='C1', label='Mean abs. err')
+l_rmse, = axs5[0].plot(alphas, rmse, color='C0')
+fill_rmse = axs5[0].fill_between(
+    alphas, (rmse-std_rmse), (rmse+std_rmse), color='C0', alpha=0.2)
+l_mae, = axs5[0].plot(alphas, mae, color='C1')
+fill_mae = axs5[0].fill_between(alphas, (mae-std_mae), (mae+std_mae),
+                                color='C1', alpha=0.2)
 axs5[0].set_xscale('log')
 axs5[0].set_xlim(1, 1e5)
 axs5[0].set_xticks(np.logspace(0, 5, 6))
@@ -478,24 +490,23 @@ axs5[0].set_xticks(
 axs5[0].set_ylim(10, 35)
 axs5[0].set_yticks(np.linspace(12.5, 32.5, 5), minor=True)
 axs5[0].set_ylabel('Price error')
-axs5[0].grid(visible=True, linewidth=0.3)
-axs5[0].grid(visible=True, which='minor', linewidth=0.2)
-axs5[0].legend(loc=(0.015, 0.81))
+axs5[0].legend(handles=[(l_rmse, fill_rmse), (l_mae, fill_mae)],
+               labels=['Root mean sq. err.', 'Mean abs. err'])
 
 # R-squared
-axs5[1].plot(alphas, r2, color='C2', label='R-squared')
+l_r2, = axs5[1].plot(alphas, r2, color='C2')
+fill_r2 = axs5[1].fill_between(alphas, r2-std_r2, r2+std_r2,
+                                color='C2', alpha=0.2)
 axs5[1].set_xlabel(r'Regularization parameter $\alpha$', fontsize=11)
 axs5[1].set_ylim(0, 1)
-axs5[1].grid(visible=True, linewidth=0.3)
-axs5[1].grid(visible=True, which='minor', linewidth=0.2)
-axs5[1].legend(loc=(0.015, 0.89))
+axs5[1].legend(handles=[(l_r2, fill_r2)], labels=['R-squared'], loc=(0.015, 0.89))
 
 # MAPE
-axs5[2].plot(alphas, 100*mape, color='C3', label='MAPE')
+l_mape, = axs5[2].plot(alphas, 100*mape, color='C0')
+fill_mape = axs5[2].fill_between(alphas, 100*(mape-std_mape), 100*(mape+std_mape),
+                                 color='C0', alpha=0.2) 
 axs5[2].set_ylim(12, 26)
-axs5[2].grid(visible=True, linewidth=0.3)
-axs5[2].grid(visible=True, which='minor', linewidth=0.2)
-axs5[2].legend(loc=(0.015, 0.89))
+axs5[2].legend(handles=[(l_mape, fill_mape)], labels=['MAPE'], loc=(0.015, 0.89))
 
 
 plt.show()
@@ -605,43 +616,57 @@ reg.fit(X_tr, y_tr)
 ## Extract the relevant metrics
 cv_res = reg['regressor'].cv_results_
 rmse = -cv_res['mean_test_neg_root_mean_squared_error']
+std_rmse = cv_res['std_test_neg_root_mean_squared_error']
 r2 = cv_res['mean_test_r2']
+std_r2 = cv_res['std_test_r2']
 mae = -cv_res['mean_test_neg_mean_absolute_error']
+std_mae = cv_res['std_test_neg_mean_absolute_error']
 mape = -cv_res['mean_test_neg_mean_absolute_percentage_error']
+std_mape = -cv_res['std_test_neg_mean_absolute_percentage_error']
 
 
 ##
 fig6, axs6 = plt.subplots(
-    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(9, 3.6), dpi=120,
+    nrows=1, ncols=3, sharex=True, sharey=False, figsize=(9, 3.6), dpi=200,
     gridspec_kw={'left': 0.06, 'right': 0.98, 'top': 0.88, 'bottom': 0.15, 'wspace': 0.24})
 fig6.suptitle("Figure 6: Scoring metrics vs the number of gradient boosting estimators",
               x=0.02, ha='left')
 
+for ax in axs6.ravel():
+    ax.grid(visible=True, linewidth=0.4)
+    ax.grid(visible=True, which='minor', linewidth=0.2)
+
 # RMSE and MAE
-axs6[0].plot(n_estimators_vals, rmse, color='C0', label='Root mean sq. err.')
-axs6[0].plot(n_estimators_vals, mae, color='C1', label='Mean abs. err')
+l_rmse, = axs6[0].plot(n_estimators_vals, rmse, color='C0')
+fill_rmse = axs6[0].fill_between(
+    n_estimators_vals, (rmse-std_rmse), (rmse+std_rmse), color='C0', alpha=0.2)
+l_mae, = axs6[0].plot(n_estimators_vals, mae, color='C1')
+fill_mae = axs6[0].fill_between(n_estimators_vals, (mae-std_mae), (mae+std_mae),
+                                color='C1', alpha=0.2)
 axs6[0].set_xlim(0, 1000)
 axs6[0].set_ylim(10, 18)
 axs6[0].set_yticks(np.linspace(10.5, 17.5, 8), minor=True)
 axs6[0].set_ylabel('Price error')
-axs6[0].grid(visible=True, linewidth=0.3)
-axs6[0].grid(visible=True, which='minor', linewidth=0.2)
-axs6[0].legend(loc=(0.015, 0.81))
+axs6[0].legend(handles=[(l_rmse, fill_rmse), (l_mae, fill_mae)],
+               labels=['Root mean sq. err.', 'Mean abs. err'],
+               loc=(0.015, 0.81))
 
 # R-squared
-axs6[1].plot(n_estimators_vals, r2, color='C2', label='R-squared')
+l_r2, = axs6[1].plot(n_estimators_vals, r2, color='C2')
+fill_r2 = axs6[1].fill_between(n_estimators_vals, r2-std_r2, r2+std_r2,
+                                 color='C2', alpha=0.2)
 axs6[1].set_xlabel(r'Number of estimators `n_estimators`', fontsize=11)
 axs6[1].set_ylim(0.7, 0.8)
-axs6[1].grid(visible=True, linewidth=0.3)
-axs6[1].grid(visible=True, which='minor', linewidth=0.2)
-axs6[1].legend(loc=(0.015, 0.89))
+axs6[1].legend(handles=[(l_r2, fill_r2)], labels=['R-squared'], loc=(0.015, 0.89))
 
 # MAPE
 axs6[2].plot(n_estimators_vals, 100*mape, color='C3', label='MAPE')
+l_mape, = axs6[2].plot(n_estimators_vals, 100*mape, color='C0')
+fill_mape = axs6[2].fill_between(n_estimators_vals,
+                                 100*(mape-std_mape), 100*(mape+std_mape),
+                                 color='C0', alpha=0.2) 
 axs6[2].set_ylim(12, 13)
-axs6[2].grid(visible=True, linewidth=0.3)
-axs6[2].grid(visible=True, which='minor', linewidth=0.2)
-axs6[2].legend(loc=(0.61, 0.89))
+axs6[2].legend(handles=[(l_mape, fill_mape)], labels=['MAPE'], loc=(0.61, 0.89))
 
 
 plt.show()
