@@ -7,7 +7,7 @@ Connect to / create database
 
 import logging
 
-from airflow.sdk import DAG, Variable, task
+from airflow.sdk import DAG, task
 
 
 
@@ -29,8 +29,8 @@ def setup_database(
     from engine_core import Base, Merchant, Customer
     
     uri = BaseHook.get_connection('transaction_db').get_uri()
-    engine = create_engine(uri, #Variable.get('AIRFLOW_CONN_TRANSACTION_DB'),
-                           echo=False)
+    uri = uri.replace('postgres://', 'postgresql://')
+    engine = create_engine(uri, echo=False)
     Base.metadata.create_all(engine)
 
     ## Add merchants and customers table content to database if not present

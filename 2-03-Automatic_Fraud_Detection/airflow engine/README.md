@@ -68,6 +68,9 @@ airflow api-server --port 8080
 
 ### Deployment on Hugging Face
 
+When using `LocalExecutor` ou must set the environment variable with your space address:
+`ENV AIRFLOW__API__BASE_URL=<https://{owner}-{your-space-name}.hf.space/>`
+See [here](https://github.com/apache/airflow/issues/49931)
 
 
 1. Create a huggingface [space](https://huggingface.co/new-space). Choose `docker` as the software development kit.

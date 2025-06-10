@@ -6,41 +6,36 @@ ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
 ENV AIRFLOW__CORE__DAGS_FOLDER="${AIRFLOW_HOME}/dags"
+ENV AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
 ENV AIRFLOW__API__WORKER_TIMEOUT=300
 ENV AIRFLOW__API__PORT=7860
-ENV AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE="${AIRFLOW_HOME}/simple_auth_manager_passwords.json"
+ENV AIRFLOW__API__BASE_URL=https://netesf13d-airflow-server-2-03-fraud-detection.hf.space/
+
+# ENV AIRFLOW_VAR_TRANSACTIONS_API_URI=$AIRFLOW_VAR_TRANSACTIONS_API_URI
+# ENV AIRFLOW_VAR_FRAUD_DETECTION_API_URI=$AIRFLOW_VAR_FRAUD_DETECTION_API_URI
 
 USER root
 
 ## Change the UID of airflow user to 1000
 RUN usermod -u 1000 airflow
 
-## Copy credentials of the form '{"admin":"<password>"}' to the auth manager file
-RUN --mount=type=secret,id=ADMIN_CREDENTIALS,mode=0444,required=true \
-    cat /run/secrets/ADMIN_CREDENTIALS > "${AIRFLOW_HOME}/simple_auth_manager_passwords.json"
-
 ## Copy DAGs, setup permissions
 COPY ./dags $AIRFLOW__CORE__DAGS_FOLDER
 RUN chown -R airflow $AIRFLOW__CORE__DAGS_FOLDER
-COPY ./simple_auth_manager_passwords.json "${AIRFLOW_HOME}/"
-RUN chown airflow "${AIRFLOW_HOME}/simple_auth_manager_passwords.json"
 
 ## Switch back to airflow user
 USER airflow
 
+
 ## Install dependencies
 COPY requirements.txt .
-RUN pip install apache-airflow==${AIRFLOW_VERSION} -r requirements.txt
+RUN pip install --no-cache-dir apache-airflow==${AIRFLOW_VERSION} \
+    apache-airflow-providers-fab \
+    -r requirements.txt
 
-# !!! test
-RUN ls /opt/airflow -la
-RUN ls /opt/airflow/dags -la
-
-## Setup the backend database
+## Setup the backend database and fetch DAGs
 # RUN airflow db reset -y
 RUN airflow db migrate
-
-## Fetch DAGs from files
 RUN airflow dags reserialize
 
 
@@ -54,6 +49,14 @@ USER root
 ## Connection to storage database
 RUN --mount=type=secret,id=AIRFLOW_CONN_TRANSACTION_DB,mode=0444,required=true \
     airflow connections add transaction_db --conn-uri $(cat /run/secrets/AIRFLOW_CONN_TRANSACTION_DB)
+
+## Create admin account
+RUN --mount=type=secret,id=ADMIN_PASSWORD,mode=0444,required=true \
+    airflow users create \
+    --firstname John --lastname Doe --email a@b.c \
+    --role Admin \
+    --username admin \
+    --password $(cat /run/secrets/ADMIN_PASSWORD)
 
 USER airflow
 

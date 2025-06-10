@@ -8,7 +8,6 @@ Check environment variables and API servers
 from airflow.sdk import DAG, Variable, task
 
 
-
 @task(task_id='check_variables')
 def chk_vars():
     """
@@ -21,11 +20,9 @@ def chk_vars():
     from airflow.hooks.base import BaseHook
     try:
         BaseHook.get_connection('transaction_db').get_uri()
-        # Variable.get('AIRFLOW_CONN_TRANSACTION_DB')
     except KeyError:
         raise KeyError('transaction and reference storage database connection '
                         '`transaction_db` is not set')
-                       #'`AIRFLOW_CONN_TRANSACTION_DB` is not set')
     try:
         Variable.get('TRANSACTIONS_API_URI')
     except KeyError:

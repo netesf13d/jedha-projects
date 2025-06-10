@@ -1,6 +1,3 @@
 # -*- coding: utf-8 -*-
-"""
 
-"""
-
-from .data import make_statement, fetch_data
+from .data_io import make_statement, fetch_data

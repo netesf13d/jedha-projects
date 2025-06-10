@@ -31,7 +31,7 @@ def test_get_fraud_detection_models(url: str = 'http://localhost:8000')-> list[s
     Examples
     --------
     >>> test_get_pricing_models('http://localhost:8000')
-    ['ridge-regression', 'gradient-boosting']
+    ['logistic-regression', 'random-forest', 'hist-gradient-boosting']
     """
     r = requests.get(f'{url}/pricing_models', timeout=3)
     r.raise_for_status()

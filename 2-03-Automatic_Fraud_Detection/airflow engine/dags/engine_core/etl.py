@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-TDOD doc
-!!!
+ETL processing utilities.
 """
 
+import logging
 from datetime import datetime
 
 import numpy as np
@@ -55,7 +55,14 @@ def merchant_features(transaction: dict, engine)-> dict:
         .filter_by(**merch_filt)
     )
     with Session(engine) as session:
-        merch_features = session.execute(statement).all()[0]
+        merch_features = session.execute(statement).all()
+    
+    try:
+        merch_features = merch_features[0]
+    except IndexError:
+        logging.error(f'no merchant corresponding to {merch_filt}')
+        raise
+    
     return {'merchant_id': merch_features[0],
             'merch_fraud_victim': merch_features[1]}
 
@@ -84,7 +91,14 @@ def customer_features(transaction: dict, engine)-> dict:
         .filter_by(**cust_filt)
     )
     with Session(engine, future=True) as session:
-        cust_features = session.execute(statement).all()[0]
+        cust_features = session.execute(statement).all()
+    
+    try:
+        cust_features = cust_features[0]
+    except IndexError:
+        logging.error(f'no merchant corresponding to {cust_filt}')
+        raise
+    
     return {'customer_id': cust_features[0],
             'cust_fraudster': cust_features[1]}
 

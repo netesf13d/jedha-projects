@@ -93,7 +93,7 @@ tags_metadata = [
      'description': 'Fraud detection model.'},
 ]
 
-contact = {'name': 'Jedha', 'url': 'https://jedha.co'}
+contact = {'name': 'John Doe'}
 
 
 app = FastAPI(

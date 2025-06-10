@@ -10,7 +10,13 @@ The pipeline produced is presented below. We train fraud detection models using 
 The SQL database contains reference tables containing merchants and customers information, along with a table that stores transaction events. The contents of the `transactions` table is accessed by a dashboard that provides analytics.
 
 <p align="center">
+    <img src="./media/pipeline.png" width="700" />
+    <em>image_caption</em>
+</p>
+
+<p align="center">
     <img src="./media/process_transaction_dag.png" width="600" />
+    <em>image_caption</em>
 </p>
 
 
@@ -19,10 +25,9 @@ The SQL database contains reference tables containing merchants and customers in
 This project repository is structured as follows.
 - The Jupyter notebook `Automatic_Fraud_Detection - study.ipynb` presents the study of the data: data analysis and model construction.
 - The directory `scripts` contains the study as a python script.
-- The directory `data` contains the relevant data for the project.
-- The file `requirements.txt` gives the list of the project dependencies.
+- The directory `train` contains scripts and utilities to dispatch the training of pricing models on AWS EC2 instances.
 - The directory `mlflow` contains !!!
 - The directory `api` contains !!!
-- The directory `engine` contains !!!
-- The directory `train` contains scripts and utilities to dispatch the training of pricing models on AWS EC2 instances. 
+- The directory `airflow_engine` contains !!!
+- The directory `dashboard` contains !!!
 - The directory `presentation` contains the slideshow for the exam, in both `odp` and `pdf` formats.
