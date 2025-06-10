@@ -96,7 +96,7 @@ def customer_features(transaction: dict, engine)-> dict:
     try:
         cust_features = cust_features[0]
     except IndexError:
-        logging.error(f'no merchant corresponding to {cust_filt}')
+        logging.error(f'no customer corresponding to {cust_filt}')
         raise
     
     return {'customer_id': cust_features[0],
