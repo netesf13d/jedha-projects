@@ -271,12 +271,28 @@ will perform very well.
 
 # %% Utils
 """
-# !!! 
-## <a id="preproc_utils"></a> Data preprocessing and utilities
+!!! Clean the section
+## <a id="utils"></a> Data preprocessing and utilities
 
 Before moving on to model construction and training, we first introduce here some utilities related to model evaluation. We also setup here the common parts of the training pipelines.
 
+### Preprocessing utilities
 
+
+"""
+
+def strip_diacritics(txt: str)-> str:
+    """
+    Remove all diacritics from words and characters forbidden in filenames.
+    """
+    norm_txt = unicodedata.normalize('NFD', txt)
+    shaved = ''.join(c for c in norm_txt
+                     if not unicodedata.combining(c))
+    return unicodedata.normalize('NFC', shaved)
+
+
+
+"""
 ### Model evaluation utilities
 
 We evaluate our classification models using metrics which are robust to the very high imbalance of fraud event occurences. These are derived from the confusion matrix:
@@ -306,11 +322,14 @@ def classification_metrics(y_true: np.ndarray,
 ## Dataframe to hold the results
 metric_names = ['precision', 'recall', 'F1-score']
 index = pd.MultiIndex.from_product(
-    [('Logistic regression', 'Random forest', 'hist gradient boosting'),
+    [('Logistic regression', 'MLP - TFIDF', 'GRU - characters'),
      ('train', 'test')],
     names=['model', 'eval. set'])
 evaluation_df = pd.DataFrame(
     np.full((6, 3), np.nan), index=index, columns=metric_names)
+
+
+
 
 
 
@@ -396,7 +415,7 @@ We set up a simple logistic regression here as a benchmark for comparison with m
 
 We keep things simple here: no parameter tuning or decision threshold adjustment.
 We split the dataset into a train and test set, the latter containing 20% of the observations.
-# We will retain this split for the rest of the project.
+We will retain this split for the rest of the project.
 """
 
 ## Simple train-test split, use the dataset with duplicates
@@ -405,11 +424,16 @@ X_tr, X_test, y_tr, y_test = train_test_split(
     test_size=0.2, stratify=df['is_spam'], random_state=SEED)
 
 ## pipeline
+base_lr = LogisticRegression(class_weight='balanced')
 pipeline = Pipeline([('column_preprocessing', StandardScaler()),
-                     ('classifier', LogisticRegression())])
+                     ('classifier', base_lr)])
 
-## training
+## train
+t0 = time.time()
 lr_model = pipeline.fit(X_tr, y_tr)
+t1 = time.time()
+print(f'Logistic regression model training in {t1-t0:.2f} s')
+
 
 """
 ### Interpretation
@@ -438,11 +462,18 @@ spam words introduce biases. This is especially the case for the masking of digi
 feature for the classifiation. The evaluation below thus certainly overestimates the performance. 
 """
 
-print('===== Train set metrics =====')
-print_metrics(confusion_matrix(y_tr, lr_model.predict(X_tr)))
+## evaluate of train set
+y_pred_tr = lr_model.predict(X_tr)
+_, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[0] = prec, recall, f1
 
-print('\n===== Test set metrics =====')
-print_metrics(confusion_matrix(y_test, lr_model.predict(X_test)))
+## evaluate on test set
+y_pred_test = lr_model.predict(X_test)
+_, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
+evaluation_df.iloc[1] = prec, recall, f1
+
+
+print(evaluation_df)
 
 """
 Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve this score.
@@ -469,15 +500,6 @@ Our tokenization will produce different tokens for words that have essentially t
 
 
 ## step 1: remove diacritics and preprocess
-def strip_diacritics(txt: str)-> str:
-    """
-    Remove all diacritics from words and characters forbidden in filenames.
-    """
-    norm_txt = unicodedata.normalize('NFD', txt)
-    shaved = ''.join(c for c in norm_txt
-                     if not unicodedata.combining(c))
-    return unicodedata.normalize('NFC', shaved)
-
 norm_msgs = df['message'].apply(strip_diacritics).apply(str.casefold)
 norm_msgs.head()
 
@@ -504,6 +526,11 @@ for i, msg in enumerate(corpus):
     msg = re.sub(r'\b[,\.\-\w]*\d[,\.\-\w]*\b', '<num>', msg) # replace numbers with `<num>`
     msg = re.sub(r'\s+', ' ', msg) # replace consecutive whitespaces with single whitespace
     preprocessed_corpus[i] = msg
+
+
+"""
+!!! This gives ...
+"""
 
 ##
 print(corpus[12])
@@ -554,7 +581,10 @@ mlp_model = MLPClassifier(hidden_layer_sizes=(1000, 300, 100, 10),
                           solver='adam', alpha=1e-1,
                           max_iter=300, random_state=SEED)
 
+t0 = time.time()
 mlp_model.fit(X_tr, y_tr)
+t1 = time.time()
+print(f'Multi-layer perceptron training in {t1-t0:.2f} s')
 
 
 # %%
@@ -562,11 +592,18 @@ mlp_model.fit(X_tr, y_tr)
 ### Model evaluation
 """
 
-print('===== Train set metrics =====')
-print_metrics(confusion_matrix(y_tr, mlp_model.predict(X_tr)))
+## evaluate of train set
+y_pred_tr = mlp_model.predict(X_tr)
+_, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[1] = prec, recall, f1
 
-print('\n===== Test set metrics =====')
-print_metrics(confusion_matrix(y_test, mlp_model.predict(X_test)))
+## evaluate on test set
+y_pred_test = mlp_model.predict(X_test)
+_, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
+evaluation_df.iloc[3] = prec, recall, f1
+
+
+print(evaluation_df)
 
 """
 The F1-score reaches a value of 93.1% on the test set, a significative improvement
@@ -683,9 +720,12 @@ gru_chars_model.compile(optimizer='nadam',
 
 # %%
 ##
+
+t0 = time.time()
 history = gru_chars_model.fit(ds_tr, epochs=50, validation_data=ds_val,
                               verbose=2, callbacks=[early_stop_cb])
-
+t1 = time.time()
+print(f'Gated recurrent unit model training in {t1-t0:.2f} s')
 
 # %%
 """
@@ -697,10 +737,10 @@ history = gru_chars_model.fit(ds_tr, epochs=50, validation_data=ds_val,
 x = history.epoch
 loss = history.history['loss']
 val_loss = history.history['val_loss']
-prec = np.array(history.history['precision_7'])
-val_prec = np.array(history.history['val_precision_7'])
-recall = np.array(history.history['recall_7'])
-val_recall = np.array(history.history['val_recall_7'])
+prec = np.array(history.history['precision'])
+val_prec = np.array(history.history['val_precision'])
+recall = np.array(history.history['recall'])
+val_recall = np.array(history.history['val_recall'])
 f1_score = 2 * prec*recall / (prec + recall)
 val_f1_score = 2 * val_prec*val_recall / (val_prec + val_recall)
 
