@@ -271,26 +271,47 @@ will perform very well.
 
 # %% Utils
 """
-## <a id="utils"></a> Utilities
+# !!! 
+## <a id="preproc_utils"></a> Data preprocessing and utilities
 
-We define here some utility functions
+Before moving on to model construction and training, we first introduce here some utilities related to model evaluation. We also setup here the common parts of the training pipelines.
+
+
+### Model evaluation utilities
+
+We evaluate our classification models using metrics which are robust to the very high imbalance of fraud event occurences. These are derived from the confusion matrix:
+- The precision
+- The recall
+- The F1 score
 """
 
-def print_metrics(cm: np.ndarray,
-                  print_cm: bool = True,
-                  print_precrec: bool = True)-> None:
+def classification_metrics(y_true: np.ndarray,
+                           y_pred: np.ndarray)-> None:
     """
-    Print metrics related to the confusion matrix: precision, recall, F1-score.
+    Helper function to evaluate and return the relevant evaluation metrics:
+        confusion matrix, precision, recall, F1-score
     """
+    cm = confusion_matrix(y_true, y_pred)
+    
     t = np.sum(cm, axis=1)[1]
     recall = (cm[1, 1] / t) if t != 0 else 1.
     t = np.sum(cm, axis=0)[1]
     prec = (cm[1, 1] / t) if t != 0 else 1.
-    if print_cm:
-        print("Confusion matrix\n", cm / np.sum(cm))
-    if print_precrec:
-        print(f'Precision: {prec:.8}; recall: {recall:.8}')
-    print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
+    f1 = 2*prec*recall/(prec+recall)
+    
+    return cm, prec, recall, f1
+
+
+
+## Dataframe to hold the results
+metric_names = ['precision', 'recall', 'F1-score']
+index = pd.MultiIndex.from_product(
+    [('Logistic regression', 'Random forest', 'hist gradient boosting'),
+     ('train', 'test')],
+    names=['model', 'eval. set'])
+evaluation_df = pd.DataFrame(
+    np.full((6, 3), np.nan), index=index, columns=metric_names)
+
 
 
 def plot_metrics(x: np.ndarray,

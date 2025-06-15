@@ -574,10 +574,8 @@ very high imbalance of fraud event occurences. These are derived from the confus
 - The F1 score
 """
 
-def eval_metrics(y_true: np.ndarray,
-                 y_pred: np.ndarray,
-                 print_cm: bool = False,
-                 print_f1: bool = False)-> None:
+def classification_metrics(y_true: np.ndarray,
+                           y_pred: np.ndarray)-> None:
     """
     Helper function to evaluate and return the relevant evaluation metrics:
         confusion matrix, precision, recall, F1-score
@@ -589,12 +587,6 @@ def eval_metrics(y_true: np.ndarray,
     t = np.sum(cm, axis=0)[1]
     prec = (cm[1, 1] / t) if t != 0 else 1.
     f1 = 2*prec*recall/(prec+recall)
-    
-    if print_cm:
-        print("Confusion matrix\n", cm / np.sum(cm))
-    if print_f1:
-        print(f'Precision: {prec:.8}; recall: {recall:.8}')
-        print(f'F1-score: {2*prec*recall/(prec+recall):.8}')
     
     return cm, prec, recall, f1
 
@@ -758,12 +750,12 @@ print(f'Logistic regression training in {t1-t0:.2f} s')
 
 ## evaluate of train set
 y_pred_tr = lr_model.predict(X_tr)
-_, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
+_, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
 evaluation_df.iloc[0] = prec, recall, f1
 
 ## evaluate on test set
 y_pred_test = lr_model.predict(X_test)
-_, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
+_, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
 evaluation_df.iloc[1] = prec, recall, f1
 
 # print(evaluation_df.loc['Logistic regression'])
@@ -882,12 +874,12 @@ print(f'Random forest model training in {t1-t0:.2f} s')
 
 ## evaluate of train set
 y_pred_tr = rf_model.predict(X_tr)
-_, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
+_, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
 evaluation_df.iloc[2] = prec, recall, f1
 
 ## evaluate on test set
 y_pred_test = rf_model.predict(X_test)
-_, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
+_, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
 evaluation_df.iloc[3] = prec, recall, f1
 
 # print(evaluation_df.loc['Random forest'])
@@ -1011,12 +1003,12 @@ print(f'Hist gradient boosting model training in {t1-t0:.2f} s')
 
 ## evaluate of train set
 y_pred_tr = hgb_model.predict(X_tr)
-_, prec, recall, f1 = eval_metrics(y_tr, y_pred_tr)
+_, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
 evaluation_df.iloc[4] = prec, recall, f1
 
 ## evaluate on test set
 y_pred_test = hgb_model.predict(X_test)
-_, prec, recall, f1 = eval_metrics(y_test, y_pred_test)
+_, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
 evaluation_df.iloc[5] = prec, recall, f1
 
 # print(evaluation_df.loc['Hist gradient boosting'])

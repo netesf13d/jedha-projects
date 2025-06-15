@@ -378,7 +378,7 @@ This is the value of the squared error loss at the model optimum.
 
 ##### Some utililties #####
 ## setup evaluation metrics
-def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
+def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray):
     """
     Helper function that evaluates the relevant evaluation metrics:
         MSE, RMSE, R-squared, MAE, MAPE
@@ -401,11 +401,11 @@ evaluation_df = pd.DataFrame(
 
 ## evaluate of train set
 y_pred_tr = linreg_model.predict(X_tr)
-evaluation_df.iloc[0] = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[0] = regression_metrics(y_tr, y_pred_tr)
 
 ## evaluate on test set
 y_pred_test = linreg_model.predict(X_test)
-evaluation_df.iloc[1] = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[1] = regression_metrics(y_test, y_pred_test)
 
 ##
 evaluation_df.loc['unregularized']
@@ -499,13 +499,13 @@ for i, alpha in enumerate(alphas):
     for itr, ival in cv.split(X_tr, y_tr):
         reg.fit(X_tr.iloc[itr], y_tr.iloc[itr])
         y_pred_v[ival] = reg.predict(X_tr.iloc[ival])
-    metrics[:, i] = eval_metrics(y_tr, y_pred_v)
+    metrics[:, i] = regression_metrics(y_tr, y_pred_v)
     
     # predict on full dataset to get regression coefficients
     reg.fit(X_tr, y_tr)
     coefs[:, i] = reg['regressor'].coef_
     # y_pred_v = reg.predict(X_tr)
-    # metrics[:, i] = eval_metrics(y_tr, y_pred_v)
+    # metrics[:, i] = regression_metrics(y_tr, y_pred_v)
 
 
 ## define best regularization parameter as the argmin of MAPE (see below)
@@ -628,11 +628,11 @@ lasso_model.fit(X_tr, y_tr)
 
 ## evaluate of train set
 y_pred_tr = lasso_model.predict(X_tr)
-evaluation_df.iloc[2] = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[2] = regression_metrics(y_tr, y_pred_tr)
 
 ## evaluate on test set
 y_pred_test = lasso_model.predict(X_test)
-evaluation_df.iloc[3] = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[3] = regression_metrics(y_test, y_pred_test)
 
 ##
 evaluation_df.loc['lasso']

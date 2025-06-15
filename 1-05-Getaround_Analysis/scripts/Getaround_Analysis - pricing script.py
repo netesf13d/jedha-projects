@@ -403,7 +403,7 @@ We evaluate our model using the following metrics:
 """
 
 ## Evaluation metrics helper function
-def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray):
+def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray):
     """
     Helper function that evaluates the relevant evaluation metrics:
         MSE, RMSE, R-squared, MAE, MAPE
@@ -535,11 +535,11 @@ ridge_model.fit(X_tr, y_tr)
 
 ## evaluate of train set
 y_pred_tr = ridge_model.predict(X_tr)
-evaluation_df.iloc[0] = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[0] = regression_metrics(y_tr, y_pred_tr)
 
 ## evaluate on test set
 y_pred_test = ridge_model.predict(X_test)
-evaluation_df.iloc[1] = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[1] = regression_metrics(y_test, y_pred_test)
 
 
 print(evaluation_df.loc['Ridge'])
@@ -694,11 +694,11 @@ gb_model.fit(X_tr, y_tr)
 
 ## evaluate of train set
 y_pred_tr = gb_model.predict(X_tr)
-evaluation_df.iloc[2] = eval_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[2] = regression_metrics(y_tr, y_pred_tr)
 
 ## evaluate on test set
 y_pred_test = gb_model.predict(X_test)
-evaluation_df.iloc[3] = eval_metrics(y_test, y_pred_test)
+evaluation_df.iloc[3] = regression_metrics(y_test, y_pred_test)
 
 print(evaluation_df)
 
