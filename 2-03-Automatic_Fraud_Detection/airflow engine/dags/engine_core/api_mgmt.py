@@ -6,7 +6,6 @@
 import json
 
 import httpx
-import numpy as np
 
 
 

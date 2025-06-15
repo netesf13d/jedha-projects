@@ -4,6 +4,10 @@ This project simulates a real-world business case at Stripe, a leading FinTech c
 
 The project consists in the design of detailed data models for OLTP, OLAP, and NoSQL systems, develop a unified data pipeline architecture, and propose strategies for performance optimization, data consistency, and system security. The project also requires to integrate machine learning workflows for use cases such as fraud detection and customer personalization. Deliverables include entity relationship diagrams, schema designs, pipeline blueprints, compliance strategies, and example queries—demonstrating end-to-end data engineering proficiency in a complex, high-stakes environment.
 
+<p align="center">
+    <img src="./Documentation/figures/architecture.png" width="700" />
+    <em>image_caption</em>
+</p>
 
 ## Structure of the project
 
