@@ -323,10 +323,10 @@ def classification_metrics(y_true: np.ndarray,
 metric_names = ['precision', 'recall', 'F1-score']
 index = pd.MultiIndex.from_product(
     [('Logistic regression', 'MLP - TFIDF', 'GRU - characters'),
-     ('train', 'test')],
+     ('train', 'validation', 'test')],
     names=['model', 'eval. set'])
 evaluation_df = pd.DataFrame(
-    np.full((6, 3), np.nan), index=index, columns=metric_names)
+    np.full((len(index), 3), np.nan), index=index, columns=metric_names)
 
 
 
@@ -404,6 +404,89 @@ def plot_metrics(x: np.ndarray,
     return fig, axs
 
 
+"""
+!!! 
+## <a id="text_preprocessing"></a> Data preprocessing and utilities
+
+Before moving on to model construction and training, we first introduce here some utilities related to model evaluation. We also setup here the common parts of the training pipelines.
+
+### Text preprocessing
+
+The text prepocessing proceeds in 4 steps:
+1. Remove diacritics and casefold the messages.
+2. Lemmatize words. However, we keep stop words as valid tokens.
+3. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
+Also discard the ham-specific token `<#>`.
+4. Finally, replace tokens with a single occurrence (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
+This processing is currently not available with scikit-learn `CountVectorizer`, so we do it manually.
+
+Most of the messages are written in [SMS language](https://en.wikipedia.org/wiki/SMS_language) with inconsistent style.
+Our tokenization will produce different tokens for words that have essentially the same meaning.
+"""
+
+
+## step 1: remove diacritics and preprocess
+norm_msgs = df['message'].apply(strip_diacritics).apply(str.casefold)
+norm_msgs.head()
+
+
+# %%
+
+## step 2: lemmatize words, remove punctuation
+nlp = spacy.load('en_core_web_sm')
+corpus = []
+for msg in norm_msgs:
+    doc = nlp(msg)
+    doc = ' '.join(wd.lemma_ for wd in doc if not wd.is_punct)
+                   # if wd.is_alpha and not wd.is_stop)
+    corpus.append(doc)
+corpus = np.array(corpus, dtype=object)
+
+
+# %%
+## step 3: replace numbers and specific tokens
+preprocessed_corpus = np.empty_like(corpus, dtype=object)
+for i, msg in enumerate(corpus):
+    msg = msg.replace(' < > ', '') # discard `< # >` token
+    msg = re.sub(r'< decimal >|< time >', '<num>', msg) # replace number masking tokens with `<num>`
+    msg = re.sub(r'\b[,\.\-\w]*\d[,\.\-\w]*\b', '<num>', msg) # replace numbers with `<num>`
+    msg = re.sub(r'\s+', ' ', msg) # replace consecutive whitespaces with single whitespace
+    preprocessed_corpus[i] = msg
+
+
+"""
+!!! This gives ...
+"""
+
+##
+print(corpus[12])
+print('----------')
+print(preprocessed_corpus[12])
+
+##
+print(corpus[802])
+print('----------')
+print(preprocessed_corpus[802])
+
+##
+print(corpus[2408])
+print('----------')
+print(preprocessed_corpus[2408])
+
+
+# %%
+
+## Step 4: manual handling of single words
+text = ' ## '.join(preprocessed_corpus)
+
+vocab, counts = np.unique(text.split(' '), return_counts=True)
+single_words = vocab[counts == 1]
+for wd in single_words:
+    text = text.replace(f' {wd} ', ' <oov> ')
+processed_corpus = np.array(text.split(' ## '), dtype=np.str_)
+
+
+
 # %% logreg
 """
 ## <a id="logreg"></a> Benchmarking with a logistic regression
@@ -470,11 +553,12 @@ evaluation_df.iloc[0] = prec, recall, f1
 ## evaluate on test set
 y_pred_test = lr_model.predict(X_test)
 _, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
-evaluation_df.iloc[1] = prec, recall, f1
+evaluation_df.iloc[2] = prec, recall, f1
 
 
 print(evaluation_df)
 
+sys.exit()
 """
 Not bad! We get a benchmark F1-score of about 0.9. Let us see if we can improve this score.
 """
@@ -550,7 +634,7 @@ print(preprocessed_corpus[2408])
 
 # %%
 
-## Step 4: manual handling of singwords
+## Step 4: manual handling of single words
 text = ' ## '.join(preprocessed_corpus)
 
 vocab, counts = np.unique(text.split(' '), return_counts=True)
@@ -595,12 +679,12 @@ print(f'Multi-layer perceptron training in {t1-t0:.2f} s')
 ## evaluate of train set
 y_pred_tr = mlp_model.predict(X_tr)
 _, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
-evaluation_df.iloc[1] = prec, recall, f1
+evaluation_df.iloc[3] = prec, recall, f1
 
 ## evaluate on test set
 y_pred_test = mlp_model.predict(X_test)
 _, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
-evaluation_df.iloc[3] = prec, recall, f1
+evaluation_df.iloc[5] = prec, recall, f1
 
 
 print(evaluation_df)
@@ -755,26 +839,26 @@ plt.show()
 
 
 # %%
-##
-print('===== Train set metrics =====')
+
+## evaluate of train set
 y_pred_tr = (gru_chars_model.predict(X_tr).ravel() > 0.5)
-print_metrics(confusion_matrix(y_tr, y_pred_tr))
+_, prec, recall, f1 = classification_metrics(y_tr, y_pred_tr)
+evaluation_df.iloc[6] = prec, recall, f1
 
-##
-print('===== Validation set metrics =====')
+## evaluate on validation set
 y_pred_val = (gru_chars_model.predict(X_val).ravel() > 0.5)
-print_metrics(confusion_matrix(y_val, y_pred_val))
+_, prec, recall, f1 = classification_metrics(y_val, y_pred_val)
+evaluation_df.iloc[7] = prec, recall, f1
 
-##
-print('\n===== Test set metrics =====')
+## evaluate on test set
 y_pred_test = (gru_chars_model.predict(X_test).ravel() > 0.5)
-print_metrics(confusion_matrix(y_test, y_pred_test))
+_, prec, recall, f1 = classification_metrics(y_test, y_pred_test)
+evaluation_df.iloc[8] = prec, recall, f1
 
 
 """
 !!!
 """
-
 
 # %% GRU words
 """
@@ -787,7 +871,8 @@ print_metrics(confusion_matrix(y_test, y_pred_test))
 The text prepocessing is similar to that of the TF-IDF encoding:
 1. Remove diacritics and casefold the messages.
 2. Lemmatize words, keep stop words as valid tokens.
-3. Replace tokens containing digits with a special token `'<num>'`. This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
+3. Replace tokens containing digits with a special token `'<num>'`.
+This includes the tokens `<DECIMAL>` and `<TIME>` from hams.
 Also discard the ham-specific token `<#>`.
 4. Finally, replace tokens with a single occurrence (including the ham-specific token `<URL>`) with an out-of-vocabulary token (`<oov>`).
 This processing is currently not available with scikit-learn `CountVectorizer`, so we do it manually.
